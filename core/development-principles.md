@@ -66,6 +66,81 @@ Before responding, ask yourself:
    - Address security, performance, and maintenance considerations
    - Highlight potential pitfalls and common mistakes to avoid
 
+## Complete Impact Analysis Protocol
+
+**CRITICAL**: When making ANY code change (renaming, refactoring, adding/removing parameters, etc.), ALWAYS perform complete impact analysis.
+
+### The Three-Step Change Protocol
+
+#### 1️⃣ BEFORE Making Changes - Find ALL References
+
+- Use `grep` or `codebase_search` to find **EVERY occurrence** of what you're changing
+- Check ALL file types that might reference it (code, configs, docs, tests, workflows)
+- Identify: definitions, callers, consumers, documentation, tests
+- Create a mental map: **"What depends on this?"**
+
+```bash
+# Find all occurrences before making changes
+grep -r "parameter_name" . --exclude-dir=node_modules --exclude-dir=.git
+```
+
+#### 2️⃣ DURING Changes - Update ALL Locations
+
+- **Don't just update the obvious file you're looking at**
+- Update ALL locations found in step 1
+- Check cross-file dependencies (imports, calls, configs)
+- For parameters/interfaces: update **both providers AND consumers**
+
+**Common mistake**: Updating the definition but forgetting the callers, or vice versa.
+
+#### 3️⃣ AFTER Changes - Verify Completeness
+
+- **Grep for the OLD name** - should return ZERO results (except comments/docs explaining the change)
+- Check for indirect references (docs, comments, variable names that might reference it)
+- Run linters if available
+- Ask: **"What would break if I deployed this right now?"**
+
+```bash
+# This should return NOTHING after your change is complete:
+grep -r "OLD_NAME" . --exclude-dir=node_modules --exclude-dir=.git
+```
+
+### 🔴 The Key Principle
+
+> **A change is NEVER complete until you've verified the old reference no longer exists anywhere in the system (except historical docs/comments).**
+
+### 🚨 Red Flags Requiring Deeper Analysis
+
+Changes that REQUIRE complete impact analysis:
+
+- Renaming anything used across multiple files
+- Changing function/API signatures
+- Modifying config keys or environment variables
+- Updating workflow parameters or action inputs
+- Refactoring shared utilities or constants
+- Changing database column names or table names
+- Modifying API endpoint paths or parameter names
+
+### ✅ The Final Grep Test
+
+```bash
+# This should return NOTHING after your change is complete:
+grep -r "OLD_NAME" . --exclude-dir=node_modules --exclude-dir=.git
+
+# If it returns results (excluding docs/comments), your change is INCOMPLETE.
+```
+
+### 📋 Impact Analysis Checklist
+
+- [ ] Found ALL occurrences of what I'm changing
+- [ ] Identified ALL file types that reference it (code, configs, docs, tests)
+- [ ] Updated ALL definitions
+- [ ] Updated ALL callers/consumers
+- [ ] Updated ALL documentation
+- [ ] Verified old name returns ZERO grep results
+- [ ] Ran linters/tests
+- [ ] Asked: "What would break if deployed now?"
+
 ## Implementation Requirements
 
 ### Gather Actual Evidence

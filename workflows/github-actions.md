@@ -56,6 +56,103 @@ Test complete user journeys, not just isolated steps:
 - Test both success and failure scenarios
 - Ensure validation paths work the same as deployment paths
 
+#### 6. Parameter Renaming Protocol
+
+**CRITICAL**: When renaming workflow inputs, parameters, or variables in GitHub Actions, you MUST update multiple locations.
+
+**The GitHub Actions Quirk**: GitHub Actions have a two-tier system:
+
+1. **Workflow files** (`.github/workflows/*.yaml`) - where parameters are **PASSED**
+2. **Action files** (`.github/actions/*/action.yml`) - where parameters are **DEFINED** as inputs
+
+**A single parameter rename requires changes in BOTH locations!**
+
+##### The Complete Rename Process
+
+###### Step 1: Search BOTH Callers AND Definitions
+
+```bash
+# Search across ALL GitHub Actions files
+grep -r "parameter_name" .github/ --include="*.yml" --include="*.yaml"
+```
+
+You must check:
+
+- ✅ **Workflow files** (`.github/workflows/*.yaml`) - where parameters are PASSED
+- ✅ **Action files** (`.github/actions/*/action.yml`) - where parameters are DEFINED as inputs
+- ✅ **Reusable workflows** - which may also define/use the parameter
+- ✅ **Documentation** - references to the parameter
+
+###### Step 2: Update ALL Locations
+
+Update the parameter name in:
+
+1. **Action input definitions** (`.github/actions/*/action.yml`):
+
+   ```yaml
+   inputs:
+     old_parameter_name:  # ← Change this
+       description: "..."
+   ```
+
+2. **Action input references** within the same action file:
+
+   ```yaml
+   run: |
+     echo "${{ inputs.old_parameter_name }}"  # ← Change this
+   ```
+
+3. **Workflow files** that call the action:
+
+   ```yaml
+   - uses: ./.github/actions/my-action
+     with:
+       old_parameter_name: value  # ← Change this
+   ```
+
+4. **Workflow inputs** (if applicable):
+
+   ```yaml
+   on:
+     workflow_dispatch:
+       inputs:
+         old_parameter_name:  # ← Change this
+   ```
+
+###### Step 3: Verify ZERO Old References Remain
+
+```bash
+# This should return NOTHING:
+grep -r "old_parameter_name" .github/
+
+# This should show all the NEW references:
+grep -r "new_parameter_name" .github/
+```
+
+##### Common Mistake
+
+**Mistake**: Updating the workflow files but forgetting the action definition file.
+
+**Result**: The workflow passes `new_parameter_name`, but the action expects `old_parameter_name`, resulting in an empty value.
+
+**Example Error**:
+
+```text
+Warning: Unexpected input(s) 'new_parameter_name', valid inputs are ['old_parameter_name', ...]
+```
+
+##### Quick Reference Checklist
+
+- [ ] Found ALL occurrences in `.github/` directory
+- [ ] Updated action input definitions (`.github/actions/*/action.yml`)
+- [ ] Updated action input references within action files
+- [ ] Updated workflow files that call the action
+- [ ] Updated workflow input definitions (if applicable)
+- [ ] Updated any reusable workflow definitions
+- [ ] Updated documentation
+- [ ] Verified old parameter name returns ZERO grep results
+- [ ] Ran workflow syntax validation
+
 ### Project-Specific Standards
 
 #### Version Pinning
