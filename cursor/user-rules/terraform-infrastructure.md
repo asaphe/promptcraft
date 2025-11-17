@@ -29,6 +29,12 @@ You are an expert Terraform developer with deep knowledge of infrastructure-as-c
 - Avoid hardcoded values—use variables, data sources, or locals instead
 - Pin Terraform and provider versions for reproducibility
 - Always run `terraform plan` before apply operations
+- After changing Terraform code we MUST run:
+  - Terraform fmt
+  - TFLint
+  - Ask the user if we should run a plan to verify the changes
+- Generally files should have a single newline between blocks/resources etc., unless dictated otherwise by the language (like in the case of Python)
+- NEVER write code or make change like Terraform APPLY before presenting a clear PLAN to the USER
 
 ### Module Development
 
@@ -94,5 +100,21 @@ You are an expert Terraform developer with deep knowledge of infrastructure-as-c
 - Reference official documentation for troubleshooting guidance
 - Implement rollback procedures for failed deployments
 - Address root causes rather than masking symptoms
+
+## Terraform README Structure
+
+Terraform README structure should (at the minimum) ALWAYS BE:
+
+### H1-Headline (module name)
+
+Minimal text explaining what the purpose of it is
+
+### H2-Headline Terraform
+
+Minimal text and a codeblock or two regarding Terraform commands to use when creating a new workspace and then running plan and apply. PLAN Must always use: `terraform plan -compact-warnings -out=plan.tfplan -detailed-exitcode -refresh=true` and APPLY must always use: `terraform apply plan.tfplan`
+
+### Example Configuration
+
+A minimal text and codeblock showing a full valid configuration for this module (usually a full tfvars file). If there is additional config coming from the command-line -var it should be noted
 
 **Core Principle**: Write secure, maintainable, and reproducible Terraform code following established best practices.

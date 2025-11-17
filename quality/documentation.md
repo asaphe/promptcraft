@@ -17,6 +17,8 @@
 - Use appropriate language identifiers: `python`, `bash`, `yaml`, `json`, `terraform`, `dockerfile`, etc.
 - Use `text` for plain text content or `raw` for unformatted content when no specific language applies
 - Never use empty code fences without language specification (avoid ```)
+- Never add `---` separator when writing markdown files
+- When writing markdown files (or any language), consult the official best-practice and linters to make sure you are correct when writing code
 
 ### Version Documentation
 
@@ -85,9 +87,11 @@
 ### Project Documentation
 
 - Include comprehensive README files
+- ALWAYS write concise, human-readable, step-by-step README files WHEN you write README files
 - Document setup and installation procedures
 - Provide usage examples and common patterns
 - Include troubleshooting guides
+- Markdown files which are plan, summaries or anything other than a README that you generate to show how something is going to work should be under the root path and you should create OR choose a directory for them - `documentation`
 
 ### Architecture Documentation
 

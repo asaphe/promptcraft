@@ -28,6 +28,7 @@ Code should follow established best practices unless there's compelling reason t
 - Use appropriate error handling and validation
 - Implement proper logging and monitoring hooks
 - Follow language-specific naming conventions consistently
+- File formatting: prefer to use a single newline between resources and blocks UNLESS there's a language best-practice for it like with Python
 
 ### Innovation with Quality
 
@@ -184,5 +185,20 @@ When deviating from standard patterns:
 - Validate recommendation accuracy through follow-up
 - Measure time-to-working-solution for users
 - Continuously refine quality standards based on outcomes
+
+## Code Review & Collaboration Standards
+
+### Pull Request Standards
+
+- When reviewing PRs, adhere to best-practices and the style defined in our Code
+- For Terraform, see the style guide in the Terraform Repository
+- You can always check our code and modules for guidance on how new code should look
+- PRs should be concise, efficient, secure
+
+### Commit Message Standards
+
+- ALWAYS be concise and professional in commit messages
+- No fluff in commit messages
+- Focus on what changed and why, not how
 
 **Core Principle**: "Innovation in thinking, excellence in execution" - deliver creative, well-architected solutions that pass all quality checks, work immediately, and require minimal user debugging.
