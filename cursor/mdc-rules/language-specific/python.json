@@ -1,0 +1,47 @@
+{
+  "name": "Python Coding Standards",
+  "description": "Enforces Python coding standards and PEP 8 compliance. Based on language-standards.md",
+  "version": "1.0.0",
+  "author": "Promptcraft",
+  "filePattern": "*.py",
+  "exclude": [
+    "__pycache__/**",
+    "*.pyc",
+    "venv/**",
+    ".venv/**",
+    "**/test_*.py",
+    "**/*_test.py"
+  ],
+  "rules": [
+    {
+      "pattern": "^def\\s+[a-z][a-z0-9_]*",
+      "filePattern": "*.py",
+      "message": "Python functions must use snake_case naming",
+      "severity": "error"
+    },
+    {
+      "pattern": "^class\\s+[A-Z]",
+      "filePattern": "*.py",
+      "message": "Python classes must use PascalCase naming",
+      "severity": "error"
+    },
+    {
+      "pattern": "^[A-Z][A-Z0-9_]*\\s*=",
+      "filePattern": "*.py",
+      "message": "Python constants must use UPPER_CASE",
+      "severity": "warning"
+    },
+    {
+      "pattern": "\"\"\".*\"\"\"",
+      "filePattern": "*.py",
+      "message": "Public functions should have docstrings following numpy/google style",
+      "severity": "warning"
+    },
+    {
+      "pattern": "->\\s*:",
+      "filePattern": "*.py",
+      "message": "Public functions should use type hints",
+      "severity": "warning"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "name": "Universal Naming Conventions",
+  "description": "Enforces safe, portable identifier naming across all languages and tools. Based on universal naming rule from general-principles.md",
+  "version": "1.0.0",
+  "author": "Promptcraft",
+  "exclude": [
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    "**/*.test.*",
+    "**/*.spec.*"
+  ],
+  "rules": [
+    {
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+      "filePattern": "*.{ts,tsx,js,jsx,py,java,go,sh,bash,yaml,yml,json,tf}",
+      "message": "Identifiers (variables, parameters, function names) must use only alphanumeric characters and underscores, starting with a letter. Never use hyphens, dots, or spaces. Valid: deployment_name, userId, max_retry_count. Invalid: deployment-name, user.id, max retries",
+      "severity": "error"
+    },
+    {
+      "pattern": "\\b[a-z][a-zA-Z0-9_]*\\b",
+      "filePattern": "*.{ts,tsx,js,jsx}",
+      "message": "TypeScript/JavaScript variables and functions should use camelCase",
+      "severity": "warning"
+    },
+    {
+      "pattern": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+      "filePattern": "*.{ts,tsx,js,jsx,java,go}",
+      "message": "Classes and types should use PascalCase",
+      "severity": "warning"
+    },
+    {
+      "pattern": "\\b[A-Z][A-Z0-9_]*\\b",
+      "filePattern": "*.{py,sh,bash,go}",
+      "message": "Constants should use UPPER_CASE",
+      "severity": "warning"
+    },
+    {
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "filePattern": "*.py",
+      "message": "Python variables and functions should use snake_case",
+      "severity": "warning"
+    }
+  ]
+}

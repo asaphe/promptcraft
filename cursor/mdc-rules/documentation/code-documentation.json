@@ -1,0 +1,33 @@
+{
+  "name": "Code Documentation Requirements",
+  "description": "Enforces code documentation standards. Based on code-quality.md and language-standards.md",
+  "version": "1.0.0",
+  "author": "Promptcraft",
+  "exclude": [
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    "**/*.test.*",
+    "**/*.spec.*"
+  ],
+  "rules": [
+    {
+      "pattern": "/\\*\\*[\\s\\S]*?\\*/",
+      "filePattern": "*.{ts,tsx,js,jsx}",
+      "message": "TypeScript/JavaScript files should have JSDoc documentation for public functions",
+      "severity": "warning"
+    },
+    {
+      "pattern": "\"\"\".*\"\"\"",
+      "filePattern": "*.py",
+      "message": "Python public functions should have docstrings",
+      "severity": "warning"
+    },
+    {
+      "pattern": "^//",
+      "filePattern": "*.{ts,tsx,js,jsx,go,java}",
+      "message": "Complex business logic should have explanatory comments",
+      "severity": "info"
+    }
+  ]
+}

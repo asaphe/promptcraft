@@ -1,0 +1,37 @@
+{
+  "name": "File Naming Conventions",
+  "description": "Enforces consistent file naming across different languages. Based on language-standards.md",
+  "version": "1.0.0",
+  "author": "Promptcraft",
+  "exclude": [
+    "node_modules/**",
+    "dist/**",
+    "build/**"
+  ],
+  "rules": [
+    {
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*\\.(ts|tsx|js|jsx)$",
+      "filePattern": "*.{ts,tsx,js,jsx}",
+      "message": "TypeScript/JavaScript files must use kebab-case (e.g., user-profile.tsx, api-client.ts)",
+      "severity": "error"
+    },
+    {
+      "pattern": "^[a-z][a-z0-9_]*\\.py$",
+      "filePattern": "*.py",
+      "message": "Python files must use snake_case (e.g., user_profile.py, api_client.py)",
+      "severity": "error"
+    },
+    {
+      "pattern": "^[a-z][a-z0-9_]*\\.(sh|bash)$",
+      "filePattern": "*.{sh,bash}",
+      "message": "Bash scripts should use snake_case with descriptive names (e.g., backup_files.sh, log_rotation.sh)",
+      "severity": "warning"
+    },
+    {
+      "pattern": "^[a-z][a-z0-9_]*\\.go$",
+      "filePattern": "*.go",
+      "message": "Go files should use lowercase with no separators (e.g., userprofile.go, apiclient.go)",
+      "severity": "warning"
+    }
+  ]
+}

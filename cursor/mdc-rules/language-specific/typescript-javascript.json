@@ -1,0 +1,46 @@
+{
+  "name": "TypeScript/JavaScript Standards",
+  "description": "Enforces TypeScript and JavaScript coding standards. Based on language-standards.md",
+  "version": "1.0.0",
+  "author": "Promptcraft",
+  "filePattern": "*.{ts,tsx,js,jsx}",
+  "exclude": [
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    "**/*.test.*",
+    "**/*.spec.*"
+  ],
+  "rules": [
+    {
+      "pattern": "\\bany\\b",
+      "filePattern": "*.{ts,tsx}",
+      "message": "Avoid the 'any' type completely. Use proper TypeScript types.",
+      "severity": "error"
+    },
+    {
+      "pattern": "^\\s*function\\s+[a-z]",
+      "filePattern": "*.{ts,tsx,js,jsx}",
+      "message": "Prefer standard function declarations over arrow functions for named functions",
+      "severity": "warning"
+    },
+    {
+      "pattern": "\\?\\.",
+      "filePattern": "*.{ts,tsx,js,jsx}",
+      "message": "Use optional chaining (?.) and nullish coalescing (??) operators appropriately",
+      "severity": "info"
+    },
+    {
+      "pattern": "interface\\s+[A-Z]",
+      "filePattern": "*.{ts,tsx}",
+      "message": "Interfaces should use PascalCase and start with capital letter",
+      "severity": "warning"
+    },
+    {
+      "pattern": "^import\\s+.*\\s+from\\s+['\"]",
+      "filePattern": "*.{ts,tsx,js,jsx}",
+      "message": "Imports must be at the top of the file",
+      "severity": "error"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "Code Formatting Standards",
+  "description": "Enforces consistent code formatting and structure. Based on code-quality.md and language-standards.md",
+  "version": "1.0.0",
+  "author": "Promptcraft",
+  "exclude": [
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    "**/*.test.*",
+    "**/*.spec.*"
+  ],
+  "rules": [
+    {
+      "pattern": "^import.*from",
+      "filePattern": "*.{ts,tsx,js,jsx}",
+      "message": "Imports must be at the top of the file",
+      "severity": "error"
+    },
+    {
+      "pattern": "^['\"]",
+      "filePattern": "*.{ts,tsx,js,jsx}",
+      "message": "TypeScript/JavaScript should use single quotes for string literals",
+      "severity": "warning"
+    },
+    {
+      "maxLines": 500,
+      "filePattern": "*.{ts,tsx,js,jsx,py,java,go}",
+      "message": "Files should not exceed 500 lines. Consider splitting into smaller modules.",
+      "severity": "warning"
+    },
+    {
+      "pattern": "\\s+$",
+      "filePattern": "*.{ts,tsx,js,jsx,py,java,go,sh,bash}",
+      "message": "No trailing whitespace allowed",
+      "severity": "error"
+    }
+  ]
+}
