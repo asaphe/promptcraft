@@ -190,6 +190,91 @@ Warning: Unexpected input(s) 'new_parameter_name', valid inputs are ['old_parame
 - Use if: guards to prevent unnecessary execution (e.g., if: github.ref == 'refs/heads/main')
 - Use OIDC-based short-lived tokens for cloud access
 
+#### Mandatory Linting & Validation Protocol
+
+**CRITICAL**: Before committing ANY workflow or Dockerfile changes, you MUST run appropriate linting and validation tools.
+
+##### GitHub Actions Workflow Validation
+
+1. **actionlint** - Validates workflow syntax and best practices:
+
+   ```bash
+   actionlint .github/workflows/workflow-name.yaml
+   ```
+
+   - Fix all errors (except expected self-hosted runner label warnings)
+   - Common issues: invalid context usage (e.g., `secrets` in matrix `env`), syntax errors, undefined variables
+
+2. **YAML Syntax Validation** - Verify YAML is well-formed:
+
+   ```bash
+   yq eval 'true' .github/workflows/workflow-name.yaml
+   ```
+
+   - Ensures YAML parsing works correctly
+   - Catches indentation and syntax errors
+
+3. **Command Output Verification**:
+   - **ALWAYS check command output** - Don't guess at issues
+   - Read error messages carefully before making assumptions
+   - Verify actual error vs. expected behavior
+   - Example: If `act` fails, check if it's YAML syntax, Docker socket, or workflow logic
+
+##### Dockerfile Validation
+
+1. **hadolint** - Lints Dockerfiles for best practices:
+
+   ```bash
+   hadolint path/to/Dockerfile
+   ```
+
+   - Must pass with zero errors
+   - Checks for security issues, best practices, and common mistakes
+   - Run on all Dockerfiles before committing
+
+2. **Multi-stage Build Validation**:
+   - Verify ARG declarations are in correct stages
+   - Ensure ARGs are re-declared in stages where needed
+   - Check ENV variables are set in appropriate stages
+   - Validate build-args are passed correctly from workflow
+
+##### Build-Args & Conditional Syntax Validation
+
+When using conditional build-args in workflows:
+
+1. **Always use `|| ''` fallback** to prevent `false` values:
+
+   ```yaml
+   # ✅ Correct
+   ${{ matrix.language == 'typescript' && 'NODE_ENV=production' || '' }}
+
+   # ❌ Wrong - returns 'false' string when condition is false
+   ${{ matrix.language == 'typescript' && 'NODE_ENV=production' }}
+   ```
+
+2. **Test conditional evaluation**:
+   - Verify conditionals return expected values for all matrix combinations
+   - Use `act` or test workflows to validate actual output
+   - Check that empty strings are handled correctly by Docker build action
+
+3. **Secrets Context Limitations**:
+   - `secrets` context is NOT available in matrix `env` definitions
+   - Pass secrets via build-args or step-level `env` instead
+   - Example: Use `build-args` for Docker secrets, not matrix `env`
+
+##### Validation Checklist
+
+Before committing workflow/Dockerfile changes:
+
+- [ ] `actionlint` passes (or only expected warnings)
+- [ ] `yq` validates YAML syntax
+- [ ] `hadolint` passes for all Dockerfiles
+- [ ] All conditional expressions use `|| ''` fallback
+- [ ] No `secrets` context in matrix definitions
+- [ ] Build-args tested with `act` or validated manually
+- [ ] Command outputs checked and verified (not guessed)
+- [ ] ARG/ENV properly scoped in Dockerfile stages
+
 ### Workflow Patterns
 
 - Use path-based change detection with dorny/paths-filter
