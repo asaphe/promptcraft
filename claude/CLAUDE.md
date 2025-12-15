@@ -7,9 +7,11 @@
 
 ---
 
-**ALWAYS SPECIFY WHICH MODEL GAVE THE ANSWER AND THE CONFIDENCE LEVEL**
+## General
 
-**DO NOT LEAVE OBVIOUS COMMENTS IN THE CODE**
+1. **ALWAYS SPECIFY WHICH MODEL GAVE THE ANSWER AND THE CONFIDENCE LEVEL**
+2. **DO NOT LEAVE OBVIOUS COMMENTS IN THE CODE**
+3. Consider the benefits for the 12-Factor App design architecture when designing systems. <https://12factor.net/>
 
 ## Quick Reference Summary
 
