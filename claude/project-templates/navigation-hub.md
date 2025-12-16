@@ -1,6 +1,6 @@
-# CLAUDE.md
+# CLAUDE.md - Navigation Hub Template
 
-This directory contains comprehensive guidance for Claude Code (claude.ai/code).
+This directory contains comprehensive guidance for Claude Code (claude.ai/code) when working in your repository.
 
 ---
 
@@ -12,9 +12,9 @@ This directory contains comprehensive guidance for Claude Code (claude.ai/code).
 
 Essential guide for daily development work:
 
-- **Essential Commands** - Python, TypeScript, Java, build commands
+- **Essential Commands** - Language-specific commands, build tools
 - **Architecture Overview** - Monorepo structure, key patterns
-- **Technology Stack** - Python 3.12, TypeScript/Node 22+, Java 21, Go
+- **Technology Stack** - Languages, frameworks, tools
 - **Local Development** - Docker Compose, environment setup
 - **Common Workflows** - Adding services, debugging, testing
 
@@ -43,7 +43,7 @@ Focused guidance for workflow development:
 - Mandatory testing protocols (act, path validation)
 - Project-specific patterns (change detection, container builds)
 - Deployment workflows and security integration
-- AWS integration patterns
+- Cloud provider integration patterns
 - Troubleshooting workflows
 
 **Use when:** Working in `.github/workflows/`
@@ -54,8 +54,8 @@ Infrastructure and deployment guidance:
 
 - Terraform module organization and standards
 - Kubernetes & Helm best practices
-- Container standards and ECR management
-- AWS resources and IAM patterns
+- Container standards and registry management
+- Cloud resources and IAM patterns
 - Monitoring and troubleshooting
 
 **Use when:** Working in `devops/terraform/` or `devops/helm-reusable-chart/`
@@ -118,7 +118,7 @@ Project-level rules for Cursor IDE in `.mdc` format:
 ### Security
 
 - Never hardcode secrets, API keys, or sensitive data
-- Use proper secret management (AWS Secrets Manager, External Secrets Operator)
+- Use proper secret management (cloud-native secret managers, External Secrets Operator)
 - Apply principle of least privilege for all access patterns
 - Pin versions for reproducibility (actions, base images, providers)
 
@@ -132,38 +132,38 @@ Project-level rules for Cursor IDE in `.mdc` format:
 
 ---
 
-## Technology Stack
+## Technology Stack Example
 
 **Backend Services:**
 
-- Python 3.12.8 (Poetry, FastAPI, Dagster, Celery, Temporal)
-- TypeScript/Node.js 22+ (pnpm, NestJS, React 19)
-- Java 21 (Maven, Spring Boot, Flowable)
+- Python (Poetry, FastAPI, async frameworks)
+- TypeScript/Node.js (pnpm, frameworks, React)
+- Java (Maven/Gradle, Spring Boot)
 - Go (High-performance services)
 
 **Infrastructure:**
 
-- AWS (EKS, ECR, RDS, S3, Secrets Manager)
-- Kubernetes (Helm charts, ArgoCD)
-- Terraform (~40 modules)
+- Cloud Provider (EKS/GKE, Container Registry, Databases, Object Storage, Secret Management)
+- Kubernetes (Helm charts, GitOps tools)
+- Terraform (Infrastructure modules)
 - Docker (Multi-stage builds)
 
 **Databases:**
 
-- PostgreSQL 17 (Multiple logical databases)
-- ClickHouse 25.9.3 (Analytics)
-- RabbitMQ 4.1.0, AWS SQS (Messaging)
+- PostgreSQL (Multiple logical databases)
+- Analytics Database (ClickHouse, BigQuery, etc.)
+- Message Queues (RabbitMQ, Cloud-native queues)
 
 ---
 
-## Architecture Patterns
+## Architecture Patterns Example
 
-1. **Event-Driven** - Async communication via SQS queues
+1. **Event-Driven** - Async communication via message queues
 2. **Multi-Database** - Separate logical databases for domains
-3. **Microservices** - ~40 services across 4 languages
+3. **Microservices** - Multiple services across different languages
 4. **Schema-Driven** - JSON schemas as single source of truth
-5. **Infrastructure as Code** - All AWS resources via Terraform
-6. **GitOps** - Declarative K8s deployments via ArgoCD
+5. **Infrastructure as Code** - All cloud resources via Terraform
+6. **GitOps** - Declarative deployments via GitOps tools
 
 ---
 
@@ -185,6 +185,6 @@ Project-level rules for Cursor IDE in `.mdc` format:
 
 ---
 
-**Model**: Claude Sonnet 4.5
+**Template Version**: 1.0
+**Based on**: Real-world monorepo implementation
 **Last Updated**: 2025-12-16
-**Version**: 2.0 (Reorganized with selective git tracking)
