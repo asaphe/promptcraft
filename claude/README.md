@@ -132,6 +132,47 @@ Ready-to-customize documentation templates for your repository:
 
 **Note:** Cursor IDE rules are maintained separately in `../cursor/mdc-rules/` directory. A Kubernetes/Helm rule has been added there.
 
+## Context Window Optimization
+
+Claude Code auto-loads all `CLAUDE.md` files into every conversation's context window. Bloated CLAUDE.md files directly reduce the space available for actual work, causing frequent conversation compactions.
+
+### Principle: Auto-load rules, on-demand reference
+
+- **Auto-loaded (`CLAUDE.md`)**: Only behavioral rules, constraints, and coding standards that Claude must follow in every conversation
+- **On-demand (`.claude/docs/`)**: Reference material (build commands, architecture details, environment variables) that Claude reads only when needed
+
+### What belongs in CLAUDE.md (auto-loaded)
+
+- Code standards (type safety, naming conventions, patterns)
+- Safety rules (dangerous commands, commit policies)
+- Short pointers to on-demand docs: `For build commands, read .claude/docs/build-commands.md`
+
+### What belongs in .claude/docs/ (on-demand)
+
+- Build commands and local dev setup
+- Architecture overviews and directory structure
+- Technology stack details and version info
+- Environment variable references
+- AWS account details, profile mappings
+
+### settings.local.json cleanup
+
+The `settings.local.json` file accumulates one-off permission entries every time you approve a Bash command. Over time, this can grow to 30KB+ and is loaded into every conversation. Periodically replace specific entries with broad wildcards:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(terraform:*)",
+      "Bash(kubectl:*)",
+      "Bash(helm:*)",
+      "Bash(aws:*)",
+      "Bash(git:*)"
+    ]
+  }
+}
+```
+
 ## Usage Guide
 
 ### Setting Up a New Repository
@@ -139,22 +180,23 @@ Ready-to-customize documentation templates for your repository:
 1. **Create `.claude/` directory structure:**
 
    ```bash
-   mkdir -p .claude/specs
+   mkdir -p .claude/specs .claude/docs
    ```
 
-2. **Copy navigation hub:**
+2. **Copy navigation hub (minimal, rules-only):**
 
    ```bash
    cp claude/project-templates/navigation-hub.md .claude/CLAUDE.md
    ```
 
-3. **Copy codebase guide:**
+3. **Copy reference docs (on-demand, not auto-loaded):**
 
    ```bash
-   cp claude/project-templates/codebase-guide-template.md .claude/CODEBASE.md
+   cp claude/project-templates/codebase-guide-template.md .claude/docs/codebase.md
+   cp claude/project-templates/devops-infrastructure-guide.md .claude/docs/infrastructure.md
    ```
 
-4. **Copy CI/CD spec:**
+4. **Copy CI/CD spec (on-demand):**
 
    ```bash
    cp claude/specs/ci-cd-specification.md .claude/specs/
@@ -163,13 +205,12 @@ Ready-to-customize documentation templates for your repository:
 5. **Customize the files:**
    - Replace all `<placeholder>` values
    - Update service names, paths, and commands
-   - Add project-specific sections
+   - Keep CLAUDE.md lean — move reference material to `docs/`
 
 6. **Add directory-specific guides:**
 
    ```bash
    cp claude/project-templates/github-actions-guide.md .github/CLAUDE.md
-   cp claude/project-templates/devops-infrastructure-guide.md devops/CLAUDE.md
    ```
 
 7. **Set up selective git tracking:**
@@ -231,12 +272,13 @@ Common placeholders used in templates:
 
 ## Best Practices
 
-1. **Start with navigation hub** - Use `navigation-hub.md` as your `.claude/CLAUDE.md`
-2. **Progressive disclosure** - Link to detailed guides from the hub
+1. **Keep CLAUDE.md minimal** - Only rules and pointers; move reference material to `.claude/docs/`
+2. **On-demand reference docs** - Build commands, architecture, tech stack go in `.claude/docs/` (not auto-loaded)
 3. **Directory-specific guides** - Place guides close to the code they document
 4. **Version control** - Commit all `.claude/` docs except `settings.local.json`
-5. **Regular updates** - Review quarterly or when patterns change
-6. **Team collaboration** - Submit PRs for documentation improvements
+5. **Clean permissions regularly** - Replace one-off `settings.local.json` entries with broad wildcards
+6. **Regular updates** - Review quarterly or when patterns change
+7. **Team collaboration** - Submit PRs for documentation improvements
 
 ## Based On
 
