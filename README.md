@@ -13,7 +13,8 @@ This repository contains carefully curated rules and standards that can be used 
 ├── core/                          # Fundamental principles and protocols
 │   ├── tone-and-style.md         # Communication style and formatting
 │   ├── development-principles.md  # Core development protocols and quality standards
-│   └── tool-safety.md            # Investigation and tool validation protocols
+│   ├── tool-safety.md            # Investigation and tool validation protocols
+│   └── agent-design-patterns.md  # AI agent design, splitting, cross-agent deferral patterns
 ├── languages/                     # Language-specific development standards
 │   ├── general-standards.md      # Cross-language principles and conventions
 │   ├── typescript-javascript.md  # TypeScript/JavaScript specific guidelines
@@ -31,6 +32,12 @@ This repository contains carefully curated rules and standards that can be used 
 │   └── ci-cd-patterns.md       # CI/CD patterns and deployment strategies
 ├── project/                     # Project-specific preferences and environment settings
 │   └── environment-preferences.md # Environment setup and project-specific preferences
+├── claude/                      # Claude Code documentation and agent templates
+│   ├── agents/                 # Subagent design guides and templates
+│   │   ├── agent-design-guide.md  # How to design Claude Code subagents
+│   │   └── agent-template.md     # Ready-to-use agent template
+│   ├── project-templates/      # Repository documentation templates
+│   └── specs/                  # RFC-style specifications
 ├── chatgpt/                     # ChatGPT-specific optimized instructions
 │   ├── global/                  # Global custom instructions (choose one)
 │   │   ├── general-instructions.md      # For general development work

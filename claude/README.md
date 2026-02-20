@@ -6,6 +6,9 @@ This directory contains production-tested templates for organizing Claude Code d
 
 ```text
 claude/
+├── agents/                     # Subagent design and templates
+│   ├── agent-design-guide.md         # How to design Claude Code subagents
+│   └── agent-template.md            # Ready-to-use agent template
 ├── project-templates/          # Ready-to-use documentation templates
 │   ├── navigation-hub.md             # Central navigation/overview
 │   ├── codebase-guide-template.md    # Development workflows & architecture
@@ -16,9 +19,43 @@ claude/
 └── README.md                   # This file
 
 Note: Cursor IDE rules are in ../cursor/mdc-rules/ (existing structure)
+See also: ../core/agent-design-patterns.md for tool-agnostic agent design principles
 ```
 
 ## Templates Overview
+
+### Subagent Design (`agents/`)
+
+Guides and templates for building Claude Code specialist subagents (`.claude/agents/*.md`).
+
+#### agent-design-guide.md
+
+**Purpose:** Comprehensive guide for designing Claude Code subagents
+
+**Features:**
+
+- YAML frontmatter specification (name, description, tools, model, memory)
+- System prompt structure (10 recommended sections)
+- Model and tool selection guides
+- Sizing guidelines and common mistakes
+- Central roster and CLAUDE.md integration patterns
+
+**Use When:** Creating new subagents, restructuring existing ones, or onboarding team members to the agent system
+
+#### agent-template.md
+
+**Purpose:** Ready-to-copy template for a new agent
+
+**Features:**
+
+- Complete YAML frontmatter with all fields
+- All 10 recommended sections with placeholder text
+- Customization checklist
+- Model and tool selection reference tables
+
+**Use When:** Creating a new `.claude/agents/<name>.md` file
+
+**See Also:** `../core/agent-design-patterns.md` for tool-agnostic principles (when to split agents, cross-agent deferral patterns, failure triage table design)
 
 ### Project Templates (`project-templates/`)
 
