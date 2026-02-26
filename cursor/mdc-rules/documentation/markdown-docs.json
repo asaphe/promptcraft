@@ -1,0 +1,39 @@
+{
+  "name": "Markdown Documentation Standards",
+  "description": "Enforces markdown documentation standards. Based on code-quality.md and documentation.md",
+  "version": "1.0.0",
+  "author": "Promptcraft",
+  "filePattern": "*.md",
+  "exclude": [
+    "node_modules/**",
+    "dist/**",
+    "build/**"
+  ],
+  "rules": [
+    {
+      "pattern": "^#\\s+[A-Z]",
+      "filePattern": "*.md",
+      "message": "Top-level headers should use single '#'",
+      "severity": "warning"
+    },
+    {
+      "pattern": "```\\s*$",
+      "filePattern": "*.md",
+      "message": "Code blocks must specify language/type (e.g., ```python, ```bash, ```yaml)",
+      "severity": "error"
+    },
+    {
+      "pattern": "```(python|bash|yaml|json|terraform|typescript|javascript|go|java|text|raw)",
+      "filePattern": "*.md",
+      "message": "Code blocks should use appropriate language identifiers",
+      "severity": "info"
+    },
+    {
+      "pattern": "(Revolutionary|Amazing|Incredible)",
+      "filePattern": "*.md",
+      "message": "Avoid hyperbolic language in technical documentation",
+      "severity": "warning",
+      "caseSensitive": false
+    }
+  ]
+}

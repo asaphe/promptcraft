@@ -1,0 +1,50 @@
+{
+  "name": "Terraform Code Standards",
+  "description": "Enforces Terraform coding standards and best practices. Based on terraform-infrastructure.md and project-specific-standards.md",
+  "version": "1.0.0",
+  "author": "Promptcraft",
+  "filePattern": "*.tf",
+  "exclude": [
+    ".terraform/**",
+    "**/.terraform/**"
+  ],
+  "rules": [
+    {
+      "pattern": "backend\\s+\"s3\"",
+      "filePattern": "backend.tf",
+      "message": "Use S3 backend with encryption and DynamoDB locking",
+      "severity": "warning"
+    },
+    {
+      "pattern": "required_version\\s*=\\s*\"[^\"]+\"",
+      "filePattern": "versions.tf",
+      "message": "Terraform version must be pinned in versions.tf",
+      "severity": "error"
+    },
+    {
+      "pattern": "version\\s*=\\s*\"[^\"]+\"",
+      "filePattern": "versions.tf",
+      "message": "Provider versions must be pinned in versions.tf",
+      "severity": "error"
+    },
+    {
+      "pattern": "(password|secret|key|token)\\s*=\\s*\"[^\"]+\"",
+      "filePattern": "*.tf",
+      "message": "Never hardcode secrets in Terraform files. Use variables, data sources, or secret management.",
+      "severity": "error",
+      "caseSensitive": false
+    },
+    {
+      "pattern": "resource\\s+\"[^\"]+\"\\s+\"[^\"]+\"",
+      "filePattern": "*.tf",
+      "message": "Resource names should follow consistent naming patterns",
+      "severity": "info"
+    },
+    {
+      "pattern": "variable\\s+\"[^\"]+\"\\s*\\{",
+      "filePattern": "variables.tf",
+      "message": "Variables should be defined in variables.tf with type and description",
+      "severity": "warning"
+    }
+  ]
+}

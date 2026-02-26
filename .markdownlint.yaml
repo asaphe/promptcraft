@@ -1,0 +1,10 @@
+# markdownlint configuration
+# Docs are meant to be read in rendered form; hard-wrapping at 80 chars
+# hurts readability in tables, code examples, and inline links.
+MD013: false
+
+# Files with YAML frontmatter (agents, skills) start with ---
+MD041: false
+
+# Angle-bracket placeholders like <service-name> are intentional
+MD033: false

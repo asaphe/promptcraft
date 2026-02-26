@@ -1,0 +1,37 @@
+{
+  "name": "Terraform Structure Standards",
+  "description": "Enforces Terraform module structure and organization. Based on terraform-infrastructure.md and project-specific-standards.md",
+  "version": "1.0.0",
+  "author": "Promptcraft",
+  "filePattern": "*.tf",
+  "exclude": [
+    ".terraform/**",
+    "**/.terraform/**"
+  ],
+  "rules": [
+    {
+      "pattern": "^\\s*(resource|data|variable|output|module|provider|terraform|locals)\\s+",
+      "filePattern": "*.tf",
+      "message": "Terraform files should follow standard structure: main.tf, variables.tf, outputs.tf, providers.tf, versions.tf",
+      "severity": "info"
+    },
+    {
+      "pattern": "backend\\s+\"s3\"",
+      "filePattern": "backend.tf",
+      "message": "Backend should use S3 with encryption and DynamoDB locking",
+      "severity": "warning"
+    },
+    {
+      "pattern": "required_version\\s*=",
+      "filePattern": "versions.tf",
+      "message": "Terraform version should be pinned in versions.tf",
+      "severity": "error"
+    },
+    {
+      "pattern": "version\\s*=",
+      "filePattern": "*.tf",
+      "message": "Provider versions should be pinned in versions.tf",
+      "severity": "error"
+    }
+  ]
+}

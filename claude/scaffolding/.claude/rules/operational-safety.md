@@ -1,0 +1,17 @@
+# Operational Safety Rules
+
+- **Re-verify state after context continuation** — After any context continuation or session handoff, re-read actual files for: current git branch, terraform workspace, image tag, and target workflow. Never rely solely on continuation summaries for operational values.
+
+- **Checkpoint deep sessions proactively** — When a session is deep (50+ tool calls, multiple modules), offer a checkpoint summary: current branch, what's done, what remains, and any open decisions.
+
+- **Plan mode rejections mean the plan isn't ready** — When ExitPlanMode is rejected, ask what's missing. Don't try to exit again without addressing feedback. Present plans incrementally.
+
+- **Enumerate before destructive operations** — When asked to "remove" or "clean up," produce an explicit numbered list of exactly which resources will be affected. Get per-item or per-batch confirmation. Never infer scope from broad terms.
+
+- **Read before editing — no parallel edits without reads** — Never issue an Edit call for a file not read in the current turn. When editing multiple files, read them all first, then edit. After context continuations, re-read before editing.
+
+- **Cross-reference all variants before copying** — When duplicating or adapting files that exist in multiple variants (e.g., staging/production, sibling modules), diff all available variants first. A difference between variants is not automatically a bug — verify whether it has any effect by tracing how the value is consumed.
+
+- **Fix diagnostics immediately — never rationalize them away** — When IDE diagnostics or linter warnings appear after a change, fix them in the same session. Do not classify warnings as "minor" or "style-only" to avoid fixing them. Every diagnostic is a finding.
+
+- **Failure analysis: cheapest diagnostic first, no premature fixes** — When investigating a failure: (1) classify the error signature (timeout = transient, 403 = access, connection refused = network); (2) if transient, recommend a re-run before deep investigation; (3) present a diagnosis and get confirmation before editing files; (4) configuration differences found during investigation are findings to report, not automatic root causes — correlation is not causation.

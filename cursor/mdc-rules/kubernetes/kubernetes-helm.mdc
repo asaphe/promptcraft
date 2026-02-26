@@ -1,0 +1,679 @@
+---
+description: Kubernetes and Helm best practices including resource management, security, chart organization, and deployment patterns
+globs:
+  - "**/helm/**/*.yaml"
+  - "**/helm/**/*.yml"
+  - "**/values/*.yaml"
+  - "**/values/**/*.yaml"
+  - "**/.helmignore"
+  - "**/Chart.yaml"
+alwaysApply: false
+---
+
+# Kubernetes & Helm Standards
+
+You are an expert Kubernetes and Helm engineer with deep knowledge of container orchestration, resource management, and deployment best practices.
+
+## Helm Chart Organization
+
+### Chart Structure
+
+Use single reusable chart with tenant-specific values overrides:
+
+```
+helm-reusable-chart/
+├── Chart.yaml          # Metadata and version
+├── values.yaml         # Default values
+├── templates/
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   ├── ingress.yaml
+│   ├── serviceaccount.yaml
+│   ├── secrets.yaml    # External Secrets Operator
+│   └── hpa.yaml        # Horizontal Pod Autoscaler
+└── values/
+    ├── staging/        # Environment-specific
+    └── production/
+```
+
+### Chart Versioning
+
+- Use semantic versioning (MAJOR.MINOR.PATCH)
+- Document changes in Chart.yaml annotations
+- Package and publish to OCI registry
+- Dynamically fetch version from Chart.yaml in automation
+
+### Multi-Tenancy Support
+
+- Organize values hierarchically: environment → tenant → service
+- Use proper isolation with namespaces and resource quotas
+- Apply consistent templating patterns across tenants
+- Support tenant-specific customizations via value overrides
+
+## Resource Management
+
+### Standard Resource Configuration
+
+Default resources for all containers:
+
+```yaml
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+```
+
+**Guidelines:**
+- Always define both requests and limits
+- Requests = minimum guaranteed resources
+- Limits = maximum allowed resources
+- Adjust based on actual usage patterns
+- Monitor and tune over time
+
+### Resource Quotas
+
+Apply quotas per namespace for multi-tenancy:
+
+```yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute-quota
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: 20Gi
+    limits.cpu: "20"
+    limits.memory: 40Gi
+    persistentvolumeclaims: "10"
+```
+
+## Security Best Practices
+
+### Pod Security Context
+
+Run containers as non-root:
+
+```yaml
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+```
+
+### Service Accounts
+
+Create dedicated service accounts with minimal permissions:
+
+```yaml
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/service-role
+  name: app-server-sa
+```
+
+### Network Policies
+
+Define granular traffic control:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-server-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: app-server
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: production
+      ports:
+        - protocol: TCP
+          port: 8080
+```
+
+### Security Scanning
+
+- Never use privileged containers unless absolutely required
+- Follow PodSecurityStandards (restricted profile)
+- Scan images for vulnerabilities before deployment
+- Use security contexts to drop unnecessary capabilities
+
+## Health Checks
+
+### Required Probes
+
+ALWAYS implement comprehensive health checks:
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health/live
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+startupProbe:
+  httpGet:
+    path: /health/startup
+    port: 8080
+  initialDelaySeconds: 0
+  periodSeconds: 5
+  failureThreshold: 30
+```
+
+**Probe Types:**
+- **Liveness**: Restart container if unhealthy
+- **Readiness**: Remove from load balancer if not ready
+- **Startup**: Protect slow-starting containers
+
+## Service Configuration
+
+### Standard Service Pattern
+
+```yaml
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  annotations:
+    # Datadog monitoring
+    ad.datadoghq.com/tags: '{"env":"production","service":"app-server"}'
+    # Service mesh (if using)
+    linkerd.io/inject: enabled
+```
+
+**Service Types:**
+- **ClusterIP**: Internal services (default, preferred)
+- **LoadBalancer**: External access (use sparingly, expensive)
+- **NodePort**: Direct node access (avoid in production)
+
+### Ingress Configuration
+
+ALB Ingress Controller pattern:
+
+```yaml
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:REGION:ACCOUNT:certificate/ID
+    alb.ingress.kubernetes.io/healthcheck-path: /health/ready
+  hosts:
+    - host: api.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+## Autoscaling
+
+### Horizontal Pod Autoscaler (HPA)
+
+```yaml
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+```
+
+### KEDA Event-Based Autoscaling
+
+For queue-based workloads:
+
+```yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker-scaler
+spec:
+  scaleTargetRef:
+    name: worker
+  minReplicaCount: 1
+  maxReplicaCount: 50
+  triggers:
+    - type: aws-sqs-queue
+      metadata:
+        queueURL: https://sqs.us-east-1.amazonaws.com/ACCOUNT/queue-name
+        queueLength: "5"
+        awsRegion: us-east-1
+```
+
+## Secret Management
+
+### External Secrets Operator
+
+NEVER store secrets in Git or Helm values:
+
+```yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: database-credentials
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: SecretStore
+  target:
+    name: database-credentials
+    creationPolicy: Owner
+  data:
+    - secretKey: username
+      remoteRef:
+        key: prod/database/credentials
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: prod/database/credentials
+        property: password
+```
+
+### IAM Roles for Service Accounts (IRSA)
+
+Secure AWS access without credentials:
+
+```yaml
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/app-server-role
+  name: app-server-sa
+```
+
+## Persistent Storage
+
+### Storage Class Selection
+
+```yaml
+persistence:
+  enabled: true
+  storageClass: gp3  # AWS EBS gp3 (faster, cheaper than gp2)
+  accessMode: ReadWriteOnce
+  size: 10Gi
+  annotations:
+    volume.beta.kubernetes.io/storage-class: gp3
+```
+
+### StatefulSets for Persistent Workloads
+
+Use StatefulSets when you need:
+- Stable network identity
+- Ordered deployment and scaling
+- Persistent storage per pod
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: database
+spec:
+  serviceName: database
+  replicas: 3
+  selector:
+    matchLabels:
+      app: database
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: 100Gi
+```
+
+## Observability
+
+### Structured Logging
+
+Enable JSON logging for parsing:
+
+```yaml
+env:
+  - name: LOG_FORMAT
+    value: json
+  - name: LOG_LEVEL
+    value: info
+```
+
+### Monitoring Annotations
+
+Datadog integration:
+
+```yaml
+annotations:
+  ad.datadoghq.com/tags: '{"env":"production","service":"app-server","version":"1.0.0"}'
+  ad.datadoghq.com/service.check_names: '["http_check"]'
+  ad.datadoghq.com/service.init_configs: '[{}]'
+  ad.datadoghq.com/service.instances: |
+    [
+      {
+        "name": "app-server-health",
+        "url": "http://%%host%%:%%port%%/health",
+        "timeout": 5
+      }
+    ]
+```
+
+Prometheus metrics:
+
+```yaml
+annotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+```
+
+## Deployment Strategies
+
+### Rolling Update (Default)
+
+```yaml
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+```
+
+### Blue-Green Deployment
+
+Use separate deployments with service selector switching:
+
+```yaml
+# Blue deployment (current)
+selector:
+  app: app-server
+  version: blue
+
+# Green deployment (new)
+selector:
+  app: app-server
+  version: green
+
+# Service points to active version
+service:
+  selector:
+    app: app-server
+    version: blue  # Switch to green after validation
+```
+
+### Canary Deployment
+
+Progressive traffic shifting:
+
+```yaml
+# Use Flagger or similar for automated canary
+apiVersion: flagger.app/v1beta1
+kind: Canary
+metadata:
+  name: app-server
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: app-server
+  progressDeadlineSeconds: 600
+  service:
+    port: 8080
+  analysis:
+    interval: 1m
+    threshold: 5
+    maxWeight: 50
+    stepWeight: 10
+    metrics:
+      - name: request-success-rate
+        thresholdRange:
+          min: 99
+        interval: 1m
+```
+
+## Helm Best Practices
+
+### Values Organization
+
+Structure values hierarchically:
+
+```yaml
+global:
+  environment: production
+  region: us-east-1
+
+image:
+  repository: ACCOUNT.dkr.ecr.REGION.amazonaws.com/app-server
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  className: alb
+```
+
+### Template Functions
+
+Use Helm functions for flexibility:
+
+```yaml
+# Conditional rendering
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+# ...
+{{- end }}
+
+# Default values
+replicas: {{ .Values.replicas | default 2 }}
+
+# String manipulation
+name: {{ .Release.Name | trunc 63 | trimSuffix "-" }}
+
+# Include template
+{{- include "app.labels" . | nindent 4 }}
+```
+
+### Chart Testing
+
+Validate charts before deployment:
+
+```bash
+# Lint chart
+helm lint helm-reusable-chart/
+
+# Template and check output
+helm template app-server helm-reusable-chart/ \
+  --values values/production/app-server.yaml
+
+# Dry-run install
+helm install app-server helm-reusable-chart/ \
+  --values values/production/app-server.yaml \
+  --dry-run --debug
+```
+
+## GitOps with ArgoCD
+
+### Application Manifest
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-server-production
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo
+    targetRevision: main
+    path: helm-reusable-chart
+    helm:
+      valueFiles:
+        - values/production/app-server.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+```
+
+## Common Patterns
+
+### Init Containers
+
+Prepare environment before main container:
+
+```yaml
+initContainers:
+  - name: wait-for-database
+    image: busybox:1.36
+    command: ['sh', '-c', 'until nc -z postgres 5432; do sleep 2; done']
+
+  - name: run-migrations
+    image: app-server:1.0.0
+    command: ['python', 'manage.py', 'migrate']
+    env:
+      - name: DATABASE_URL
+        valueFrom:
+          secretKeyRef:
+            name: database-credentials
+            key: url
+```
+
+### Sidecar Containers
+
+Additional functionality in same pod:
+
+```yaml
+containers:
+  - name: app-server
+    image: app-server:1.0.0
+    # ... main container config
+
+  - name: log-forwarder
+    image: fluent/fluent-bit:2.0
+    volumeMounts:
+      - name: logs
+        mountPath: /var/log/app
+```
+
+### Pod Disruption Budgets
+
+Ensure availability during disruptions:
+
+```yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: app-server-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: app-server
+```
+
+## Performance Optimization
+
+### Resource Tuning
+
+Monitor and adjust based on actual usage:
+
+```bash
+# Check resource usage
+kubectl top pods -n production
+
+# Get detailed metrics
+kubectl describe pod <pod-name> -n production | grep -A 5 Requests
+```
+
+### Caching Strategies
+
+- Use Redis or similar for application caching
+- Enable DNS caching (coredns)
+- Use CDN for static assets
+- Implement HTTP caching headers
+
+### Node Affinity
+
+Place pods on appropriate nodes:
+
+```yaml
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: workload-type
+              operator: In
+              values:
+                - compute-optimized
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Pod not starting:**
+```bash
+kubectl get pods -n production
+kubectl describe pod <pod-name> -n production
+kubectl logs <pod-name> -n production --previous
+```
+
+**Service not accessible:**
+```bash
+kubectl get svc -n production
+kubectl get endpoints <service-name> -n production
+kubectl port-forward svc/<service-name> 8080:8080 -n production
+```
+
+**Resource exhaustion:**
+```bash
+kubectl top nodes
+kubectl top pods -n production
+kubectl describe node <node-name>
+```
+
+---
+
+**Core Philosophy**: "Secure by Default, Observable by Design" - Deploy reliable, secure, well-monitored Kubernetes workloads following cloud-native best practices.

@@ -1,0 +1,35 @@
+{
+  "name": "Bash Scripting Standards",
+  "description": "Enforces Bash scripting best practices and shellcheck compliance. Based on language-standards.md",
+  "version": "1.0.0",
+  "author": "Promptcraft",
+  "filePattern": "*.{sh,bash}",
+  "exclude": [],
+  "rules": [
+    {
+      "pattern": "^#!/bin/(bash|sh)",
+      "filePattern": "*.{sh,bash}",
+      "message": "Scripts must have appropriate shebang line (#!/bin/bash or #!/bin/sh)",
+      "severity": "warning"
+    },
+    {
+      "pattern": "^[a-z][a-z0-9_]*\\.(sh|bash)$",
+      "filePattern": "*.{sh,bash}",
+      "message": "Bash scripts should use snake_case with descriptive names (e.g., backup_files.sh)",
+      "severity": "warning"
+    },
+    {
+      "pattern": "set\\s+-[euo]+",
+      "filePattern": "*.{sh,bash}",
+      "message": "Consider using 'set -euo pipefail' for strict error handling",
+      "severity": "info"
+    },
+    {
+      "pattern": "password|secret|key|token",
+      "filePattern": "*.{sh,bash}",
+      "message": "Never hardcode secrets, passwords, or API keys in scripts. Use environment variables or secure credential management.",
+      "severity": "error",
+      "caseSensitive": false
+    }
+  ]
+}

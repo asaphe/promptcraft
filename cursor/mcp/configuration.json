@@ -1,0 +1,41 @@
+{
+  "mcpServers": {
+    "hcp-terraform": {
+      "command": "/path/to/terraform-mcp-server",
+      "args": [
+        "stdio"
+      ]
+    },
+    "kubernetes": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "kubernetes-mcp-server@latest"
+      ]
+    },
+    "github": {
+      "command": "op",
+      "args": [
+        "run",
+        "--",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "op://YourVault/GitHub-Token-Name/password"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "fast-filesystem-mcp",
+        "/path/to/your/projects",
+        "/path/to/workspace",
+        "/path/to/downloads",
+        "/path/to/documents"
+      ]
+    }
+  }
+}
