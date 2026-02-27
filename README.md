@@ -47,6 +47,7 @@ This repository contains carefully curated rules and standards that can be used 
 │   │   └── global-claude-md-example.md  # Example ~/.claude/CLAUDE.md
 │   ├── project-templates/      # Repository documentation templates
 │   ├── specs/                  # RFC-style specifications
+│   ├── learning-system-guide.md   # Automated learning capture with hooks, classification, and plugins
 │   ├── global-claude-md-guide.md  # How to design personal ~/.claude/CLAUDE.md
 │   └── pr-review-protocol.md     # Structured PR review routing and posting
 ├── chatgpt/                     # ChatGPT-specific optimized instructions
