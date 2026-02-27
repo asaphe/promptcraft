@@ -77,7 +77,7 @@ When the next session starts and pending learnings exist, the agent reviews them
 
 | Signal | Classification | Target |
 | ------ | ------------- | ------ |
-| Applies to any developer in the repo | **Team-wide** | `.claude/rules/{domain}.md` |
+| Applies to any developer in the repo | **Team-wide** | `.claude/rules/{subdirectory}/{rule}.md` |
 | Specific to one agent's domain | **Agent-specific** | `.claude/agents/{agent}.md` |
 | User workflow preference | **Personal global** | `~/.claude/CLAUDE.md` |
 | User preference for this project | **Personal project** | `CLAUDE.local.md` or auto memory |
@@ -243,7 +243,7 @@ a classification system that routes learnings to the right location, and a manua
 
 | Signal | Classification | Target |
 |--------|---------------|--------|
-| Applies to any developer in this repo | Team-wide | `.claude/rules/{domain}.md` |
+| Applies to any developer in this repo | Team-wide | `.claude/rules/{subdirectory}/{rule}.md` |
 | Specific to one agent's domain | Agent-specific | `.claude/agents/{agent}.md` |
 | User workflow preference | Personal global | `~/.claude/CLAUDE.md` |
 | User preference for this project only | Personal project | `CLAUDE.local.md` or auto memory |
@@ -272,6 +272,47 @@ When running `/scan-history`, cross-reference existing rules against recent sess
 - Rules that were **never triggered** in the last 30 days may be candidates for retirement
 - Rules that were **violated frequently** may need strengthening or better placement
 - Rules that reference **deprecated tools or patterns** should be updated or removed
+
+## Rules Organization
+
+As rules accumulate, a flat `.claude/rules/` directory creates token pressure — every rule loads into every session regardless of relevance. Organize rules into subdirectories with conditional loading using the `paths:` frontmatter feature.
+
+### Directory Structure
+
+```
+.claude/rules/
++-- general/              # Always loaded (no paths: filter)
+|   +-- operational-safety.md
+|   +-- pr-review.md
++-- devops/               # Loaded only when working on devops/ or .github/ files
+|   +-- ci-runners.md
+|   +-- clickhouse-backup.md
+|   +-- mt-deployment.md
+|   +-- terraform-apply.md
+```
+
+### `paths:` Frontmatter
+
+Add a YAML frontmatter block to conditionally load a rule:
+
+```markdown
+---
+paths: ["devops/terraform/**", "devops/helm-reusable-chart/**"]
+---
+# Terraform Apply Safety Rules
+- **Rule** -- Description.
+```
+
+Claude Code only loads this rule when the session involves files matching those glob patterns. Without `paths:`, the rule loads unconditionally.
+
+### Design Principles
+
+- **`general/`** is for cross-cutting rules (safety, review standards) — no `paths:` filter, always loaded
+- **Domain subdirectories** (e.g., `devops/`, `backend/`, `frontend/`) use `paths:` to scope loading
+- **Agents are not affected** — agents reference rules explicitly via their Key References section (Read tool), bypassing the auto-loading mechanism entirely
+- **New teams** add their own subdirectory with appropriately scoped `paths:` patterns
+
+This keeps token usage proportional to task relevance — a TypeScript session doesn't load Terraform rules, and vice versa.
 
 ## Plugin Distribution
 
@@ -334,3 +375,4 @@ The key insight: **rules should carry zero provenance**. Dates, confirmation cou
 5. **Review date headers are for humans** — The `<!-- Last reviewed -->` comment helps humans track staleness; Claude ignores HTML comments in context.
 6. **Pipefail safety is non-negotiable** — Every `jq` and `grep` pipeline in hook scripts must end with `|| true`. A silent hook abort means lost learnings with no visible error.
 7. **Symlink plugin scripts to the canonical hooks** — Eliminates the duplicate-maintenance burden that caused bug propagation (e.g., missing `|| true` fixes needing to be applied in two places).
+8. **Organize rules into scoped subdirectories** — Use `paths:` frontmatter to conditionally load domain-specific rules. General rules (no `paths:`) always load; domain rules only load when relevant files are in scope. This keeps token usage proportional to task relevance as the rule set grows.
