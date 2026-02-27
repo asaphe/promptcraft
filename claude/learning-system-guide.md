@@ -11,25 +11,25 @@ Claude Code's learning capture relies on agents noticing corrections during a se
 The learning system has three layers:
 
 ```
-                  ┌─────────────────────────────┐
-                  │  Layer 1: Automated Hooks    │
-                  │  (SessionEnd, SessionStart,  │
-                  │   PreCompact)                │
-                  └──────────┬──────────────────┘
-                             │ writes/reads
-                  ┌──────────▼──────────────────┐
-                  │  Layer 2: Staging File       │
-                  │  pending-learnings.md        │
-                  │  (in auto-memory dir)        │
-                  └──────────┬──────────────────┘
-                             │ reviewed by
-                  ┌──────────▼──────────────────┐
-                  │  Layer 3: Classification     │
-                  │  learning-classifier agent   │
-                  │  → .claude/rules/ (team)     │
-                  │  → .claude/agents/ (agent)   │
-                  │  → auto memory (personal)    │
-                  └─────────────────────────────┘
+                  +---------------------------------+
+                  |  Layer 1: Automated Hooks        |
+                  |  (SessionEnd, SessionStart,      |
+                  |   PreCompact)                    |
+                  +----------------+-----------------+
+                                   | writes/reads
+                  +----------------v-----------------+
+                  |  Layer 2: Staging File            |
+                  |  pending-learnings.md             |
+                  |  (in auto-memory dir)             |
+                  +----------------+-----------------+
+                                   | reviewed by
+                  +----------------v-----------------+
+                  |  Layer 3: Classification          |
+                  |  learning-classifier agent        |
+                  |  -> .claude/rules/ (team)         |
+                  |  -> .claude/agents/ (agent)       |
+                  |  -> auto memory (personal)        |
+                  +---------------------------------+
 ```
 
 ### Layer 1: Automated Hooks
@@ -87,7 +87,7 @@ When the next session starts and pending learnings exist, the agent reviews them
 
 ### Hook Scripts
 
-All hooks receive JSON on stdin with `transcript_path`, `session_id`, `cwd`, and event-specific fields. They derive the memory directory from `transcript_path` — the auto-memory directory is always a sibling `memory/` folder under the same project path.
+All hooks receive JSON on stdin with `transcript_path`, `session_id`, `cwd`, and event-specific fields. Stdin is small hook metadata JSON (not the full transcript) — safe to buffer with `INPUT=$(cat)`. The scripts derive the memory directory from `transcript_path` — the auto-memory directory is always a sibling `memory/` folder under the same project path.
 
 #### session-end-learnings.sh
 
@@ -102,23 +102,34 @@ Only writes if 2+ signals detected or session had 50+ tool calls. This threshold
 ```bash
 # Signal detection (simplified)
 CORRECTIONS=$(jq -r '
-  select(.type == "human") | .message.content // [] |
+  select(.type == "user") | .message.content // [] |
   if type == "array" then .[] else . end |
   if type == "object" then .text // empty else . end
-' "$TRANSCRIPT_PATH" | grep -iE '(^no[,. !]|wrong|not that|I said)')
+' "$TRANSCRIPT_PATH" 2>/dev/null | \
+  grep -iE '(^no[,. !]|wrong|not that|I said)' | \
+  head -10 || true)
 
 RETRIES=$(jq -r '
   select(.type == "assistant") | .message.content // [] | .[] |
   select(.type == "tool_use") | .name
-' "$TRANSCRIPT_PATH" | uniq -d)
+' "$TRANSCRIPT_PATH" 2>/dev/null | \
+  uniq -d | head -5 || true)
+
+TOOL_COUNT=$(jq -r '
+  select(.type == "assistant") | .message.content // [] | .[] |
+  select(.type == "tool_use") | .name
+' "$TRANSCRIPT_PATH" 2>/dev/null | wc -l | tr -d ' ' || true)
+TOOL_COUNT=${TOOL_COUNT:-0}
 ```
+
+**Pipefail safety:** Every `jq` pipeline must end with `|| true`. Under `set -eo pipefail`, if `jq` encounters malformed JSON (truncated transcript, partial write), it exits non-zero and `pipefail` propagates that through the pipe, silently aborting the script. The `CORRECTIONS` pipeline also uses `grep` which returns exit code 1 on no-match — same risk.
 
 #### session-start-learnings.sh
 
 Outputs text to stdout (SessionStart stdout is injected into Claude's context):
 
-- If `pending-learnings.md` exists and has content → tells Claude to review candidates
-- If `MEMORY.md` is empty → nudges about auto memory usage
+- If `pending-learnings.md` exists and has content, tells Claude to review candidates
+- If `MEMORY.md` is empty, nudges about auto memory usage
 
 The nudge is lightweight — it only fires if the memory file doesn't exist or is empty.
 
@@ -200,6 +211,22 @@ maxTurns: 10
 
 Using Haiku keeps it fast and cheap. The agent only needs to read a few files and make a classification decision.
 
+### Review Agents
+
+The project has three review agents that produce read-only PR findings:
+
+| Agent | Scope |
+| ----- | ----- |
+| **devops-reviewer** | Terraform, GitHub Actions, Dockerfiles, shell scripts (including hook scripts), Helm charts |
+| **secrets-config-reviewer** | Secret tfvars, helm template secret refs, ExternalSecret configs, naming convention |
+| **agent-config-reviewer** | `.claude/` agent definitions, skills, commands, CLAUDE.md, hooks, plugin validation |
+
+The `secrets-config-reviewer` validates the highest-frequency correction domain — secrets and MT configuration. It checks secret path naming convention, tier classification, TSJ mechanism selection per app, `USE_SECRET_SERVICE` consistency, `mt_secret_template_mode` correctness, token syntax (`.tfvars` uses `<TOKEN>`, `.yaml.tftpl` uses `${variable}`), and cross-environment template consistency.
+
+The `agent-config-reviewer` includes hook and plugin validation: verifying that referenced script paths exist, are executable, have valid timeout/async/matcher fields, and that plugin script copies are byte-identical to their source-of-truth counterparts (or symlinked).
+
+The `devops-reviewer` includes hook-script-specific checks: `jq` filters matching transcript JSONL format, `grep` patterns using `|| true` for pipefail safety, and output written to appropriate directories.
+
 ### CLAUDE.md Integration
 
 Add a Learning System section to your project CLAUDE.md:
@@ -252,20 +279,22 @@ For teams with multiple repositories, package the learning system as a Claude Co
 
 ```
 team-learning/
-├── .claude-plugin/
-│   └── plugin.json
-├── skills/
-│   └── scan-history/
-│       └── SKILL.md
-├── agents/
-│   └── learning-classifier.md
-├── hooks/
-│   └── hooks.json
-└── scripts/
-    ├── session-end-learnings.sh
-    ├── session-start-learnings.sh
-    └── precompact-preserve.sh
++-- .claude-plugin/
+|   +-- plugin.json
++-- skills/
+|   +-- scan-history/
+|       +-- SKILL.md
++-- agents/
+|   +-- learning-classifier.md
++-- hooks/
+|   +-- hooks.json
++-- scripts/
+    +-- session-end-learnings.sh -> ../../../hooks/session-end-learnings.sh
+    +-- session-start-learnings.sh -> ../../../hooks/session-start-learnings.sh
+    +-- precompact-preserve.sh -> ../../../hooks/precompact-preserve.sh
 ```
+
+**Script symlinks:** Plugin scripts in `scripts/` are symlinks to the canonical `hooks/*.sh` files. This eliminates the duplicate-maintenance burden — edits to the repo-level hooks are automatically reflected in the plugin. Agent and skill files are still copies (symlinks don't work for those in the plugin loader).
 
 Install for the team:
 
@@ -273,7 +302,7 @@ Install for the team:
 claude plugin install team-learning --scope project
 ```
 
-This writes to `.claude/settings.json` → committed to git → every team member gets it on clone.
+This writes to `.claude/settings.json`, which is committed to git so every team member gets it on clone.
 
 **Important:** If hooks are already configured in the project's `settings.json`, don't also install the plugin in the same project — the hooks would fire twice. The plugin is for **other repos** that want the same learning system.
 
@@ -303,3 +332,5 @@ The key insight: **rules should carry zero provenance**. Dates, confirmation cou
 3. **Personal vs shared is a spectrum** — Use the classification table, but when in doubt, start in auto memory and promote to rules after confirming the pattern recurs.
 4. **Rules carry no metadata** — No dates, counts, or session references. Pure actionable bullets.
 5. **Review date headers are for humans** — The `<!-- Last reviewed -->` comment helps humans track staleness; Claude ignores HTML comments in context.
+6. **Pipefail safety is non-negotiable** — Every `jq` and `grep` pipeline in hook scripts must end with `|| true`. A silent hook abort means lost learnings with no visible error.
+7. **Symlink plugin scripts to the canonical hooks** — Eliminates the duplicate-maintenance burden that caused bug propagation (e.g., missing `|| true` fixes needing to be applied in two places).
