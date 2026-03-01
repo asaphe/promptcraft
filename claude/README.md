@@ -24,6 +24,7 @@ claude/
 ├── scaffolding/                # Complete example .claude/ directory (copy and customize)
 │   ├── .claude/               # Example project config with agents, rules, skills, docs
 │   └── global-claude-md-example.md  # Example ~/.claude/CLAUDE.md
+├── claude-best-practices.md    # End-to-end best practices guide (context, planning, tools, workflow)
 ├── global-claude-md-guide.md   # How to design personal ~/.claude/CLAUDE.md
 ├── pr-review-protocol.md       # Structured PR review routing and posting
 └── README.md                   # This file
@@ -119,6 +120,26 @@ Guides and templates for building Claude Code skills (user-invocable slash comma
 - Tool selection guide
 
 **Use When:** Creating a new `.claude/skills/<name>/SKILL.md` file
+
+### Best Practices Guide
+
+#### claude-best-practices.md
+
+**Purpose:** End-to-end guide for getting the most out of Claude Code
+
+**Features:**
+
+- Context management (CLAUDE.md sizing, clearing strategies, token budgets)
+- Planning workflow (Explore → Plan → Code → Commit)
+- Quality gates (TDD, hooks, code review patterns)
+- Tool strategy (skills auto-activation, MCP design, subagent patterns)
+- Workflow optimization (course correction, visual references, worktrees, headless mode)
+- Production lessons (decision checkpoints, finding verification, operational safety)
+- Getting started progression (4-week plan)
+- Success metrics (context efficiency, code quality, productivity)
+- Anti-patterns to avoid
+
+**Use When:** Onboarding to Claude Code, establishing team practices, or reviewing workflow effectiveness
 
 ### Global CLAUDE.md Guide
 
