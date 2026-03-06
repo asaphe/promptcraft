@@ -50,6 +50,8 @@ This repository contains carefully curated rules and standards that can be used 
 │   ├── claude-best-practices.md   # End-to-end best practices (context, planning, tools, workflow)
 │   ├── learning-system-guide.md   # Automated learning capture with hooks, classification, and plugins
 │   ├── global-claude-md-guide.md  # How to design personal ~/.claude/CLAUDE.md
+│   ├── portability-guide.md       # Dotfiles, symlinks, backups, Desktop vs Code config
+│   ├── mcp-management-guide.md    # MCP server lifecycle: add, remove, team connectors, pitfalls
 │   └── pr-review-protocol.md     # Structured PR review routing and posting
 ├── chatgpt/                     # ChatGPT-specific optimized instructions
 │   ├── global/                  # Global custom instructions (choose one)

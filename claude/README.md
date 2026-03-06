@@ -26,6 +26,8 @@ claude/
 │   └── global-claude-md-example.md  # Example ~/.claude/CLAUDE.md
 ├── claude-best-practices.md    # End-to-end best practices guide (context, planning, tools, workflow)
 ├── global-claude-md-guide.md   # How to design personal ~/.claude/CLAUDE.md
+├── portability-guide.md        # Dotfiles, symlinks, backups, Desktop vs Code config
+├── mcp-management-guide.md     # MCP server lifecycle: add, remove, team connectors, pitfalls
 ├── pr-review-protocol.md       # Structured PR review routing and posting
 └── README.md                   # This file
 
@@ -67,6 +69,22 @@ Guides and templates for building Claude Code specialist subagents (`.claude/age
 **Use When:** Creating a new `.claude/agents/<name>.md` file
 
 **See Also:** `../core/agent-design-patterns.md` for tool-agnostic principles (when to split agents, cross-agent deferral patterns, failure triage table design)
+
+#### review-agent-trio.md
+
+**Purpose:** Pattern for splitting PR review into specialized domain agents
+
+**Features:**
+
+- Why a single reviewer produces shallow findings
+- How to split by correction-frequency domains
+- Agent design (tools, model, maxTurns) for read-only reviewers
+- Orchestration via skills or main session
+- File routing patterns
+- Finding quality protocol (self-verification, present-before-posting)
+- Scaling guidelines (when to add/merge reviewers)
+
+**Use When:** Setting up AI-assisted PR reviews, scaling beyond a single reviewer agent
 
 ### Operational Rules (`rules/`)
 
@@ -156,6 +174,43 @@ Guides and templates for building Claude Code skills (user-invocable slash comma
 - Anti-patterns (project-specific content in global, duplication, bloat)
 
 **Use When:** Setting up a new global config, reviewing what should be global vs project-specific
+
+### Portability Guide
+
+#### portability-guide.md
+
+**Purpose:** How to make Claude Code config portable across machines
+
+**Features:**
+
+- Claude Code vs Claude Desktop configuration comparison
+- Claude Desktop config reference (all known `preferences` keys)
+- Symlink strategy (what to symlink vs skip, setup script)
+- `LOCAL_SENSITIVE.md` pattern for machine-local secrets reference
+- `settings.local.json` for machine-specific overrides
+- Backup script for valuable non-symlinked files
+- Multi-clone awareness pattern
+- Config layering summary (global → project → local)
+- New machine setup checklist
+
+**Use When:** Setting up Claude Code on a new machine, creating a dotfiles strategy, understanding config portability
+
+### MCP Management Guide
+
+#### mcp-management-guide.md
+
+**Purpose:** Complete lifecycle for MCP servers — adding, removing, and team management
+
+**Features:**
+
+- Four configuration scopes (user, project, desktop, org connector)
+- Adding servers at each scope
+- Removing servers (including org connectors via API)
+- Common pitfalls (ghost servers, auth errors, duplicates, context window impact)
+- Team MCP strategy (when to use each scope)
+- MCP vs CLI decision framework
+
+**Use When:** Adding/removing MCP servers, troubleshooting MCP issues, deciding team-wide vs personal MCP strategy
 
 ### PR Review Protocol
 
@@ -461,7 +516,7 @@ These templates are extracted from a production monorepo with:
 - Kubernetes deployment via Helm charts
 - Terraform infrastructure (~40 modules)
 - Comprehensive CI/CD via GitHub Actions
-- 9 specialist agents (7 operational + 2 review)
+- 11 specialist agents (7 operational + 3 review + 1 utility)
 - 10+ user-invocable skills (deploy, verify, inspect, scaffold, checkpoint, history mining)
 - Auto-loaded operational rules from hundreds of real sessions
 - Structured PR review protocol with specialized review agents
@@ -479,5 +534,5 @@ Improvements welcome! If you find issues or have suggestions:
 
 ---
 
-**Last Updated**: 2026-02-26
-**Template Version**: 2.0
+**Last Updated**: 2026-03-06
+**Template Version**: 3.0
