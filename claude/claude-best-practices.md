@@ -379,6 +379,9 @@ See: [../core/operational-safety-patterns.md](../core/operational-safety-pattern
 - [Learning System Guide](learning-system-guide.md) — Automated knowledge capture from sessions
 - [PR Review Protocol](pr-review-protocol.md) — Structured review with finding verification
 - [Operational Safety Patterns](../core/operational-safety-patterns.md) — Session safety and destructive operation protocols
+- [Portability Guide](portability-guide.md) — Dotfiles, symlinks, backups, and multi-machine setup
+- [MCP Management Guide](mcp-management-guide.md) — Adding, removing, and managing MCP servers across scopes
+- [Review Agent Trio](agents/review-agent-trio.md) — Specialized reviewer agents for higher-quality PR review
 - [Scaffolding Directory](scaffolding/) — Complete example `.claude/` directory ready to customize
 
 ---
