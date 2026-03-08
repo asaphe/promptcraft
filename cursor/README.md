@@ -17,6 +17,7 @@ cursor/
 │   ├── workflow-patterns.md     # GitHub Actions, CI/CD, automation
 │   ├── general-principles.md    # Universal standards and environment management
 │   └── ansible-automation.md    # Ansible configuration management and automation
+├── multi-tool-coexistence.md  # AGENTS.md + CLAUDE.md + Cursor rules coexistence guide
 ├── mdc-rules/           # MDC (JSON) rules for project-level enforcement
 │   ├── naming/                  # Naming convention rules
 │   ├── formatting/              # Code formatting rules
