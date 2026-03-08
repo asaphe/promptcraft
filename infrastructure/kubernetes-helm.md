@@ -73,6 +73,30 @@
 - Apply tenant-specific encryption keys and secrets
 - Audit tenant access patterns and resource usage
 
+## Node Autoscaler Alignment (Karpenter / Cluster Autoscaler)
+
+### Capacity-Type Consistency
+
+When using node autoscalers that provision nodes based on pod requirements:
+
+- **Verify nodeSelector and node pool alignment** — If a pod uses `nodeSelector` to request a specific capacity type (e.g., `spot` or `on-demand`), verify the target node pool actually offers that capacity type. A mismatch means pods will never schedule, resulting in silent job timeouts.
+- **Always include on-demand fallback for time-sensitive workloads** — Job runners, batch processors, and CI pods should have `["spot", "on-demand"]` capacity types in their node pool. Spot-only pools risk scheduling failures when spot capacity is unavailable.
+- **Use standard instance families as defaults** — Never default to exotic or specialized instance families (storage-optimized, GPU, etc.) in node pool configurations. These have limited spot availability and may have zero capacity in some availability zones. Default to general-purpose or compute-optimized families. Override to specialized families only when the workload explicitly requires them.
+
+### Multi-Taint Node Pools
+
+When a node pool uses multiple taints for workload isolation:
+
+- **Document which pods tolerate which taints** — If a node pool has both a namespace taint and a workload-type taint (e.g., `my-namespace:NoSchedule` + `batch-jobs:NoSchedule`), only pods with both tolerations can schedule there. Infrastructure pods (daemons, webservers) typically only get the namespace toleration and land on general-purpose pools.
+- **Verify tolerations match the full taint set** — A pod targeting a multi-taint node pool must tolerate ALL taints. Missing even one toleration means the pod cannot schedule on that pool, even if the nodeSelector matches.
+
+### Incident Response: kubectl Over IaC
+
+During active scheduling incidents:
+
+- **Use kubectl/helm patches for immediate fixes** — IaC tools (Terraform `helm_release`, etc.) can have long timeouts (10-15 minutes). For urgent fixes, patch deployments or node pools directly via `kubectl patch` or `helm upgrade`. The IaC state converges after the PR merges.
+- **Draw conclusions from early signals** — Check pod events and scheduling status within seconds of a change. Don't wait for full IaC apply completion to verify a fix works. Karpenter events, `FailedScheduling` messages, and `NodeClaim` creation are immediate signals.
+
 ## Development Practices
 
 ### Chart Development

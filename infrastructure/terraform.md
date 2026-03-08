@@ -53,6 +53,19 @@
 - Common versions in use: majority 1.11.0, some 1.12.2, some 1.12.0
 - Use Terraform to deploy operators like KEDA operator Helm chart when appropriate
 
+## Data Source Filtering
+
+When using `for` expressions to filter data from JSON config files or data sources:
+
+- **Filter by explicit type, not just by name** — If a config file contains entries of different types (e.g., single-tenant vs multi-tenant deployments), always filter by the type field, not just the name. Matching by name alone can catch entries of the wrong type and trigger incorrect code paths (wrong secret paths, wrong environment prefixes, etc.).
+- **Test defaults with no override present** — Many modules use `lookup()` or `try()` with fallback defaults. Verify the default value is correct for all deployment types, not just the ones that have explicit overrides in tfvars. A bad default that's masked by existing overrides will silently break new deployments.
+
+## Helm Release via Terraform
+
+- **Helm releases have long timeouts** — `helm_release` resources in Terraform wait for all pods to be Ready (default or configured timeout, often 5-15 minutes). During this wait, Terraform holds the state lock and blocks other operations.
+- **Prefer direct Helm/kubectl for urgent fixes** — For incident response, use `helm upgrade` or `kubectl patch` directly. Let Terraform converge after the PR merges via CI/CD.
+- **Stuck Helm releases need manual recovery** — A `helm_release` stuck in `pending-upgrade` or `pending-rollback` state cannot be updated by Terraform. Use `helm uninstall` followed by a fresh `terraform apply` to recover. This is safe when the release's supporting resources (IAM roles, secrets, queues) are managed separately.
+
 ## Development Workflow
 
 - Before providing any Terraform code, test it to confirm it works as expected
