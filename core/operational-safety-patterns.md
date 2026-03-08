@@ -147,6 +147,23 @@ Do not refactor, clean up, or "improve" code adjacent to your target. A bug fix 
 
 When investigating a failure or reviewing code, the default output is a report — not a fix. Present findings and get explicit approval before transitioning from analysis to implementation. The user may want to fix it themselves, fix it differently, or defer it.
 
+## Incident Response Speed
+
+### Prefer Direct Tools Over IaC During Incidents
+
+When resolving a live production issue, prioritize speed:
+
+- **Use the fastest path to a working state** — During incidents, apply fixes directly (kubectl, CLI tools, console) rather than waiting for IaC applies that may timeout. A Helm release via Terraform can take 15+ minutes; a `kubectl patch` takes seconds.
+- **IaC convergence happens after** — Once the immediate fix is verified, commit the code changes and let CI/CD converge the IaC state. The PR ensures long-term correctness; the direct fix ensures immediate availability.
+- **Check early signals, don't wait for completion** — After applying a fix, verify by checking the first available signal (pod events, scheduling status, node provisioning). Don't block on a full deployment cycle to confirm a fix works.
+
+### Mismatched Defaults Are Silent Killers
+
+When a system has **two configuration surfaces that must agree** (e.g., a pod's nodeSelector and a node pool's capacity types, or a service's expected port and a load balancer's target port):
+
+- **Always verify both sides** — A mismatch between producer and consumer configs causes silent failures (pods stuck in Pending, connections refused, etc.) that look like infrastructure problems but are configuration bugs.
+- **Test the default path, not just overrides** — Many configs have defaults that are rarely exercised because overrides mask them. When no override exists, the default takes effect — verify it's correct.
+
 ## State Management Safety
 
 ### Workspaces and Environments
