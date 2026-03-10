@@ -73,7 +73,7 @@ Grant the minimum tools needed. Common patterns:
 
 **Cover all execution paths, not just the happy path:** Audit every conditional branch in the skill body — including no-input fallbacks, optional modes, and error recovery steps — and ensure each tool they reference is listed. A tool missing from `allowed-tools` silently fails at runtime with no warning at authoring time.
 
-**MCP tool naming is exact:** MCP tools follow the `mcp__{server-name}__{tool-name}` pattern (double underscores, hyphens in server name become underscores). Never abbreviate or guess — verify against the MCP server's actual tool list. `clickup_get_task` is wrong; `mcp__my-server__get_task` is correct.
+**MCP tool naming is exact:** MCP tools follow the `mcp__{server-name}__{tool-name}` pattern (double underscores, hyphens in server name become underscores). Never abbreviate or guess — verify against the MCP server's actual tool list. `my_server_get_task` is wrong; `mcp__my-server__get_task` is correct.
 
 #### `argument-hint`
 
