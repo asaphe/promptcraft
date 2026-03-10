@@ -87,6 +87,28 @@ mutation {
 }
 ```
 
+### Hide / Minimize Bot Comments
+
+Use `minimizeComment` to collapse addressed or irrelevant bot comments. It works on all three GitHub node types:
+
+| Node prefix | Type | Example |
+|-------------|------|---------|
+| `PRRC_` | Inline review comment | Cursor, CodeQL inline finding |
+| `IC_` | Issue / PR body comment | Codex, bot conversation comment |
+| `PRR_` | PR review body | github-actions review summary |
+
+```graphql
+mutation {
+  minimizeComment(input: { subjectId: "<node-id>", classifier: RESOLVED }) {
+    minimizedComment { isMinimized }
+  }
+}
+```
+
+Available classifiers: `RESOLVED`, `OUTDATED`, `DUPLICATE`, `OFF_TOPIC`, `SPAM`, `ABUSE`.
+
+For bot inline threads: use **both** `resolveReviewThread` (hides the thread) **and** `minimizeComment` (collapses the comment in the timeline). For review-body comments (`PRR_`) and issue comments (`IC_`), `minimizeComment` alone is sufficient.
+
 ## Severity Classification
 
 ### Blocking vs Suggestion

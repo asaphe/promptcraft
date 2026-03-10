@@ -164,6 +164,29 @@ When a system has **two configuration surfaces that must agree** (e.g., a pod's 
 - **Always verify both sides** — A mismatch between producer and consumer configs causes silent failures (pods stuck in Pending, connections refused, etc.) that look like infrastructure problems but are configuration bugs.
 - **Test the default path, not just overrides** — Many configs have defaults that are rarely exercised because overrides mask them. When no override exists, the default takes effect — verify it's correct.
 
+## Git Isolation and History Hygiene
+
+### Use git worktree for Isolated Git Work, Not cp -r
+
+When you need an isolated copy of a repo to do safe rebase or branch work:
+
+- **Use `git worktree add /tmp/wt-name branch-name`** — creates a fully functional working tree sharing the same git object store
+- **Never use `cp -r`** — silently skips hidden directories (`.git`, `.claude`, `.github`, `.env`), and fails or hangs on deeply nested `node_modules`
+
+If the branch is already checked out in the main worktree, worktree add will fail. In that case, the remote branch itself is the backup — proceed with `git reset --soft` or rebase in the main tree, knowing `git reset --hard origin/<branch>` restores everything.
+
+### Squash Noisy Iteration Commits Before Merge
+
+Before merging a PR, review the commit history. Multiple commits that all touch the same file iterating toward a correct result ("add rule", "clarify rule", "fix rule", "correct rule again") should be squashed into one clean commit:
+
+```bash
+git reset --soft HEAD~N          # N = number of commits to squash
+git commit -m "docs: descriptive final message"
+git push --force-with-lease
+```
+
+The remote branch is the safety net — if anything goes wrong, `git reset --hard origin/<branch>` restores the original state. `--force-with-lease` prevents accidentally overwriting someone else's concurrent push.
+
 ## State Management Safety
 
 ### Workspaces and Environments
