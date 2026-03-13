@@ -14,6 +14,28 @@
 - Use Terraform workspaces for environment and service separation
 - Follow workspace naming: "{env}-{service}-{region}" or "{env}_{tenant}-{service}"
 
+### Prefer Direct State Fixes Over Scaffolding Blocks
+
+When migrating resources between modules or renaming resources in state:
+
+| Approach | When to Use |
+|----------|-------------|
+| `terraform state mv` / `terraform state rm` | Default — clean, immediate, no code changes required |
+| Direct S3 state JSON editing | Bulk operations or cross-workspace moves |
+| `moved` / `removed` blocks in code | Only when the migration must be repeatable (e.g., published modules used by many teams) |
+
+Temporary `moved` and `removed` blocks are scaffolding code — they clutter the codebase, require follow-up cleanup, and are easy to forget. Fix the state directly unless there's a specific reason the migration must be codified.
+
+### Verify Existing State Before Acting
+
+Before applying any module to a workspace:
+
+1. Check existing state (`terraform state list` or download the state file)
+2. Compare what's in state vs. what the tfvars file declares
+3. If they don't match, use `-target` to apply only the new resources
+
+A full `terraform apply` against a workspace whose existing resources don't match the tfvars file can attempt to create resources that conflict with the environment.
+
 ## Code Quality
 
 - Run "terraform fmt -recursive" before commits

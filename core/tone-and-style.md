@@ -41,6 +41,44 @@
 - Prefer official sources first, then unofficial sources
 - Read uploaded files before giving answers when applicable
 
+## XML Structuring for Complex Prompts
+
+When prompts contain multiple distinct sections (context, instructions, examples, data), use XML tags to create clear boundaries:
+
+```xml
+<context>
+Background information the assistant needs to understand the task.
+</context>
+
+<instructions>
+What specifically to do with the provided context.
+</instructions>
+
+<examples>
+  <good-example>Concrete demonstration of desired output.</good-example>
+  <bad-example>What to avoid.</bad-example>
+</examples>
+```
+
+### When to Use XML Tags
+
+| Situation | Use XML? |
+|-----------|----------|
+| Separating context from instructions | Yes |
+| Providing input/output examples | Yes |
+| Passing structured data (diffs, logs, configs) | Yes |
+| Simple single-purpose prompts | No — plain text is fine |
+| Short follow-up messages in a conversation | No |
+
+### Guidelines
+
+- Use descriptive tag names (`<error-log>` not `<data1>`)
+- Nest tags for complex structures (`<examples>` containing `<good-example>`)
+- Don't over-tag — if a prompt is already clear without XML, adding tags just adds noise
+- XML tags are especially effective in system prompts and agent definitions where multiple concerns coexist
+
+See [prompting-examples.md](prompting-examples.md) for concrete examples of XML structuring combined with multishot patterns.
+
 ## Interaction Management
 
 - Pause and ask for consent before going on long tangents or explanations without requesting further input

@@ -10,74 +10,108 @@ This repository contains carefully curated rules and standards that can be used 
 
 ```raw
 .
-├── core/                          # Fundamental principles and protocols
-│   ├── tone-and-style.md         # Communication style and formatting
-│   ├── development-principles.md  # Core development protocols and quality standards
-│   ├── tool-safety.md            # Investigation and tool validation protocols
-│   ├── agent-design-patterns.md  # AI agent design, splitting, cross-agent deferral patterns
-│   └── operational-safety-patterns.md  # Session safety patterns for AI coding assistants
-├── languages/                     # Language-specific development standards
-│   ├── general-standards.md      # Cross-language principles and conventions
-│   ├── typescript-javascript.md  # TypeScript/JavaScript specific guidelines
-│   ├── python.md                 # Python development standards
-│   ├── bash.md                   # Bash scripting best practices
-│   └── java-go.md               # Java and Go development guidelines
-├── infrastructure/               # Infrastructure and DevOps practices
-│   ├── terraform.md             # Terraform standards and best practices
-│   ├── kubernetes-helm.md       # Kubernetes and Helm guidelines
-│   ├── docker.md               # Docker and containerization standards
-│   ├── aws.md                  # AWS cloud services guidelines
-│   └── ansible.md              # Ansible automation standards
-├── workflows/                   # CI/CD and automation workflows
-│   ├── github-actions.md       # GitHub Actions development protocol
-│   └── ci-cd-patterns.md       # CI/CD patterns and deployment strategies
-├── project/                     # Project-specific preferences and environment settings
+├── core/                           # Fundamental principles and protocols
+│   ├── tone-and-style.md          # Communication style, formatting, XML structuring
+│   ├── development-principles.md   # Core development protocols and quality standards
+│   ├── tool-safety.md             # Investigation, tool validation, verify-before-asserting
+│   ├── agent-design-patterns.md   # AI agent design, splitting, cross-agent deferral
+│   ├── operational-safety-patterns.md  # Session safety, approval interpretation, privacy scanning
+│   └── prompting-examples.md      # Multishot examples, XML structuring, prompt chaining demos
+├── languages/                      # Language-specific development standards
+│   ├── general-standards.md       # Cross-language principles and conventions
+│   ├── typescript-javascript.md   # TypeScript/JavaScript specific guidelines
+│   ├── python.md                  # Python development standards
+│   ├── bash.md                    # Bash scripting best practices
+│   └── java-go.md                 # Java and Go development guidelines
+├── infrastructure/                 # Infrastructure and DevOps practices
+│   ├── terraform.md               # Terraform standards, state management, migration patterns
+│   ├── kubernetes-helm.md         # Kubernetes and Helm guidelines
+│   ├── docker.md                  # Docker and containerization standards
+│   ├── aws.md                     # AWS cloud services guidelines
+│   └── ansible.md                 # Ansible automation standards
+├── workflows/                      # CI/CD and automation workflows
+│   ├── github-actions.md          # GitHub Actions development protocol
+│   └── ci-cd-patterns.md         # CI/CD patterns and deployment strategies
+├── project/                        # Project-specific preferences and environment settings
 │   └── environment-preferences.md # Environment setup and project-specific preferences
-├── claude/                      # Claude Code documentation, agents, skills, and protocols
-│   ├── agents/                 # Subagent design guides and templates
+├── claude/                         # Claude Code documentation, agents, skills, and protocols
+│   ├── agents/                    # Subagent design guides and templates
 │   │   ├── agent-design-guide.md  # How to design Claude Code subagents
-│   │   └── agent-template.md     # Ready-to-use agent template
-│   ├── rules/                  # Operational rules system
+│   │   ├── agent-template.md      # Ready-to-use agent template
+│   │   └── review-agent-trio.md   # Specialized reviewer agents for PR review
+│   ├── rules/                     # Operational rules system
 │   │   └── operational-rules-guide.md  # How to design and maintain auto-loaded rules
-│   ├── skills/                 # Skill (slash command) design
+│   ├── skills/                    # Skill (slash command) design
 │   │   ├── skill-design-guide.md  # How to design Claude Code skills
-│   │   └── skill-template.md     # Ready-to-use skill template
-│   ├── scaffolding/            # Complete example .claude/ directory (copy & customize)
-│   │   ├── .claude/            # Agents, rules, skills, docs, specs examples
-│   │   └── global-claude-md-example.md  # Example ~/.claude/CLAUDE.md
-│   ├── project-templates/      # Repository documentation templates
-│   ├── specs/                  # RFC-style specifications
-│   ├── claude-best-practices.md   # End-to-end best practices (context, planning, tools, workflow)
-│   ├── learning-system-guide.md   # Automated learning capture with hooks, classification, and plugins
+│   │   └── skill-template.md      # Ready-to-use skill template
+│   ├── scaffolding/               # Complete example .claude/ directory (copy & customize)
+│   │   ├── .claude/               # Agents, rules, skills, docs, specs examples
+│   │   ├── global-claude-md-example.md  # Example ~/.claude/CLAUDE.md
+│   │   └── README.md             # Scaffolding usage instructions
+│   ├── project-templates/         # Repository documentation templates
+│   │   ├── codebase-guide-template.md
+│   │   ├── devops-infrastructure-guide.md
+│   │   ├── github-actions-guide.md
+│   │   └── navigation-hub.md
+│   ├── specs/                     # RFC-style specifications
+│   │   └── ci-cd-specification.md
+│   ├── claude-best-practices.md   # End-to-end best practices, prompt chaining, workflow
+│   ├── hooks-guide.md             # Hook design patterns (PreToolUse, PostToolUse, Stop)
+│   ├── settings-json-guide.md     # Permissions, env vars, layering, wildcards
+│   ├── github-actions-integration.md  # Claude Code in CI/CD via claude-code-action
+│   ├── learning-system-guide.md   # Automated learning capture with hooks and plugins
 │   ├── global-claude-md-guide.md  # How to design personal ~/.claude/CLAUDE.md
 │   ├── portability-guide.md       # Dotfiles, symlinks, backups, Desktop vs Code config
-│   ├── mcp-management-guide.md    # MCP server lifecycle: add, remove, team connectors, pitfalls
-│   └── pr-review-protocol.md     # Structured PR review routing and posting
-├── chatgpt/                     # ChatGPT-specific optimized instructions
-│   ├── global/                  # Global custom instructions (choose one)
+│   ├── mcp-management-guide.md    # MCP server lifecycle: add, remove, team connectors
+│   ├── pr-review-protocol.md      # Structured PR review routing and posting
+│   ├── CLAUDE.md                  # Example project CLAUDE.md
+│   └── README.md                 # Claude section overview
+├── chatgpt/                        # ChatGPT-specific optimized instructions
+│   ├── global/                    # Global custom instructions (choose one)
 │   │   ├── general-instructions.md      # For general development work
 │   │   └── professional-instructions.md # For DevOps/infrastructure focus
-│   ├── projects/                # Project-specific instructions for ChatGPT Projects
+│   ├── projects/                  # Project-specific instructions for ChatGPT Projects
 │   │   ├── infrastructure-project.md    # Infrastructure/DevOps projects
 │   │   ├── development-project.md       # Software development projects
-│   │   └── mixed-project.md            # Full-stack/mixed projects
-│   ├── implementation-guide.md  # How to use ChatGPT instructions effectively
-│   └── README.md               # ChatGPT instruction system overview
-├── mcp/                        # Model Context Protocol (MCP) configurations
-│   ├── cursor/                 # Cursor-specific MCP configurations
-│   │   ├── configuration.json  # Main MCP config template
-│   │   └── setup-guide.md      # Step-by-step setup instructions
-│   ├── tools/                  # Individual MCP tool documentation
-│   │   ├── terraform-tools.md  # Terraform/HCP integration
-│   │   ├── github-tools.md     # GitHub integration
-│   │   └── filesystem-tools.md # Filesystem access tools
-│   ├── security/               # Security and credential management
-│   │   └── 1password-integration.md # 1Password CLI integration
-│   └── README.md              # MCP overview and setup guide
-└── quality/                    # Quality assurance and standards
-    ├── code-quality.md         # Code quality and linting requirements
-    ├── documentation.md        # Documentation standards and practices
-    └── research-standards.md   # Research and information validation
+│   │   └── mixed-project.md             # Full-stack/mixed projects
+│   ├── implementation-guide.md    # How to use ChatGPT instructions effectively
+│   └── README.md                  # ChatGPT instruction system overview
+├── cursor/                         # Cursor IDE configurations and rules
+│   ├── mcp/                       # MCP configurations for Cursor
+│   │   ├── configuration.json     # Main MCP config template
+│   │   ├── setup-guide.md        # Step-by-step setup instructions
+│   │   ├── README.md             # MCP overview
+│   │   ├── tools/                 # Individual MCP tool documentation
+│   │   │   ├── terraform-tools.md
+│   │   │   ├── github-tools.md
+│   │   │   └── filesystem-tools.md
+│   │   └── security/              # Security and credential management
+│   │       └── 1password-integration.md
+│   ├── mdc-rules/                 # MDC format rules for Cursor IDE
+│   │   ├── documentation/        # Documentation rules
+│   │   ├── formatting/           # Code formatting rules
+│   │   ├── kubernetes/           # Kubernetes/Helm rules
+│   │   ├── language-specific/    # Language-specific rules
+│   │   ├── naming/               # Naming convention rules
+│   │   ├── structure/            # Project structure rules
+│   │   ├── terraform/            # Terraform rules
+│   │   └── README.md
+│   ├── user-rules/                # User rules for Cursor
+│   ├── multi-tool-coexistence.md  # Running multiple AI tools together
+│   └── README.md                  # Cursor section overview
+├── cursor-recovery/                # Cursor data recovery tools
+│   └── sync_conversations_to_workspace.py
+├── examples/                       # Runnable examples (hooks, workflows, configs)
+├── quality/                        # Quality assurance and standards
+│   ├── code-quality.md            # Code quality and linting requirements
+│   ├── documentation.md           # Documentation standards and practices
+│   └── research-standards.md      # Research and information validation
+├── .github/                        # GitHub templates and CI
+│   ├── workflows/lint.yml         # Markdownlint CI
+│   ├── ISSUE_TEMPLATE/            # Bug report and feature request templates
+│   └── PULL_REQUEST_TEMPLATE.md   # PR template
+├── CONTRIBUTING.md                 # How to contribute
+└── LICENSE                         # CC BY 4.0
 ```
 
 ## Important Usage Notes
@@ -151,12 +185,19 @@ If uncertain about which context applies, ask for clarification rather than assu
 - Use `chatgpt/projects/` for ChatGPT Projects feature
 - Follow `chatgpt/implementation-guide.md` for setup
 
+**For Claude Code:**
+
+- Start with `claude/claude-best-practices.md` for the end-to-end workflow
+- Use `claude/hooks-guide.md` and `claude/settings-json-guide.md` for runtime configuration
+- See `claude/github-actions-integration.md` for CI/CD automation
+- Use `claude/scaffolding/` as a starting template for your `.claude/` directory
+
 **For Cursor with MCP:**
 
-- Use `mcp/cursor/configuration.json` as template for MCP setup
-- Follow `mcp/cursor/setup-guide.md` for complete installation
-- Review `mcp/tools/` for specific tool configurations
-- Implement `mcp/security/1password-integration.md` for secure credential management
+- Use `cursor/mcp/configuration.json` as template for MCP setup
+- Follow `cursor/mcp/setup-guide.md` for complete installation
+- Review `cursor/mcp/tools/` for specific tool configurations
+- Implement `cursor/mcp/security/1password-integration.md` for secure credential management
 
 ## Key Features
 
@@ -208,7 +249,7 @@ If uncertain about which context applies, ask for clarification rather than assu
 ### Integration with AI Tools
 
 - **ChatGPT**: Use the optimized instructions in `chatgpt/` directory - see `chatgpt/implementation-guide.md` for setup
-- **Claude**: Include in system prompts or conversation context
+- **Claude Code**: Use `claude/` directory for comprehensive guides — see `claude/claude-best-practices.md` for the starting point
 - **Cursor**: Add to workspace rules or project-specific configurations, plus MCP integration via `mcp/cursor/` for advanced tool access
 - **GitHub Copilot**: Include as comments in your codebase or IDE settings
 
@@ -226,7 +267,7 @@ This repository represents battle-tested standards from real-world software deve
 
 ## License
 
-This repository is intended for public use and learning. Feel free to adapt, modify, and extend these rules for your own needs.
+This repository is licensed under [CC BY 4.0](LICENSE). You are free to share and adapt the content for any purpose, including commercially, with attribution.
 
 ## Acknowledgments
 

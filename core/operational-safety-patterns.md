@@ -187,6 +187,51 @@ git push --force-with-lease
 
 The remote branch is the safety net — if anything goes wrong, `git reset --hard origin/<branch>` restores the original state. `--force-with-lease` prevents accidentally overwriting someone else's concurrent push.
 
+## Approval Interpretation
+
+### "Looks Good" Is Not "Execute Everything"
+
+When a user approves a plan or output ("looks good", "approved", "yes"), only proceed with the **explicitly stated next step**. Do not auto-chain to merge, deploy, apply, or any subsequent action.
+
+**Why this matters:** A user confirming that a plan looks correct is not authorizing execution of the entire plan. Each phase (plan → implement → test → merge → deploy) needs its own confirmation. Auto-chaining from approval to execution is the #1 cause of unintended deployments and force-pushes.
+
+### Stop and Report on No Matches
+
+When performing a scan, review, or categorization task and no files or items match any category:
+
+1. Stop immediately
+2. Report "No matches found"
+3. Do not continue to subsequent steps
+4. Do not make assumptions about what should have matched
+
+The absence of results is itself a finding. Continuing past a "no matches" result leads to operating on empty data, which produces nonsensical outputs that waste time.
+
+### "Continue" Means Resume, Not Re-Verify
+
+When a user says "continue" after a pause or interruption, resume directly from where work left off. Do not:
+
+- Re-read git state or working directory
+- Re-verify the environment
+- Re-summarize what was done
+
+"Continue" is an explicit trust signal. The user has context and wants forward progress, not a status report.
+
+### Privacy Scanning Before Public Commits
+
+Before committing to any public or shared repository, grep the staged diff for:
+
+- Company names and internal domains
+- Personal names, usernames, and email addresses
+- Account IDs, workspace IDs, and internal identifiers
+- Token prefixes and credential fragments
+- Internal service names and endpoints
+
+```bash
+git diff --staged | grep -iE '(company|internal-domain|username|account-id)'
+```
+
+If a leak is discovered after push, rewrite history immediately (`git filter-repo`) and force-push — do not just add a cleanup commit on top, as the secret remains in git history.
+
 ## State Management Safety
 
 ### Workspaces and Environments

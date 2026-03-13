@@ -8,3 +8,6 @@ MD041: false
 
 # Angle-bracket placeholders like <service-name> are intentional
 MD033: false
+
+# Table column style — existing tables use compact style throughout
+MD060: false

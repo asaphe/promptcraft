@@ -81,6 +81,32 @@ Structure every non-trivial task as: **Explore → Plan → Code → Commit**.
 
 Skipping phases 1-2 is the most common source of wasted effort. Claude will jump straight to coding if you let it — explicit phase boundaries prevent this.
 
+### Prompt Chaining
+
+For complex tasks that exceed a single prompt's effective scope, break them into sequential prompts where each step's output feeds the next:
+
+1. **Explore** — "Read module X. List all public functions with their signatures. Do NOT suggest changes."
+2. **Analyze** — "Given this inventory, identify functions that lack input validation or error handling."
+3. **Plan** — "For each finding, propose a fix. Show before/after signatures. Do NOT implement."
+4. **Implement** — "Implement the approved fixes, one function at a time. Run tests after each."
+
+**Why chaining beats monolithic prompts:**
+
+| Single Prompt | Chained Prompts |
+|---------------|-----------------|
+| Entire task must fit in working memory | Each step has focused context |
+| Errors compound across steps | Course correction between steps |
+| Hard to review intermediate reasoning | Each step produces reviewable output |
+| Context fills on large codebases | Each step can start with clean context |
+
+**Common chains:**
+
+- **Bug fix:** Reproduce → Trace root cause → Propose fix → Implement → Verify
+- **Feature:** Explore patterns → Plan → Implement backend → Implement frontend → Integration test
+- **Review:** Summarize changes → Check security → Verify tests → Write summary
+
+See [prompting-examples.md](../core/prompting-examples.md) for concrete examples with input/output pairs.
+
 ### Dev Docs Pattern
 
 For features spanning multiple sessions, maintain a working document set:
@@ -382,6 +408,10 @@ See: [../core/operational-safety-patterns.md](../core/operational-safety-pattern
 - [Portability Guide](portability-guide.md) — Dotfiles, symlinks, backups, and multi-machine setup
 - [MCP Management Guide](mcp-management-guide.md) — Adding, removing, and managing MCP servers across scopes
 - [Review Agent Trio](agents/review-agent-trio.md) — Specialized reviewer agents for higher-quality PR review
+- [Hooks Guide](hooks-guide.md) — Designing PreToolUse, PostToolUse, and Stop hooks
+- [Settings JSON Guide](settings-json-guide.md) — Permissions, env vars, hook registration, layering
+- [GitHub Actions Integration](github-actions-integration.md) — Claude Code in CI/CD via claude-code-action
+- [Prompting Examples](../core/prompting-examples.md) — Multishot examples, XML structuring, prompt chaining demos
 - [Scaffolding Directory](scaffolding/) — Complete example `.claude/` directory ready to customize
 
 ---

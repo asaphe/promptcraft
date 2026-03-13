@@ -12,6 +12,14 @@ Claude Code discovers agent files from `.claude/agents/*.md`. Each file defines 
 
 Agents run as subprocesses with their own context window. They do NOT share conversation history with the parent — they get a fresh context with only their system prompt and the task description.
 
+**Subagents do NOT inherit CLAUDE.md, rules, or parent context.** Per official documentation, subagents receive only their system prompt plus basic environment details. This means:
+
+- Critical instructions from CLAUDE.md must be embedded directly in the agent's markdown body
+- Rules files (`.claude/rules/`) are NOT loaded into subagent context
+- Content that appears "duplicated" between CLAUDE.md and agent definitions is intentional — it's the only way agents receive those instructions
+- The `skills` field is the mechanism to inject additional context on demand
+- Do NOT remove "duplicate" content from agent definitions to DRY things up — the agent will lose access to those instructions
+
 ## YAML Frontmatter Specification
 
 ```yaml
