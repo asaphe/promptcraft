@@ -88,6 +88,23 @@ When using `for` expressions to filter data from JSON config files or data sourc
 - **Prefer direct Helm/kubectl for urgent fixes** — For incident response, use `helm upgrade` or `kubectl patch` directly. Let Terraform converge after the PR merges via CI/CD.
 - **Stuck Helm releases need manual recovery** — A `helm_release` stuck in `pending-upgrade` or `pending-rollback` state cannot be updated by Terraform. Use `helm uninstall` followed by a fresh `terraform apply` to recover. This is safe when the release's supporting resources (IAM roles, secrets, queues) are managed separately.
 
+## Open-Source Terraform Modules
+
+Reusable, production-tested Terraform modules following the patterns described in this guide:
+
+| Module | Description |
+|--------|-------------|
+| [terraform-helm](https://github.com/asaphe/terraform-helm) | Helm release management (provider v3) |
+| [terraform-aws-ecr](https://github.com/asaphe/terraform-aws-ecr) | ECR repositories, lifecycle policies, replication |
+| [terraform-aws-glue](https://github.com/asaphe/terraform-aws-glue) | Glue jobs, crawlers, triggers, connections |
+| [terraform-aws-s3](https://github.com/asaphe/terraform-aws-s3) | S3 buckets with encryption, versioning, lifecycle |
+| [terraform-aws-sqs](https://github.com/asaphe/terraform-aws-sqs) | SQS queues with DLQ, IAM policies, FIFO support |
+| [terraform-aws-security-group](https://github.com/asaphe/terraform-aws-security-group) | Security groups with map-based rule definitions |
+| [terraform-aws-rds](https://github.com/asaphe/terraform-aws-rds) | Aurora RDS clusters with replicas, parameter groups |
+| [terraform-aws-cloudwatch-log-group](https://github.com/asaphe/terraform-aws-cloudwatch-log-group) | CloudWatch log groups with optional streams, KMS |
+| [terraform-datadog-monitors](https://github.com/asaphe/terraform-datadog-monitors) | Datadog monitors with notification handle formatting |
+| [terraform-clickhouse-service](https://github.com/asaphe/terraform-clickhouse-service) | ClickHouse Cloud services with scaling, encryption |
+
 ## Development Workflow
 
 - Before providing any Terraform code, test it to confirm it works as expected

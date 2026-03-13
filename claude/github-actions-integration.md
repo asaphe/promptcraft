@@ -259,6 +259,21 @@ jobs:
           prompt: "Review this PR for security and correctness issues."
 ```
 
+## Open-Source Composite Actions
+
+Reusable composite GitHub Actions for common CI/CD patterns:
+
+| Action | Description |
+|--------|-------------|
+| [github-action-setup-aws](https://github.com/asaphe/github-action-setup-aws) | AWS OIDC role assumption, CLI install, ECR login |
+| [github-action-setup-poetry](https://github.com/asaphe/github-action-setup-poetry) | Poetry install, Python setup, dependency caching |
+| [github-action-terraform-plan-apply](https://github.com/asaphe/github-action-terraform-plan-apply) | Terraform plan/apply with workspace loop, targets, error handling |
+| [github-action-terraform-destroy](https://github.com/asaphe/github-action-terraform-destroy) | Terraform destroy with workspace loop and plan-only mode |
+| [github-action-terraform-force-unlock](https://github.com/asaphe/github-action-terraform-force-unlock) | Detect and force-unlock Terraform state locks |
+| [github-action-terraform-step-summary](https://github.com/asaphe/github-action-terraform-step-summary) | Standardized Terraform step summaries |
+| [github-action-hadolint](https://github.com/asaphe/github-action-hadolint) | Hadolint Dockerfile linter without Docker dependency |
+| [github-action-slack-notify](https://github.com/asaphe/github-action-slack-notify) | Slack DM and channel notifications with GitHub user resolution |
+
 ## Related Resources
 
 - [GitHub Actions Patterns](../workflows/github-actions.md) — General GHA development protocol
