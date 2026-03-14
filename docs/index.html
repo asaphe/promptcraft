@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptCraft — Production-tested prompt engineering patterns</title>
+<meta name="description" content="Production-tested prompt engineering patterns for AI coding assistants. Open source guides for Claude Code, ChatGPT, Cursor, and more.">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0f0f0f;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Inter', sans-serif;
+    padding: 40px;
+  }
+
+  .card {
+    width: 1080px;
+    max-width: 100%;
+    background: #111113;
+    border-radius: 24px;
+    padding: 56px 60px 52px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: -120px;
+    left: -120px;
+    width: 450px;
+    height: 450px;
+    background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .card::after {
+    content: '';
+    position: absolute;
+    bottom: -100px;
+    right: -100px;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 8px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .logo-icon {
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 32px;
+    font-weight: 700;
+    color: #f0f0f0;
+    letter-spacing: -0.5px;
+  }
+
+  .title span { color: #818cf8; }
+
+  .subtitle {
+    font-size: 16px;
+    color: #71717a;
+    margin-bottom: 40px;
+    position: relative;
+    z-index: 1;
+    padding-left: 60px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  a.item {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 24px;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: block;
+  }
+
+  a.item:hover {
+    border-color: rgba(99,102,241,0.3);
+    background: rgba(99,102,241,0.04);
+  }
+
+  .item-icon {
+    font-size: 24px;
+    margin-bottom: 14px;
+    display: block;
+  }
+
+  .item-title {
+    font-weight: 700;
+    font-size: 15px;
+    color: #e4e4e7;
+    margin-bottom: 8px;
+    letter-spacing: -0.2px;
+  }
+
+  .item-desc {
+    font-size: 13px;
+    color: #71717a;
+    line-height: 1.55;
+  }
+
+  .item-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(99,102,241,0.1);
+    color: #a5b4fc;
+    border: 1px solid rgba(99,102,241,0.15);
+  }
+
+  .tag.green {
+    background: rgba(16,185,129,0.1);
+    color: #6ee7b7;
+    border-color: rgba(16,185,129,0.15);
+  }
+
+  .tag.amber {
+    background: rgba(245,158,11,0.1);
+    color: #fcd34d;
+    border-color: rgba(245,158,11,0.15);
+  }
+
+  .tag.rose {
+    background: rgba(244,63,94,0.08);
+    color: #fda4af;
+    border-color: rgba(244,63,94,0.12);
+  }
+
+  .tag.cyan {
+    background: rgba(6,182,212,0.1);
+    color: #67e8f9;
+    border-color: rgba(6,182,212,0.15);
+  }
+
+  .footer {
+    margin-top: 36px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .footer-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .footer-left a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+  }
+
+  .gh-icon {
+    width: 22px;
+    height: 22px;
+    opacity: 0.5;
+  }
+
+  .footer-url {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: #a1a1aa;
+    font-weight: 500;
+  }
+
+  .footer-left a:hover .footer-url { color: #e4e4e7; }
+  .footer-left a:hover .gh-icon { opacity: 0.8; }
+
+  .open-source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(16,185,129,0.08);
+    border: 1px solid rgba(16,185,129,0.15);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6ee7b7;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+
+  .open-source-badge::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    background: #10b981;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(16,185,129,0.5);
+  }
+
+  @media (max-width: 768px) {
+    body { padding: 16px; }
+    .card { padding: 32px 24px 28px; }
+    .grid { grid-template-columns: 1fr; }
+    .title { font-size: 24px; }
+    .subtitle { padding-left: 0; margin-top: 12px; }
+  }
+
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <div class="logo-icon">&#x2726;</div>
+    <div class="title">prompt<span>craft</span></div>
+  </div>
+  <div class="subtitle">Production-tested prompt engineering patterns for AI coding assistants</div>
+
+  <div class="grid">
+    <a class="item" href="https://github.com/asaphe/promptcraft/tree/main/core">
+      <span class="item-icon">&#x1F9E0;</span>
+      <div class="item-title">Core Principles</div>
+      <div class="item-desc">Tone control, safety patterns, tool validation, and agent design fundamentals</div>
+      <div class="item-tags">
+        <span class="tag">agents</span>
+        <span class="tag">guardrails</span>
+      </div>
+    </a>
+
+    <a class="item" href="https://github.com/asaphe/promptcraft/tree/main/claude">
+      <span class="item-icon">&#x1F4DC;</span>
+      <div class="item-title">Claude Code</div>
+      <div class="item-desc">Hooks, settings layering, subagent design, skills, slash commands &amp; scaffolding</div>
+      <div class="item-tags">
+        <span class="tag">hooks</span>
+        <span class="tag">subagents</span>
+        <span class="tag">skills</span>
+      </div>
+    </a>
+
+    <a class="item" href="https://github.com/asaphe/promptcraft/tree/main/cursor">
+      <span class="item-icon">&#x2699;&#xFE0F;</span>
+      <div class="item-title">ChatGPT &amp; Cursor</div>
+      <div class="item-desc">Custom instructions, MCP server configs, and MDC rules optimized for each tool</div>
+      <div class="item-tags">
+        <span class="tag amber">MCP</span>
+        <span class="tag amber">MDC</span>
+      </div>
+    </a>
+
+    <a class="item" href="https://github.com/asaphe/promptcraft/tree/main/infrastructure">
+      <span class="item-icon">&#x1F3D7;&#xFE0F;</span>
+      <div class="item-title">Infrastructure</div>
+      <div class="item-desc">Battle-tested standards for Terraform, Kubernetes, Docker, AWS &amp; GitHub Actions</div>
+      <div class="item-tags">
+        <span class="tag green">terraform</span>
+        <span class="tag green">k8s</span>
+        <span class="tag green">aws</span>
+      </div>
+    </a>
+
+    <a class="item" href="https://github.com/asaphe/promptcraft/tree/main/workflows">
+      <span class="item-icon">&#x1F680;</span>
+      <div class="item-title">CI/CD Integration</div>
+      <div class="item-desc">Run Claude Code in pipelines with claude-code-action for automated workflows</div>
+      <div class="item-tags">
+        <span class="tag rose">pipelines</span>
+        <span class="tag rose">actions</span>
+      </div>
+    </a>
+
+    <a class="item" href="https://github.com/asaphe/promptcraft/tree/main/examples">
+      <span class="item-icon">&#x1F4C2;</span>
+      <div class="item-title">Production Examples</div>
+      <div class="item-desc">Sanitized real-world agents, rules, skills, hooks &amp; configs from a production monorepo</div>
+      <div class="item-tags">
+        <span class="tag cyan">agents</span>
+        <span class="tag cyan">rules</span>
+        <span class="tag cyan">skills</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="footer">
+    <div class="footer-left">
+      <a href="https://github.com/asaphe/promptcraft">
+        <svg class="gh-icon" viewBox="0 0 24 24" fill="#a1a1aa"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        <span class="footer-url">asaphe/promptcraft</span>
+      </a>
+    </div>
+    <div class="footer-right">
+      <span class="open-source-badge">Open Source</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>
