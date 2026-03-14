@@ -1,0 +1,42 @@
+// Claude Code settings.json — Hook configuration patterns
+//
+// Hooks intercept tool calls at specific lifecycle points.
+// This shows two common patterns:
+// 1. PreToolUse hook that rewrites Bash commands (RTK token optimization)
+// 2. StatusLine command that shows contextual info in the CLI
+{
+  // Environment variables available to Claude Code
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+
+  "hooks": {
+    // PreToolUse hooks fire BEFORE a tool executes.
+    // They can:
+    //   - Allow the call (exit 0, no output)
+    //   - Rewrite the call (output JSON with updatedInput)
+    //   - Block the call (output JSON with permissionDecision: "deny")
+    "PreToolUse": [
+      {
+        // Only apply this hook to Bash tool calls
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            // This hook rewrites commands to use RTK for token-optimized output.
+            // The hook script receives the tool input as JSON on stdin and can
+            // return modified input via stdout.
+            "command": "~/.claude/hooks/rtk-rewrite.sh"
+          }
+        ]
+      }
+    ]
+  },
+
+  // StatusLine shows persistent context below the input line.
+  // The command receives session JSON on stdin and outputs styled text.
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline-command.sh"
+  }
+}

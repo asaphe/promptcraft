@@ -1,0 +1,111 @@
+// Claude Code settings.json — Permission patterns
+//
+// This shows how to configure tool permissions for maximum autonomy
+// while maintaining safety through CLAUDE.md rules (not permission denials).
+//
+// Key concepts:
+// - "defaultMode": "plan" means Claude starts in plan mode (read-only)
+//   and must be explicitly allowed to execute tools
+// - Bash(*) is a wildcard that allows all bash commands
+// - More granular Bash(cmd *) patterns allow specific commands
+// - MCP tool permissions use namespace__toolname patterns
+// - WebFetch(domain:...) restricts web access to specific domains
+// - Skill(...) allows specific skill invocations
+{
+  "permissions": {
+    // Default to plan mode — Claude must ask before executing
+    "defaultMode": "plan",
+
+    "allow": [
+      // --- Core tools (always needed) ---
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "NotebookEdit",
+      "WebFetch",
+      "WebSearch",
+      "Task",
+
+      // --- Bash: wildcard approach ---
+      // This allows ALL bash commands. Safety comes from CLAUDE.md rules
+      // (e.g., "never run destructive commands without approval").
+      // Alternative: list specific commands below instead.
+      "Bash(*)",
+
+      // --- Bash: granular approach (use INSTEAD of the wildcard above) ---
+      // Remove the Bash(*) line above if you prefer granular control.
+      // Infrastructure tools
+      "Bash(terraform:*)",
+      "Bash(aws:*)",
+      "Bash(kubectl:*)",
+      "Bash(helm:*)",
+
+      // Development tools
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(python3:*)",
+      "Bash(make:*)",
+      "Bash(npx:*)",
+
+      // Utilities
+      "Bash(curl:*)",
+      "Bash(jq:*)",
+      "Bash(yq:*)",
+      "Bash(dig:*)",
+      "Bash(openssl:*)",
+
+      // Linters
+      "Bash(tflint:*)",
+      "Bash(hadolint:*)",
+      "Bash(shellcheck:*)",
+      "Bash(actionlint:*)",
+
+      // --- Compound commands with env vars ---
+      // Allow terraform with specific AWS profiles
+      "Bash(AWS_PROFILE=prod terraform:*)",
+      "Bash(AWS_PROFILE=prod aws:*)",
+      "Bash(AWS_PROFILE=prod kubectl:*)",
+
+      // --- MCP tool permissions ---
+      // Wildcard for all tools from a specific MCP server
+      "mcp__claude-in-chrome__*",
+      "mcp__ide__*",
+
+      // Specific MCP tools (more secure than wildcard)
+      "mcp__filesystem__list_directory",
+      "mcp__filesystem__read_file",
+      "mcp__filesystem__write_file",
+      "mcp__github__get_pull_request",
+      "mcp__github__get_pull_request_files",
+      "mcp__github__create_pull_request_review",
+
+      // Project management MCP tools
+      "mcp__project-mgmt__create_sprint_task",
+      "mcp__project-mgmt__update_task",
+      "mcp__project-mgmt__get_task",
+      "mcp__project-mgmt__search_tasks",
+
+      // Terraform MCP
+      "mcp__terraform__resourceUsage",
+
+      // --- WebFetch domain allowlist ---
+      "WebFetch(domain:docs.datadoghq.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.anthropic.com)",
+
+      // --- Skill permissions ---
+      "Skill(scan-history)",
+      "Skill(pr-review)",
+      "Skill(pr-resolver)",
+      "Skill(open-ticket)",
+      "Skill(deploy)"
+    ],
+
+    // Additional directories Claude can access
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}

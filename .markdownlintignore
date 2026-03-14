@@ -1,0 +1,10 @@
+# Pre-existing files with lint violations — fix separately
+claude/agents/review-agent-trio.md
+claude/claude-best-practices.md
+claude/learning-system-guide.md
+claude/mcp-management-guide.md
+claude/portability-guide.md
+claude/specs/ci-cd-specification.md
+core/agent-design-patterns.md
+cursor/multi-tool-coexistence.md
+cursor/user-rules/general-principles.md
