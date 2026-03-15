@@ -46,7 +46,7 @@
 
 - **Plan multi-workspace Terraform operations upfront** — Before running `terraform plan` across multiple workspaces of the same module, list all target workspaces once, then plan each sequentially or in parallel (using isolated directories per the existing rule). Batch all plans first, review the full set, then apply — do not interleave plan->review->apply per workspace.
 
-- **Cache fetched credentials and secrets within a session** — When a secret or token is fetched (`aws secretsmanager get-secret-value`, OIDC token exchange, etc.), save it to a temp file on first fetch using restricted permissions (`f=$(mktemp /tmp/.cred-XXXXXX) && chmod 600 "$f"`). Reuse for subsequent calls. Clean up temp files at session end.
+- **Cache fetched credentials and secrets within a session** — When a secret or token is fetched (`aws secretsmanager get-secret-value`, OIDC token exchange, etc.), export it to an env var on first fetch (e.g., `export MY_TOKEN=$(aws secretsmanager get-secret-value ...)`). Reuse `$MY_TOKEN` in subsequent calls. Env vars die with the shell session — no cleanup needed and no secrets left on disk.
 
 - **Use `kubectl rollout status` or `kubectl wait` instead of polling** — When watching a deployment rollout or waiting for a resource to become ready, use blocking commands (`kubectl rollout status deployment/<name> -n <ns> --timeout=300s` or `kubectl wait --for=condition=Ready pod -l app=<name> -n <ns> --timeout=300s`) instead of repeatedly running `kubectl get pods`. Run blocking waits with `run_in_background`.
 
