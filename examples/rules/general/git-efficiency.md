@@ -13,3 +13,5 @@
 - **Use `git diff --stat` before full diffs** — Start with `git diff --stat` to see which files changed and by how much. Only read full diffs for files that matter.
 
 - **Prefer `gh` CLI over `gh api` for standard operations** — Use `gh pr list`, `gh pr view`, `gh pr create`, `gh run view` etc. instead of raw `gh api` REST calls. The CLI handles pagination, auth, and output formatting. Reserve `gh api` for operations the CLI doesn't support natively (e.g., GraphQL mutations, dismissals).
+
+- **Batch GraphQL mutations when resolving multiple threads** — Use aliased mutations in a single `gh api graphql` query instead of one call per thread. A PR with 10 threads should resolve in 1-2 API calls, not 10-20. Example: `mutation { a: resolveReviewThread(input:{threadId:"PRRT_1"}) { ... } b: resolveReviewThread(input:{threadId:"PRRT_2"}) { ... } }`. This applies to any GitHub GraphQL operation where multiple items need the same mutation.

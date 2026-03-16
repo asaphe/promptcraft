@@ -119,7 +119,12 @@ The user has multiple clones: `~/projects/repo` (primary), `repo-2`, `repo-3`.
 - Always identify which clone at the start of work
 - Be explicit about paths when referencing files across clones
 - Don't assume which clone — ask if unclear
+- Search across all clones for prior context — when the user references
+  "a conversation from today" or "we discussed X", check session history
+  filtered across all project paths, not just the current clone
 ```
+
+The history search pattern is important because Claude Code stores session history per-project-path. Without cross-clone searching, context from a conversation in `repo-2` is invisible when working in `repo-3`.
 
 ### Testing and Validation Philosophy
 
