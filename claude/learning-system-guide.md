@@ -365,6 +365,21 @@ The key insight: **rules should carry zero provenance**. Dates, confirmation cou
 | **`/scan-history` skill** | On-demand history mining | Deeper analysis than automated hooks can provide |
 | **`learning-classifier` agent** | Classification assistant | Resolves ambiguous personal vs team classification |
 | **`.claude/rules/`** | Team-shared operational rules | Final destination for team-wide learnings |
+| **[RTK](https://github.com/rtk-ai/rtk) `learn`** | CLI correction mining | Scans session history for failed→retried command pairs, generates `.claude/rules/cli-corrections.md` |
+
+### RTK Learn — Automated CLI Correction Capture
+
+[RTK](https://github.com/rtk-ai/rtk)'s `learn` subcommand complements the behavioral learning system by focusing specifically on CLI corrections. It scans Claude Code session history for patterns where a command failed and was retried with a different command that succeeded, then extracts reusable rules.
+
+```bash
+rtk learn                    # Scan current project, last 30 days
+rtk learn --all --since 60   # Scan all projects, last 60 days
+rtk learn --write-rules      # Generate .claude/rules/cli-corrections.md
+```
+
+The `--write-rules` flag generates a rules file that Claude Code auto-loads, preventing the same CLI mistakes from recurring. Use `--min-confidence` and `--min-occurrences` to filter noise.
+
+**Division of responsibility:** The hook-based learning system (SessionEnd, PreCompact) captures *behavioral* corrections ("don't mock the DB", "verify before asserting"). RTK learn captures *CLI* corrections ("use `--output table` instead of piping through python", "pass `--ref branch` to `gh workflow run`"). Both feed into `.claude/rules/` but from different signal sources.
 
 ## Key Principles
 
