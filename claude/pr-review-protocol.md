@@ -20,9 +20,7 @@ For mixed PRs (e.g., application code + Terraform + GitHub Actions), spawn all a
 
 ## Act on Reviewer Deferrals
 
-When a reviewer agent's output contains a deferral (e.g., "defer to infrastructure reviewer", "outside my scope"), the orchestrating agent must spawn the deferred reviewer before reporting results. Deferrals are incomplete reviews, not informational notes.
-
-For mixed PRs (e.g., application code + Terraform + CI config), spawn all applicable reviewers in parallel. A deferral left unactioned means part of the PR was never reviewed.
+When a reviewer agent's output contains a deferral (e.g., "defer to infrastructure reviewer", "outside my scope"), the orchestrating agent must spawn the deferred reviewer before reporting results. Deferrals are incomplete reviews, not informational notes. A deferral left unactioned means part of the PR was never reviewed.
 
 ## Present Findings Before Posting
 

@@ -171,7 +171,7 @@ Not all workflow trigger events support the same filters. Before combining trigg
 | Filter | Supported Events |
 |--------|-----------------|
 | `paths` / `paths-ignore` | `push`, `pull_request`, `pull_request_target` only |
-| `branches` / `branches-ignore` | `push`, `pull_request`, `pull_request_target`, `pull_request_review` (limited) |
+| `branches` / `branches-ignore` | `push`, `pull_request`, `pull_request_target`, `workflow_run` |
 | `types` (activity types) | Most events, but varies per event |
 
 **Anti-pattern:** Using `pull_request_review` alongside `paths` in a workflow intended to run only for specific file changes. The `paths` filter is silently ignored for `pull_request_review`, causing the workflow to fire on every PR approval repo-wide.
