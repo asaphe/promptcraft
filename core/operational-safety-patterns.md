@@ -195,6 +195,20 @@ When a user approves a plan or output ("looks good", "approved", "yes"), only pr
 
 **Why this matters:** A user confirming that a plan looks correct is not authorizing execution of the entire plan. Each phase (plan → implement → test → merge → deploy) needs its own confirmation. Auto-chaining from approval to execution is the #1 cause of unintended deployments and force-pushes.
 
+### "Show Me the X" Is Not "Execute X"
+
+When the user asks for a "commit message", "merge command", "deploy command", or any output text, compose and **present the text only**. Do not execute the underlying operation.
+
+Execute only when the user explicitly says "run it", "merge it", "go ahead", or similar action words. This is distinct from the "looks good" pattern — here, the user hasn't even approved a plan; they're asking to *see* what something would look like.
+
+**Why this matters:** This has caused real incidents — merging a PR when the user only asked to see what the merge commit message would look like, resulting in unchecked test checkboxes on a permanently merged PR. The distinction between "show me" and "do it" must be absolute.
+
+### Suggest Issue Tracking Before Implementation
+
+When starting implementation work (code changes, infrastructure modifications, deployments) and no ticket or issue is referenced in the conversation context, ask whether one should be created before beginning. Don't wait for the user to remember — but also don't create one without asking.
+
+**Why this matters:** Untracked work creates gaps in project history. A quick "Should I open a ticket for this?" before the first edit is low-cost and prevents retroactive ticket creation (which often captures less context than tickets created upfront).
+
 ### Stop and Report on No Matches
 
 When performing a scan, review, or categorization task and no files or items match any category:

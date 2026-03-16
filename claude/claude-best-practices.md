@@ -399,6 +399,7 @@ See: [../core/operational-safety-patterns.md](../core/operational-safety-pattern
 
 ## Related Resources
 
+- [Auto Memory Guide](auto-memory-guide.md) — Designing effective persistent memory for cross-session learning
 - [CLAUDE.md Design Guide](global-claude-md-guide.md) — How to structure your personal and project CLAUDE.md files
 - [Agent Design Guide](agents/agent-design-guide.md) — Building specialized subagents with proper boundaries
 - [Skill Design Guide](skills/skill-design-guide.md) — Creating slash commands for reusable workflows

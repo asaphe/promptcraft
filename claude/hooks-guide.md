@@ -167,6 +167,23 @@ Hooks follow the same layering as settings:
 
 Multiple hooks on the same event run sequentially. If any PreToolUse hook returns `"block"`, the tool call is prevented.
 
+## Token Optimization via Command Rewriting
+
+A high-impact PreToolUse pattern is rewriting CLI commands through a token-optimized proxy. Tools like [RTK (Rust Token Killer)](https://github.com/rtk-ai/rtk) intercept Bash commands and filter verbose output, achieving 60-90% token savings on common developer operations (git, terraform, kubectl, aws CLI).
+
+The hook pattern is a thin delegator:
+
+1. Hook receives the Bash command from stdin JSON
+2. Delegates to an external binary for rewrite logic (single source of truth)
+3. Returns the rewritten command via `updatedInput` in the hook response
+4. Gracefully degrades (exits 0 with no output) if the binary is missing or too old
+
+**Key design insight:** Keep rewrite rules in the external tool, not the hook script. This lets the tool maintain its own registry of supported commands and keeps the hook script stable across updates.
+
+See `../examples/hooks/rtk/` for a production implementation.
+
+**Gotcha:** Token-optimized output can truncate list commands, causing Claude to conclude a resource doesn't exist when it does. For commands where a missing entry changes the decision (workspace lists, secret inventories, image registries), bypass the proxy and use the raw command.
+
 ## Performance Considerations
 
 - Hooks run synchronously — keep them fast (< 100ms ideally)

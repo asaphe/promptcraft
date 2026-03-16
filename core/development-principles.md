@@ -214,6 +214,14 @@ When encountering technical obstacles:
 - Consider long-term maintainability and scalability
 - Validate approaches against user's specific technical environment
 
+### Evaluate Existing Tools Before Building Custom Solutions
+
+When a task or plan proposes building infrastructure tooling (CI workflows, drift detection, monitoring, automation, token optimization), research 5-7 existing products or open-source alternatives first. Produce a comparison table covering: feature coverage, maintenance burden, integration effort, cost, and maturity.
+
+Include this evaluation in the ticket or design document before committing to a custom build. Even when DIY wins, the documented evaluation prevents future "why didn't we just use X?" questions and ensures the team has considered the trade-offs.
+
+**When to skip:** Trivial scripts (< 50 lines), project-specific glue code, or cases where the user has already evaluated alternatives and made a decision.
+
 ## Implementation Standards
 
 ### DO

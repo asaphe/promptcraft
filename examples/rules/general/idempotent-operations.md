@@ -1,0 +1,9 @@
+# Idempotent Operations
+
+- **Read-before-write for all external state mutations** — Before creating or updating any external resource (cloud parameter, API registration, infrastructure workspace, secret), read the current state first. If the resource already exists, reuse its identifiers and metadata. Only generate new identifiers when the resource is confirmed absent. Pattern: `read -> exists? reuse : create`. This applies to: workflow steps that write to cloud services, API calls that create resources, and any merge/dedup logic on shared data.
+
+- **New data wins in merge operations** — When merging new entries into an existing collection (parameter store list, JSON config, infrastructure state), put new entries first so dedup functions (`unique_by`, `DISTINCT ON`, `dict.update`) keep the updated version, not the stale one. Document the merge strategy in a comment. If the operation is append-only (no updates expected), document that assumption too.
+
+- **Verify outcome matches intent before returning success** — After a mutating operation, check that the result matches what was requested. Don't return success (HTTP 2xx, exit 0) if a downstream step failed silently. Read back the state to confirm. Example: after writing to a parameter store, read it back and verify the entry count. After registering a resource, GET it to confirm.
+
+- **Review workflows for re-run safety** — When reviewing code that orchestrates multi-step operations (CI/CD workflows, deployment scripts, provisioning pipelines), trace the data flow assuming the operation has already been performed once. For each step, verify: (1) does it check for existing state before acting? (2) does it produce the same outcome on retry? (3) does it use consistent identifiers across all downstream consumers? A workflow that generates a random ID and passes it to 3 different services must ensure all 3 get the same ID on re-run.

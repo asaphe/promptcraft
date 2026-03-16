@@ -24,6 +24,7 @@ claude/
 ├── scaffolding/                # Complete example .claude/ directory (copy and customize)
 │   ├── .claude/               # Example project config with agents, rules, skills, docs
 │   └── global-claude-md-example.md  # Example ~/.claude/CLAUDE.md
+├── auto-memory-guide.md        # How to design effective persistent memory entries
 ├── claude-best-practices.md    # End-to-end best practices guide (context, planning, tools, workflow)
 ├── global-claude-md-guide.md   # How to design personal ~/.claude/CLAUDE.md
 ├── portability-guide.md        # Dotfiles, symlinks, backups, Desktop vs Code config
@@ -138,6 +139,22 @@ Guides and templates for building Claude Code skills (user-invocable slash comma
 - Tool selection guide
 
 **Use When:** Creating a new `.claude/skills/<name>/SKILL.md` file
+
+### Auto Memory Guide
+
+#### auto-memory-guide.md
+
+**Purpose:** How to design effective persistent memory entries for cross-session learning
+
+**Features:**
+
+- Four memory types (user, feedback, project, reference) with save triggers and examples
+- File format with YAML frontmatter and MEMORY.md index pattern
+- What NOT to save (avoiding duplication with other persistence mechanisms)
+- Design principles (specificity over breadth, feedback as highest ROI)
+- Memory vs other persistence mechanisms comparison
+
+**Use When:** Setting up auto memory for a new project, training team members on effective memory usage, or reviewing memory quality
 
 ### Best Practices Guide
 

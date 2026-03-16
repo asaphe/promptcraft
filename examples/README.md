@@ -29,7 +29,7 @@ Supporting documentation referenced by agents and skills — PR review methodolo
 Operational rules captured from production incidents and repeated corrections. Organized by domain:
 
 - **`devops/`** — K8s deployment patterns (init container gotchas, pod idle verification)
-- **`general/`** — Git safety, PR workflows, CI monitoring, execution discipline, operational safety
+- **`general/`** — Git safety, PR workflows, CI monitoring, execution discipline, operational safety, idempotent operations
 
 ### `skills/`
 
