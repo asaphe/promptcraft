@@ -377,7 +377,13 @@ rtk learn --all --since 60   # Scan all projects, last 60 days
 rtk learn --write-rules      # Generate .claude/rules/cli-corrections.md
 ```
 
-The `--write-rules` flag generates a rules file that Claude Code auto-loads, preventing the same CLI mistakes from recurring. Use `--min-confidence` and `--min-occurrences` to filter noise.
+Use `--min-confidence` and `--min-occurrences` to filter noise.
+
+**Caveats:**
+
+- **Review before committing** — `--write-rules` outputs raw command pairs, which may include infrastructure IDs, account details, internal repo names, and other sensitive data. Always review the generated file before committing, especially in shared or public repositories.
+- **Signal-to-noise depends on workflow** — RTK learn works best for repetitive workflows (build/test/lint cycles, standard deployments) where the same command patterns recur. For varied infrastructure work (ad-hoc Terraform, AWS CLI, K8s debugging), most corrections are one-off and context-dependent. Use `--min-occurrences 2` to surface only recurring patterns.
+- **Prefer `rtk learn` as a report first** — Run without `--write-rules` to review what it finds. Only generate the rules file after confirming the corrections are genuinely reusable.
 
 **Division of responsibility:** The hook-based learning system (SessionEnd, PreCompact) captures *behavioral* corrections ("don't mock the DB", "verify before asserting"). RTK learn captures *CLI* corrections ("use `--output table` instead of piping through python", "pass `--ref branch` to `gh workflow run`"). Both feed into `.claude/rules/` but from different signal sources.
 
