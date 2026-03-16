@@ -393,7 +393,8 @@ Use `--min-confidence` and `--min-occurrences` to filter noise.
 2. **Zero UX impact** — SessionEnd and PreCompact hooks are async. SessionStart is sync but fast (file existence check).
 3. **Personal vs shared is a spectrum** — Use the classification table, but when in doubt, start in auto memory and promote to rules after confirming the pattern recurs.
 4. **Rules carry no metadata** — No dates, counts, or session references. Pure actionable bullets.
-5. **Review date headers are for humans** — The `<!-- Last reviewed -->` comment helps humans track staleness; Claude ignores HTML comments in context.
-6. **Pipefail safety is non-negotiable** — Every `jq` and `grep` pipeline in hook scripts must end with `|| true`. A silent hook abort means lost learnings with no visible error.
-7. **Symlink plugin scripts to the canonical hooks** — Eliminates the duplicate-maintenance burden that caused bug propagation (e.g., missing `|| true` fixes needing to be applied in two places).
-8. **Organize rules into scoped subdirectories** — Use `paths:` frontmatter to conditionally load domain-specific rules. General rules (no `paths:`) always load; domain rules only load when relevant files are in scope. This keeps token usage proportional to task relevance as the rule set grows.
+5. **Rules must capture the general principle, not just one instance** — When authoring a rule, check whether it would also prevent analogous mistakes. If a rule says "don't use X" but the real principle is "only A, B, C support feature Y", teach the principle. Narrow rules get bypassed by the next variant. Both authors and reviewers should verify this.
+6. **Review date headers are for humans** — The `<!-- Last reviewed -->` comment helps humans track staleness; Claude ignores HTML comments in context.
+7. **Pipefail safety is non-negotiable** — Every `jq` and `grep` pipeline in hook scripts must end with `|| true`. A silent hook abort means lost learnings with no visible error.
+8. **Symlink plugin scripts to the canonical hooks** — Eliminates the duplicate-maintenance burden that caused bug propagation (e.g., missing `|| true` fixes needing to be applied in two places).
+9. **Organize rules into scoped subdirectories** — Use `paths:` frontmatter to conditionally load domain-specific rules. General rules (no `paths:`) always load; domain rules only load when relevant files are in scope. This keeps token usage proportional to task relevance as the rule set grows.

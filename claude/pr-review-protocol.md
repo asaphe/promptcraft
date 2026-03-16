@@ -18,6 +18,10 @@ Before starting a review, determine what changed and route to the appropriate re
 
 For mixed PRs (e.g., application code + Terraform + GitHub Actions), spawn all applicable reviewers in parallel. Each reviewer focuses on its domain.
 
+## Act on Reviewer Deferrals
+
+When a reviewer agent's output contains a deferral (e.g., "defer to infrastructure reviewer", "outside my scope"), the orchestrating agent must spawn the deferred reviewer before reporting results. Deferrals are incomplete reviews, not informational notes. A deferral left unactioned means part of the PR was never reviewed.
+
 ## Present Findings Before Posting
 
 After a review agent returns findings, **present them to the user for approval** before posting to the PR. The user may want to:

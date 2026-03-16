@@ -153,6 +153,31 @@ Warning: Unexpected input(s) 'new_parameter_name', valid inputs are ['old_parame
 - [ ] Verified old parameter name returns ZERO grep results
 - [ ] Ran workflow syntax validation
 
+#### 7. Research Before Designing
+
+Before implementing a new trigger pattern, gating mechanism, or architectural approach in a workflow, research how the community solves the same problem:
+
+- Search GitHub Community discussions and official docs for the pattern you're considering
+- Check 2-3 established open-source repos for precedent
+- Verify that the GitHub events you plan to use actually support the features you need (e.g., `paths` filtering is only supported on `push`, `pull_request`, and `pull_request_target` — not on `pull_request_review`, `issue_comment`, `schedule`, or other events)
+- Present the research findings and chosen pattern before writing code
+
+A 10-minute search prevents shipping an anti-pattern that takes hours to unwind.
+
+#### 8. Event Trigger Compatibility
+
+Not all workflow trigger events support the same filters. Before combining triggers:
+
+| Filter | Supported Events |
+|--------|-----------------|
+| `paths` / `paths-ignore` | `push`, `pull_request`, `pull_request_target` only |
+| `branches` / `branches-ignore` | `push`, `pull_request`, `pull_request_target`, `workflow_run` |
+| `types` (activity types) | Most events, but varies per event |
+
+**Anti-pattern:** Using `pull_request_review` alongside `paths` in a workflow intended to run only for specific file changes. The `paths` filter is silently ignored for `pull_request_review`, causing the workflow to fire on every PR approval repo-wide.
+
+**Correct pattern:** Use `pull_request` with `paths` as the trigger and check the additional condition (e.g., approval status) inside a job step using `actions/github-script` or the GitHub API.
+
 ### Project-Specific Standards
 
 #### Version Pinning
