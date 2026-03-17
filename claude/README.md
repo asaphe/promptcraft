@@ -27,7 +27,10 @@ claude/
 ├── auto-memory-guide.md        # How to design effective persistent memory entries
 ├── claude-best-practices.md    # End-to-end best practices guide (context, planning, tools, workflow)
 ├── global-claude-md-guide.md   # How to design personal ~/.claude/CLAUDE.md
+├── issue-writing-guide.md      # How to write effective issues (proposals, bugs, design discussions)
+├── pii-prevention-guide.md     # Preventing sensitive data leakage in public repos
 ├── portability-guide.md        # Dotfiles, symlinks, backups, Desktop vs Code config
+├── public-contribution-guide.md # End-to-end open source contribution workflow
 ├── mcp-management-guide.md     # MCP server lifecycle: add, remove, team connectors, pitfalls
 ├── pr-review-protocol.md       # Structured PR review routing and posting
 └── README.md                   # This file
@@ -155,6 +158,50 @@ Guides and templates for building Claude Code skills (user-invocable slash comma
 - Memory vs other persistence mechanisms comparison
 
 **Use When:** Setting up auto memory for a new project, training team members on effective memory usage, or reviewing memory quality
+
+### Open Source Contribution Guide
+
+#### public-contribution-guide.md
+
+**Purpose:** End-to-end workflow for contributing to open-source projects using Claude Code
+
+**Features:**
+
+- Pre-coding checklist (study repo, check existing work, open issue first)
+- Implementation discipline (fork, branch, match conventions, test with their gate)
+- PII scanning at every commit boundary
+- PR submission accuracy (test counts, verification claims, issue references)
+- Common mistakes table
+
+**Use When:** Contributing to any open-source project, especially first-time contributions to a new repo
+
+#### issue-writing-guide.md
+
+**Purpose:** How to write effective issues — feature proposals, bug reports, and design discussions
+
+**Features:**
+
+- Three issue structures (concrete proposal, bug report, design discussion)
+- Title and body writing quality guidelines
+- Follow-up protocol after PR ships
+- Anti-patterns (vague reports, prescribing architecture, stale issues)
+
+**Use When:** Opening issues on open-source projects, structuring internal feature requests
+
+#### pii-prevention-guide.md
+
+**Purpose:** Preventing sensitive data leakage in public or shared repositories
+
+**Features:**
+
+- Comprehensive table of data categories that leak (cloud IDs, accounts, paths, domains, credentials)
+- Scan timing (when to check) and methods (git diff, staged, PR body, fixtures)
+- Sanitization replacement patterns
+- Automated protection (git hooks, Claude Code rules, build-time defaults)
+- Recovery procedure for accidental pushes
+- PR description hygiene (what never belongs in a public PR body)
+
+**Use When:** Working on any public or shared repo, reviewing PRs for data exposure, setting up automated protection
 
 ### Best Practices Guide
 

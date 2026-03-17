@@ -400,6 +400,9 @@ See: [../core/operational-safety-patterns.md](../core/operational-safety-pattern
 ## Related Resources
 
 - [Auto Memory Guide](auto-memory-guide.md) — Designing effective persistent memory for cross-session learning
+- [Public Contribution Guide](public-contribution-guide.md) — End-to-end open source contribution workflow
+- [Issue Writing Guide](issue-writing-guide.md) — Structuring effective issues and proposals
+- [PII Prevention Guide](pii-prevention-guide.md) — Preventing sensitive data leakage in public repos
 - [CLAUDE.md Design Guide](global-claude-md-guide.md) — How to structure your personal and project CLAUDE.md files
 - [Agent Design Guide](agents/agent-design-guide.md) — Building specialized subagents with proper boundaries
 - [Skill Design Guide](skills/skill-design-guide.md) — Creating slash commands for reusable workflows
