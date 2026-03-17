@@ -2,22 +2,51 @@
 
 How to prevent sensitive data leakage when working on public or shared repositories.
 
+## Define Your Boundary First
+
+Every team has different sensitive data. Before scanning, you need to know what YOUR sensitive patterns are. The process:
+
+1. **List your identifiers** — What names, IDs, domains, and paths would reveal your organization or infrastructure if found in a public repo?
+2. **Build a grep pattern** — Combine them into a single regex you can run against any diff.
+3. **Store it somewhere durable** — Your global `~/.claude/CLAUDE.md`, a git hook, or a shell alias. If it's not automated, it won't happen consistently.
+
+### How to discover your sensitive patterns
+
+Run through this checklist for your environment:
+
+| Question | What to add to your pattern |
+|----------|---------------------------|
+| What's your company/org name? | Company name, domain, GitHub org |
+| What cloud provider(s)? | Resource ID prefixes (AWS: `vpc-`, `sg-`, `i-`; GCP: `projects/`; Azure: `/subscriptions/`) |
+| What account/project IDs do you use? | AWS account numbers, GCP project IDs, Azure subscription GUIDs |
+| What usernames appear in paths? | `/Users/<name>/`, `/home/<name>/` |
+| What internal domains exist? | `internal.company.com`, `admin.company.com` |
+| What credential managers? | 1Password vault URLs, Vault paths, AWS SSM prefixes |
+| What project management tool? | Ticket prefixes (`JIRA-`, `LINEAR-`), workspace IDs |
+| What internal service names? | Names that would reveal architecture if public |
+
+The result is a project-specific pattern like:
+
+```bash
+grep -iE '(mycompany|mycompany\.com|johndoe|internal\.example)' || echo "clean"
+```
+
 ## What Leaks
 
-Data that identifies your infrastructure, organization, or individuals:
+Common categories across most organizations:
 
-| Category | Examples | Risk |
-|----------|----------|------|
-| **Cloud resource IDs** | `vpc-0abc123...`, `sg-038bad...`, `i-0abc...` | Reveals infrastructure topology |
-| **Account IDs** | AWS 12-digit accounts, Azure subscription GUIDs | Enables targeted attacks |
-| **Zone/Hosted IDs** | Route53 `Z0247406X...`, CloudFlare zone IDs | DNS enumeration |
-| **UUIDs** | Databricks account, API keys, correlation IDs | Service identification |
-| **Org/repo names** | `my-company/internal-service` | Reveals private repos |
-| **Domain names** | `internal.example.co`, `admin.company.com` | Internal service discovery |
-| **User paths** | `/Users/johndoe/...`, `/home/deploy/...` | Username enumeration |
-| **Credential references** | `op://Vault/Item`, `1password.com` account URLs | Credential vault targeting |
-| **Internal ticket IDs** | `DEV-1234`, workspace IDs, user IDs | Internal tracking exposure |
-| **IP ranges / CIDRs** | `10.60.0.0/16`, private subnets | Network topology |
+| Category | Risk | Examples |
+|----------|------|----------|
+| **Organization names** | Reveals who you are | Company name in URLs, repos, domains |
+| **Cloud resource IDs** | Infrastructure topology | AWS `vpc-*`/`sg-*`/`i-*`, GCP `projects/*`, Azure `subscriptions/*` |
+| **Account identifiers** | Targeted attacks | AWS 12-digit accounts, GCP project IDs, Azure subscription GUIDs |
+| **DNS identifiers** | DNS enumeration | Route53 zone IDs, CloudFlare zone IDs, custom domains |
+| **UUIDs** | Service identification | API keys, account IDs, correlation IDs in any platform |
+| **User paths** | Username enumeration | `/Users/name/`, `/home/name/`, `C:\Users\name\` |
+| **Credential references** | Vault targeting | 1Password URIs, HashiCorp Vault paths, AWS SSM paths |
+| **Internal ticket IDs** | Internal tracking exposure | `JIRA-1234`, `LINEAR-ABC`, workspace/user IDs |
+| **IP ranges** | Network topology | Private CIDRs, VPN ranges, internal subnets |
+| **Internal domains** | Service discovery | Internal APIs, admin panels, monitoring dashboards |
 
 ## When to Scan
 
@@ -34,20 +63,16 @@ Scan at every boundary where content crosses from private to public:
 
 ### Git diff scan
 
-```bash
-git diff | grep -iE '(company-name|internal-domain|username|account-id-pattern)' || echo "clean"
-```
-
-Build a project-specific pattern covering your sensitive identifiers:
+Use the pattern you built in step 1:
 
 ```bash
-git diff | grep -iE '(mycompany|mycompany\.com|johndoe|123456789012|vpc-0|sg-0|internal\.example)' || echo "clean"
+git diff | grep -iE '<your-pattern>' || echo "clean"
 ```
 
 ### Staged files scan
 
 ```bash
-git diff --staged | grep -iE '<pattern>' || echo "clean"
+git diff --staged | grep -iE '<your-pattern>' || echo "clean"
 ```
 
 ### PR body / issue text
@@ -61,24 +86,23 @@ Before posting, search your draft text for the same patterns. Pay special attent
 ### Test fixtures
 
 ```bash
-grep -rE '<pattern>' tests/fixtures/ || echo "clean"
+grep -rE '<your-pattern>' tests/fixtures/ || echo "clean"
 ```
 
 ## Sanitization Patterns
 
-When you need to include examples that originally contained sensitive data, replace with generic placeholders:
+When including examples that originally contained sensitive data, replace with generic placeholders. Choose placeholders that are obviously not real:
 
-| Original | Replacement |
-|----------|------------|
-| `vpc-0abc123def456789a` | `vpc-<ID>` |
-| `123456789012` (account) | `<ACCOUNT_ID>` |
-| `Z0247406X6CI60Z1JQ2` | `Z<ZONE_ID>` |
-| `292bf5a3-e432-483f-b14d-949b412ea11a` | `<UUID>` |
-| `/Users/johndoe/projects/...` | `~/projects/...` |
-| `my-company/internal-service` | `<org>/<repo>` |
-| `company.1password.com` | `<vault-host>` |
-| `DEV-1234` | `TICKET-1234` |
-| `10.60.0.0/16` | `10.x.x.x/16` |
+| Type | Original | Replacement |
+|------|----------|------------|
+| Cloud resource | `vpc-0abc123def456789a` | `vpc-<ID>` |
+| Account | `123456789012` | `<ACCOUNT_ID>` |
+| UUID | `292bf5a3-e432-483f-...` | `<UUID>` |
+| User path | `/Users/johndoe/...` | `~/...` |
+| Org/repo | `my-company/my-service` | `<org>/<repo>` |
+| Domain | `admin.company.com` | `internal.example.com` |
+| Ticket | `JIRA-1234` | `TICKET-1234` |
+| CIDR | `10.60.0.0/16` | `10.x.x.x/16` |
 
 ## Automated Protection
 
@@ -88,9 +112,10 @@ Add a pre-commit hook that scans for your known patterns:
 
 ```bash
 #!/bin/bash
-if git diff --staged | grep -qiE '(mycompany|johndoe|123456789012)'; then
-  echo "ERROR: Staged changes contain sensitive data"
-  git diff --staged | grep -niE '(mycompany|johndoe|123456789012)'
+PATTERN='(mycompany|johndoe|internal\.example)'  # <-- customize this
+if git diff --staged | grep -qiE "$PATTERN"; then
+  echo "ERROR: Staged changes may contain sensitive data"
+  git diff --staged | grep -niE "$PATTERN"
   exit 1
 fi
 ```
@@ -109,13 +134,13 @@ workspace/account IDs, email addresses, and token prefixes.
 
 ### Build-time sanitization
 
-When building tools that generate output files (like CLI correction rules), sanitize by default and provide a `--no-sanitize` flag for debugging. Users should never need to remember to sanitize — the safe default protects them.
+When building tools that generate output files (reports, rules, logs), sanitize by default and provide a `--no-sanitize` flag for debugging. Users should never need to remember to sanitize — the safe default protects them.
 
 ## Recovery
 
 If sensitive data is pushed to a public repo:
 
-1. **Don't just add a cleanup commit** — The data is in git history forever
+1. **Don't just add a cleanup commit** — The data remains in git history
 2. **Rewrite history immediately:**
 
    ```bash
@@ -130,7 +155,7 @@ If sensitive data is pushed to a public repo:
 
 Things that should NEVER appear in a PR body on a public repo:
 
-- "No PII or company-specific data in any new/changed content" — This checkbox reveals you're sanitizing from a private source
+- Checkboxes about PII scanning — this reveals you're sanitizing from a private source
 - Real infrastructure IDs, even in "before" examples
 - Internal repo paths or URLs
 - References to specific company accounts or vaults
