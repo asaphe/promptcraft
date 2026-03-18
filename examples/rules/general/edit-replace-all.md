@@ -1,0 +1,3 @@
+# Edit Tool replace_all Safety
+
+- **Don't use `replace_all` when extracting a value into a named variable** — When refactoring a repeated value into a named variable (Terraform local, Python constant, TypeScript variable, Go const), `replace_all` will match the definition site too, creating a self-reference. For example, extracting `"us-east-1"` into `local.region` and using `replace_all` turns the definition into `local.region = local.region`. Instead: replace usage sites individually, or use a pattern that excludes the definition line. This applies to any language where a variable definition contains the same literal it replaces.
