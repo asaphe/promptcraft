@@ -22,6 +22,7 @@ Supporting documentation referenced by agents and skills — PR review methodolo
 ### `hooks/`
 
 - **`rtk/`** — PreToolUse hook that rewrites Bash commands through RTK (Rust Token Killer) for 60-90% token savings on CLI output. Includes the awareness rule that teaches Claude how to handle RTK failures.
+- **`destructive-guard/`** — PreToolUse hook that blocks destructive git/GitHub operations (`gh pr close`, `git push --force`, `git reset --hard`, etc.). Forces Claude to ask the user before proceeding. Includes customization examples for Terraform, kubectl, and AWS.
 - **`statusline/`** — Statusline command showing directory, git branch, AWS profile, model name, and context window usage with color-coded thresholds.
 
 ### `rules/`

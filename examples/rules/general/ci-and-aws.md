@@ -4,6 +4,8 @@
 
 - **Never poll CI in the foreground** — CI monitoring (`gh run view`, `gh run watch`, `gh pr checks`) must always use `run_in_background: true` or be delegated to a subagent. A single `gh run view` to check status once is fine, but any loop or repeated check must be background.
 
+- **`gh pr checks` misreports cancelled as failed** — The `gh pr checks` CLI renders cancelled jobs as `fail`. To distinguish real failures from concurrency cancellations, query the API directly: `gh api repos/{org}/{repo}/actions/runs/{id}/jobs --jq '.jobs[] | {name, conclusion}'`. A `cancelled` conclusion typically indicates concurrency conflicts, not a code issue — but still investigate to confirm.
+
 - **Check AWS session validity before re-authenticating** — Before running `aws sso login`, check with `aws sts get-caller-identity --profile <profile>` — only re-authenticate on failure. Within a session, verify auth once at the start; do not re-check between individual commands unless one returns an auth error.
 
 - **Use official live docs, not the HubFS PDF, for claude-code-action guidance** — The "Complete Guide to Building Skills for Claude" PDF (resources.anthropic.com/hubfs/...) is a marketing document and goes stale. The authoritative always-current references are: `https://code.claude.com/docs/` (Claude Code, GitHub Actions, Skills, Memory) and `https://platform.claude.com/docs/` (API, tool use, SDK). When verifying action parameters, prompt patterns, or `--allowedTools` syntax, fetch from the live docs, not the PDF.

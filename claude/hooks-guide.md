@@ -184,6 +184,12 @@ See `../examples/hooks/rtk/` for a production implementation.
 
 **Gotcha:** Token-optimized output can truncate list commands, causing Claude to conclude a resource doesn't exist when it does. For commands where a missing entry changes the decision (workspace lists, secret inventories, image registries), bypass the proxy and use the raw command.
 
+### Destructive Operation Guard
+
+A PreToolUse hook that blocks destructive git and GitHub CLI operations (`gh pr close`, `git push --force`, `git reset --hard`, etc.), forcing Claude to ask the user before proceeding. Unlike rules that rely on Claude remembering to check, hooks are enforced by the system — they fire even when the agent skips a rule.
+
+See `../examples/hooks/destructive-guard/` for a production implementation with customization examples for Terraform, kubectl, and AWS.
+
 ## Performance Considerations
 
 - Hooks run synchronously — keep them fast (< 100ms ideally)

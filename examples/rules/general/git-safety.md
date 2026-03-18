@@ -15,3 +15,7 @@
 - **Fixup vs squash — know the difference** — `git rebase -i` with `fixup` discards the fixup commit's message (keeps only the target commit's message). `squash` combines both messages. When the user says "fixup", use fixup — they want a clean single message, not a combined one.
 
 - **Never create empty placeholder files** — Only create files when they have actual content to write. Empty files add clutter and serve no purpose. If a file will be populated later, wait until the content is ready.
+
+- **Fix PR branches in-place — never close and reopen PRs** — When a PR branch needs a clean rebase, squash, or conflict resolution: do the work on a temp branch (or locally), then force-push it to the original branch name (`git push --force origin temp-branch:original-branch`). This preserves the PR number, review threads, CI history, and linked tickets. Closing a PR and opening a new one loses all of that context and creates noise in the project timeline.
+
+- **Always create a backup branch before rebase or squash** — Run `git branch <branch>-backup` (or `-pre-rebase`) before any history-rewriting operation. Only delete the backup after verifying the result. Relying on reflog is not a substitute — it's local, temporary, and not explicit.
