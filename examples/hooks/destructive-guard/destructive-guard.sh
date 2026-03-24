@@ -9,6 +9,8 @@
 #
 # Requires: jq
 
+set -euo pipefail
+
 INPUT=$(cat)
 CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 

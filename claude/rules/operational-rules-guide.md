@@ -107,6 +107,34 @@ Organize rules by domain into separate files:
 
 You don't need all of these from day one. Start with `operational-safety.md` and add categories as patterns emerge.
 
+## Rule Authoring Principles
+
+**Lead with positive guidance** — "Always verify the workspace before apply" is followed more reliably than "Never apply to the wrong workspace." Positive framing tells the agent what to do; negative framing only tells it what to avoid, leaving the correct behavior ambiguous. Reserve NEVER/DON'T for genuinely dangerous operations (state mutations, force-push, production deploys) where the emphasis is warranted.
+
+**Capture the principle, not just the incident** — A rule prompted by a specific mistake should prevent the entire class of mistake, not just the exact scenario. Ask: "Would this rule also prevent the next variant of this problem?" If it only catches the exact case encountered, extract the general principle. Example: "Don't consolidate config-X without diffing" → "Diff all environment variants before consolidating shared config."
+
+**Instruction weight: WHAT + WHEN** — Every rule title should answer two questions: what to do, and when to do it. "Re-verify state after context continuation" is better than "Verify state" because it specifies the trigger condition. Without the WHEN, the agent either applies the rule everywhere (wasteful) or nowhere (useless).
+
+**Keep rule files focused** — Each file should contain 3-8 rules maximum. If a file grows beyond 8, split by subdomain. Total auto-loaded rules across all files should stay under 150-200 (the instruction budget ceiling). Count with: `grep -c '^\- \*\*' .claude/rules/**/*.md`.
+
+## Rule Deprecation and Auditing
+
+Rules accumulate but rarely get pruned. Stale rules waste context tokens and can conflict with newer guidance.
+
+**Quarterly audit protocol:**
+
+1. **Count total rules**: `grep -c '^\- \*\*' .claude/rules/**/*.md` — if above 150, prune is overdue
+2. **Check last modification**: `git log --format='%ai' -1 .claude/rules/<file>` — files unchanged for 6+ months are candidates
+3. **Search session history**: For each candidate rule, search recent sessions for the rule title. If never triggered, consider retiring
+4. **Check for contradictions**: Rules added during different incidents may conflict — read all rules in the same domain together
+5. **Verify altitude**: Re-read each rule and ask "Is this still the right level of specificity?" Rules written during an incident are often too narrow
+
+**Retirement options:**
+
+- **Move to `.claude/docs/`** — Becomes an on-demand reference instead of always-loaded. Good for rules that are valid but rare.
+- **Merge into a parent rule** — When multiple narrow rules share a principle, consolidate into one that captures the class.
+- **Delete entirely** — When the underlying system has changed and the rule no longer applies.
+
 ## Anti-Patterns
 
 ### Rules that are too vague

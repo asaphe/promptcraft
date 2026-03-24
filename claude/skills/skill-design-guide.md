@@ -85,6 +85,18 @@ argument-hint: "[application] [deployment-name]"
 argument-hint: "[--since YYYY-MM-DD] [--category category]"
 ```
 
+### Trigger Phrase Design
+
+Skills are discovered by name but activated by user intent. Design both:
+
+**Name for discoverability** — The `/command` name should match the verb users think of. `/deploy` not `/trigger-deployment`. `/check-health` not `/post-deploy-verification`. If users won't guess the name, they won't use the skill.
+
+**Description for matching** — The description field determines when Claude suggests the skill. Include synonyms and alternative phrasings: "deploy, release, rollout, ship" in the description so pattern matching covers natural phrasing. If using a UserPromptSubmit hook for auto-activation, description keywords are what the hook matches against.
+
+**Argument hints for speed** — Power users type `/deploy my-app prod`. The `argument-hint` should mirror the most common invocation order. Put required arguments first, optional ones in brackets.
+
+**Disambiguation with siblings** — When multiple skills could match ("deploy" vs "verify-deploy"), each description must state WHEN to use it AND when NOT to. Include a "When NOT to Use" section in the SKILL.md pointing to the sibling.
+
 ## System Prompt Structure
 
 The markdown body after frontmatter becomes the skill's prompt. Follow this structure:
@@ -328,6 +340,24 @@ Key patterns:
 | Complex workflow | 100-160 | Multi-phase, conditional logic, monitoring |
 
 **Above 160 lines:** Consider splitting into multiple skills or extracting reference material into separate files.
+
+## Context Budget for Skills
+
+Skills run in the main conversation context, so their token cost adds to the session total.
+
+| Component | Token Cost | When Loaded |
+|-----------|-----------|-------------|
+| Skill name + description (in skill list) | ~24 tokens | Every session |
+| Full skill body (when invoked) | 200-600 tokens | On `/command` |
+| Referenced doc files (via `Read`) | Variable | On demand within skill |
+
+**Design for progressive disclosure:**
+
+- **Level 0** (always loaded): Name + description only. Cost: ~24 tokens per skill.
+- **Level 1** (on invocation): Skill body loads. Keep under 600 tokens (the sizing guidelines above help).
+- **Level 2** (within skill): Point to `.claude/docs/` files for reference tables, configuration details, and domain knowledge. The skill says "Read `.claude/docs/deploy-targets.md`" rather than inlining the table.
+
+This three-level approach means 20 skills cost only ~480 tokens in the idle session, scaling gracefully. The full cost is paid only when the skill is actually used.
 
 ## Common Mistakes
 

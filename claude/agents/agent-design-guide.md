@@ -332,6 +332,27 @@ Keep descriptions in CLAUDE.md very brief (one line each) — the full details l
 **Above 400 lines:** Split the agent. The context window cost outweighs the benefit.
 **Below 80 lines:** Consider merging with a related agent — too little context to be useful.
 
+### Instruction Budget Within Agents
+
+Agent behavioral rules (the numbered list in the "Your Behavior" section) should stay at **8-15 rules**. Above 15, the agent starts dropping lower-priority ones under context pressure.
+
+**Primacy effect:** The first 3-5 rules in the behavioral section get the strongest adherence. Place safety-critical rules first (always present plan before applying, always verify workspace, always ask before production). Place process rules after (reporting format, handoff protocol, learning capture).
+
+**Prompt section ordering:** Role paragraph first (establishes identity), then Key References (most frequently needed), then Domain Knowledge, then Behavioral Rules. Triage tables and verification commands can go last — they're consulted only when relevant, not on every invocation.
+
+### Context Budget Math
+
+Concrete numbers for the trade-off between inline content and progressive disclosure:
+
+| Component | Token Cost | Load Timing |
+|-----------|-----------|-------------|
+| Agent system prompt (inline) | ~1 token per word | Every invocation |
+| Skill name + description | ~24 tokens each | Every invocation |
+| Skill full body (when loaded) | 200-800 tokens | On demand |
+| File read via `Read` tool | Variable | On demand |
+
+Rule of thumb: if a section is > 100 tokens and used < 50% of the time, extract it to a skill or doc reference. The 24-token registration cost pays for itself after 2 invocations where the skill is not needed.
+
 ## Progressive Disclosure via Skills
 
 Instead of embedding all domain knowledge in the agent's system prompt (consuming context on every invocation), factor reference material into skill files:

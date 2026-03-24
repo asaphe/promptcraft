@@ -161,9 +161,22 @@ Verify the output matches expectations before registering.
 
 Hooks follow the same layering as settings:
 
-1. **Global** (`~/.claude/settings.json`) — Apply everywhere
-2. **Project** (`.claude/settings.json`) — Apply to this repo only
-3. **Local** (`.claude/settings.local.json`) — Personal overrides, not committed
+1. **Global** (`~/.claude/settings.json`) — Apply everywhere, personal to your machine
+2. **Project** (`.claude/settings.json`) — Apply to this repo only, committed and shared with the team
+3. **Local** (`.claude/settings.local.json`) — Personal overrides for this repo, not committed
+
+### Choosing the Right Layer
+
+| Hook Type | Best Layer | Why |
+|-----------|-----------|-----|
+| Auto-lint on edit (PostToolUse) | **Project** | Everyone benefits from consistent formatting |
+| Destructive command guard (PreToolUse) | **Global** | Personal safety preference, applies everywhere |
+| Pre-push quality gate (PreToolUse) | **Global** | Personal quality bar, may differ between team members |
+| Learning capture (SessionStart/End) | **Project** | Shared learning system, team-wide benefit |
+| Stale reference detection | **Project** | Repo-specific validation, committed with the repo |
+| Notification on idle (Notification) | **Global** | Personal workflow preference |
+
+**Principle:** If the hook enforces a team standard (linting, formatting, testing), put it at project level. If it reflects a personal preference (safety guards, notifications, quality bar), put it at global level. If it's experimental, put it at local level until proven.
 
 Multiple hooks on the same event run sequentially. If any PreToolUse hook returns `"block"`, the tool call is prevented.
 
@@ -190,12 +203,53 @@ A PreToolUse hook that blocks destructive git and GitHub CLI operations (`gh pr 
 
 See `../examples/hooks/destructive-guard/` for a production implementation with customization examples for Terraform, kubectl, and AWS.
 
+## Hooks vs Rules Decision Framework
+
+Hooks and rules serve different purposes. Choosing wrong leads to either wasted overhead (hook for something that needs judgment) or unreliable enforcement (rule for something that must always happen).
+
+| Signal | Use a Hook | Use a Rule |
+|--------|-----------|-----------|
+| Must be enforced 100% of the time | Yes (deterministic) | No (can be forgotten under context pressure) |
+| Requires context or judgment to apply | No (hooks are binary) | Yes (rules guide reasoning) |
+| Blocks a specific tool/command pattern | PreToolUse with matcher | Not enforceable as a rule |
+| Guidance for approach or style | Overkill | Yes (rules shape behavior) |
+| Performance-sensitive (runs on every call) | Must be < 100ms | N/A (rules are just text in context) |
+| Formatting or linting | PostToolUse (auto-fix after edit) | Unreliable (agent may skip) |
+
+**Key principle:** Hooks enforce; rules guide. If the behavior can be expressed as "block X when Y", use a hook. If it requires the agent to weigh trade-offs ("prefer X but consider Y"), use a rule.
+
+**Migration path:** When a rule is violated repeatedly despite being clearly stated, escalate it to a hook. The rule failed as advisory guidance — deterministic enforcement is needed. See the [poka-yoke section](claude-best-practices.md#instruction-design-principles) for the full preference order.
+
+## Failure Modes
+
+Hooks can fail silently, leaving the impression they're protecting you when they aren't.
+
+| Failure Mode | Symptom | Prevention |
+|-------------|---------|------------|
+| Script not executable | Tool call proceeds unblocked | `chmod +x` and test before registering |
+| Invalid JSON output | Claude treats output as empty (proceeds) | Pipe through `jq` in testing |
+| Script exits non-zero without JSON | Treated as "no opinion" (proceeds) | Always exit 0; use JSON `decision` field to block |
+| Matcher too broad | Every tool call triggers the hook | Test matcher against common tool calls (`Edit`, `Read`, `Bash`) |
+| Matcher too narrow | Hook never fires for target pattern | Test with exact tool input strings from a real session |
+| Hook timeout | Kills hook, proceeds without it | Add `timeout 2` wrapper; profile with `time` |
+| Reads `$ENV_VAR` instead of stdin | Gets empty input, exits with no effect | Hooks receive JSON on stdin, not env vars |
+
+**Testing protocol:** Before registering a hook, test it with realistic input:
+
+```bash
+echo '{"tool_name":"Bash","tool_input":{"command":"git push --force"}}' | ./your-hook.sh
+```
+
+Verify the output is valid JSON and the exit code is 0.
+
 ## Performance Considerations
 
-- Hooks run synchronously — keep them fast (< 100ms ideally)
+- **Budget: < 100ms for PreToolUse, < 500ms for PostToolUse/Stop** — PreToolUse blocks the tool call interactively; PostToolUse runs after completion
 - Avoid network calls in PreToolUse hooks (they block every matching tool call)
 - Use `matcher` patterns to narrow scope — don't run expensive checks on every tool call
 - For expensive validation, consider PostToolUse (non-blocking) instead of PreToolUse
+- **Measure before deploying:** `time echo '{"tool_name":"Bash","tool_input":{"command":"ls"}}' | ./hook.sh`
+- **Total hook overhead** per tool call should stay under 200ms across all matching hooks combined
 
 ## Common Mistakes
 
@@ -205,7 +259,8 @@ See `../examples/hooks/destructive-guard/` for a production implementation with 
 | Hook silently fails (no output) | Always test with sample JSON before registering |
 | Hook consumes too many resources | Profile with `time` command; keep under 100ms |
 | Hook output isn't valid JSON | Validate with `jq` before deploying |
-| Hook path is relative | Use absolute paths in settings.json |
+| Hook path is relative | Use absolute paths or `$CLAUDE_PROJECT_DIR` in settings.json |
+| Hook reads env vars instead of stdin | Claude Code passes hook data on stdin as JSON |
 
 ## Related Resources
 
