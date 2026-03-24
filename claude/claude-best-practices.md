@@ -63,6 +63,20 @@ Your total context has a budget. Monitor where tokens go:
 
 Use `paths:` frontmatter on rules files to conditionally load only what's relevant to the current task. See: [learning-system-guide.md](learning-system-guide.md#rules-organization) for the subdirectory pattern.
 
+### Instruction Design Principles
+
+Beyond token counts, how you write instructions determines whether they're followed.
+
+**Instruction Budget** — Frontier models follow approximately 150-200 discrete instructions with consistent quality. Each auto-loaded rule file, CLAUDE.md bullet, and agent behavioral rule competes for the same working memory. When total instruction count exceeds this range, compliance drops on lower-priority rules. Audit quarterly: `grep -c '^\- \*\*' .claude/rules/**/*.md` plus CLAUDE.md bullet count.
+
+**Right Altitude** — Instructions should be specific enough to act on but general enough to cover variants. Too abstract ("be careful with state") gives no actionable guidance. Too specific ("when file X has error Y, run command Z") only catches one case. The sweet spot: state the principle with one concrete example so the agent can generalize. Test: "Would this instruction also prevent the next variant of this problem?"
+
+**Primacy and Recency Effects** — Instructions at the beginning and end of a config file receive disproportionate attention under context pressure. Place highest-priority rules (safety guards, destructive-operation blocks) at the top of CLAUDE.md and at the top of each agent's behavioral section. Place less critical preferences in the middle. Ordering within the file matters as much as total size.
+
+**Progressive Disclosure** — Not everything needs to be in context at once. Three mechanisms reduce baseline token cost: (a) subdirectory CLAUDE.md files load only when working in that directory, (b) `.claude/docs/` files are read on-demand via pointers in CLAUDE.md, (c) agent `skills` field loads skill descriptions (~24 tokens each) until the full body is needed on invocation. See the [skill design guide](skills/skill-design-guide.md) for the three-level disclosure model.
+
+**Poka-Yoke (Mistake-Proofing)** — Design configurations that make mistakes structurally harder rather than relying on the agent remembering a rule. Preference order: hooks (deterministic, blocks the action) > tool scoping in `allowed-tools` (structural, prevents access) > rules (judgment-dependent, can be forgotten). If a behavior must happen 100% of the time, it belongs in a hook, not a rule. See the [hooks guide](hooks-guide.md#hooks-vs-rules-decision-framework) for the decision framework.
+
 ---
 
 ## Planning & Workflow
