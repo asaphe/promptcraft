@@ -107,6 +107,91 @@ Organize rules by domain into separate files:
 
 You don't need all of these from day one. Start with `operational-safety.md` and add categories as patterns emerge.
 
+## Rule Authoring Principles
+
+**Lead with positive guidance** — "Always verify the workspace before apply" is followed more reliably than "Never apply to the wrong workspace." Positive framing tells the agent what to do; negative framing only tells it what to avoid, leaving the correct behavior ambiguous. Reserve NEVER/DON'T for genuinely dangerous operations (state mutations, force-push, production deploys) where the emphasis is warranted.
+
+**Capture the principle, not just the incident** — A rule prompted by a specific mistake should prevent the entire class of mistake, not just the exact scenario. Ask: "Would this rule also prevent the next variant of this problem?" If it only catches the exact case encountered, extract the general principle. Example: "Don't consolidate config-X without diffing" → "Diff all environment variants before consolidating shared config."
+
+**Instruction weight: WHAT + WHEN** — Every rule title should answer two questions: what to do, and when to do it. "Re-verify state after context continuation" is better than "Verify state" because it specifies the trigger condition. Without the WHEN, the agent either applies the rule everywhere (wasteful) or nowhere (useless).
+
+**Keep rule files focused** — Each file should contain 3-8 rules maximum. If a file grows beyond 8, split by subdomain. Total auto-loaded rules across all files should stay under 150-200 (the instruction budget ceiling). Count with: `grep -c '^\- \*\*' .claude/rules/**/*.md`.
+
+## Rule Deprecation and Auditing
+
+Rules accumulate but rarely get pruned. Stale rules waste context tokens and can conflict with newer guidance.
+
+**Quarterly audit protocol:**
+
+1. **Count total rules**: `grep -c '^\- \*\*' .claude/rules/**/*.md` — if above 150, prune is overdue
+2. **Check last modification**: `git log --format='%ai' -1 .claude/rules/<file>` — files unchanged for 6+ months are candidates
+3. **Search session history**: For each candidate rule, search recent sessions for the rule title. If never triggered, consider retiring
+4. **Check for contradictions**: Rules added during different incidents may conflict — read all rules in the same domain together
+5. **Verify altitude**: Re-read each rule and ask "Is this still the right level of specificity?" Rules written during an incident are often too narrow
+
+**Retirement options:**
+
+- **Move to `.claude/docs/`** — Becomes an on-demand reference instead of always-loaded. Good for rules that are valid but rare.
+- **Merge into a parent rule** — When multiple narrow rules share a principle, consolidate into one that captures the class.
+- **Delete entirely** — When the underlying system has changed and the rule no longer applies.
+
+## Context Budget Management
+
+Rules are always-loaded — every bullet consumes context tokens on every conversation. The instruction budget is ~150-200 rules (Claude Code's system prompt uses ~50, leaving ~100-150 for your config). Exceeding this degrades instruction-following quality.
+
+### Measure Your Budget
+
+```bash
+# Count always-loaded rule bullets
+grep -c '^- \*\*' .claude/rules/**/*.md | awk -F: '{sum+=$2} END{print "Total:", sum}'
+
+# Estimate token cost
+cat .claude/CLAUDE.md .claude/rules/**/*.md | wc -c | awk '{printf "~%d tokens\n", $1/4}'
+```
+
+### Reduce With paths: Frontmatter
+
+Rules scoped with `paths:` frontmatter only load when working in matching directories:
+
+```markdown
+---
+paths:
+  - "devops/terraform/**"
+---
+# Terraform Apply Safety
+
+- **Always resolve the running image tag** — ...
+```
+
+This rule loads when editing Terraform files but not when working on Python or TypeScript. Without frontmatter, it loads in every conversation regardless of context.
+
+**Impact:** A project with 150 devops rules and 70 general rules (220 total) can drop to ~80 always-loaded by scoping all domain-specific rules. Terraform rules load only for Terraform work, CI rules only for workflow files, etc.
+
+### Move Context-Specific Rules to On-Demand Docs
+
+Some rules are only relevant during specific activities (PR review, doc writing, investigation). Move these from `.claude/rules/` (always-loaded) to `.claude/docs/` (on-demand) and add load pointers:
+
+1. **In CLAUDE.md** — Add an on-demand reference:
+   ```markdown
+   - **Reviewing a PR?** Read `.claude/docs/pr-workflow.md`
+   ```
+
+2. **In skills** — Add a read instruction at the top of the skill:
+   ```markdown
+   Before starting, read `.claude/docs/pr-workflow.md` for behavioral rules.
+   ```
+
+This way the content loads only when the skill is invoked or the user navigates to a relevant task — not on every conversation start.
+
+### Budget Allocation Guidelines
+
+| Category | Target | Notes |
+|----------|--------|-------|
+| Always-loaded general rules | 30-50 | Safety, editing discipline, git workflow |
+| Domain-specific (with paths:) | 80-120 | Only load when working in their domain |
+| On-demand docs | Unlimited | Loaded by skills and CLAUDE.md pointers |
+| CLAUDE.md | 30-40 | Project overview, agent roster, standards |
+
 ## Anti-Patterns
 
 ### Rules that are too vague

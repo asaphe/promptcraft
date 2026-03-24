@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# PreToolUse hook — blocks destructive git/GitHub operations.
+# PreToolUse hook — hard-blocks destructive git/GitHub operations.
 #
 # Install: add to settings.json under hooks.PreToolUse[].hooks[]
 #   { "type": "command", "command": "/path/to/destructive-guard.sh" }
 #
+# Uses exit code 2 for hard blocks that override allow-list permissions.
 # When blocked, Claude must ask the user before proceeding.
-# The user can still approve — the hook surfaces the action, not prevents it.
 #
 # Requires: jq
+
+set -euo pipefail
 
 INPUT=$(cat)
 CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
@@ -26,6 +28,10 @@ fi
 
 if echo "$CMD" | grep -qE 'gh\s+pr\s+merge'; then
   REASON="gh pr merge — merges a PR. Confirm with the user first."
+fi
+
+if echo "$CMD" | grep -qE 'gh\s+pr\s+create'; then
+  REASON="gh pr create — creating a PR is a visible shared action. Confirm with the user first."
 fi
 
 if echo "$CMD" | grep -qE 'gh\s+run\s+delete'; then
@@ -61,16 +67,8 @@ fi
 # --- Block if matched ---
 
 if [ -n "$REASON" ]; then
-  jq -n \
-    --arg reason "$REASON" \
-    '{
-      "hookSpecificOutput": {
-        "hookEventName": "PreToolUse",
-        "permissionDecision": "block",
-        "permissionDecisionReason": $reason
-      }
-    }'
-  exit 0
+  echo "$REASON" >&2
+  exit 2
 fi
 
 # No match — allow

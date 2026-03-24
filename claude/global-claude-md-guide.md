@@ -138,6 +138,43 @@ Every diff is a finding:
 - **Report ALL findings**, not just the ones related to the current task.
 ```
 
+### Content Ordering and Placement
+
+Instruction position within the file affects how reliably it's followed:
+
+**Primacy and recency** — The top and bottom of your global CLAUDE.md get the most attention under context pressure. Place highest-stakes rules (destructive command guards, production safety) at the top. Place frequently-referenced info (auth profiles, clone paths) near the bottom where it benefits from recency. Put less critical preferences in the middle.
+
+**Recommended section ordering:**
+
+1. Safety and destructive-operation guards (top — highest attention)
+2. Agent behavioral constraints (scope, execution discipline)
+3. Verification philosophy (testing, validation)
+4. Domain-specific rules (auth, commits, infrastructure)
+5. Documentation and output conventions
+6. Workflow and process preferences
+7. Environment-specific info (clones, profiles) (bottom — benefits from recency)
+
+### Layering Strategy and Conflict Resolution
+
+When global and project CLAUDE.md both address the same topic, the more specific instruction wins:
+
+| Scenario | Resolution |
+|----------|-----------|
+| Global says "default profile: prod", project says "default: dev" | Project wins (more specific) |
+| Global says "conventional commits", project says nothing | Global applies (inherited) |
+| Global says "never force-push", project says "force-push OK for backup branches" | Project narrows the rule (acceptable) |
+| Global and project contradict on safety | Treat as a bug — reconcile immediately |
+
+**Design principle:** Global sets the floor (minimum safety, universal preferences). Project CLAUDE.md can raise the bar or specialize, but should not lower safety constraints.
+
+### Measuring Effectiveness
+
+How to tell if your global CLAUDE.md is working:
+
+- **Track corrections per session** — If you're correcting the same behavior repeatedly, the rule isn't working. Rephrase with more specificity or escalate to a hook for deterministic enforcement.
+- **Track rule violations** — When a rule is violated, ask why: was it buried in the middle? Was it too vague? Was it overridden by a project rule?
+- **Monthly audit** — Read your global CLAUDE.md fresh. For each line, ask: "Did this prevent a mistake in the last month?" If not, it's a candidate for removal or demotion to a project-level on-demand doc.
+
 ### Documentation Output Conventions
 
 Control where generated docs go:
