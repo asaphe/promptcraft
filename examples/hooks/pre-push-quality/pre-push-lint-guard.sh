@@ -32,6 +32,7 @@ if [ -z "$CHANGED_FILES" ]; then
   exit 0
 fi
 
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 FAILURES=""
 
 # Scope check — detect PRs mixing app code with infra code
@@ -46,15 +47,12 @@ fi
 # Python — ruff check + format
 PY_FILES=$(echo "$CHANGED_FILES" | grep -E '\.py$' || true)
 if [ -n "$PY_FILES" ]; then
-  REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
-  RUFF_CHECK=$(cd "$REPO_ROOT" && echo "$PY_FILES" | xargs poetry run ruff check 2>&1) || true
-  RUFF_EXIT=$?
-  if [ $RUFF_EXIT -ne 0 ] && echo "$RUFF_CHECK" | grep -qE 'Found [0-9]+ error'; then
-    FAILURES="${FAILURES}\n\n### ruff check failures:\n${RUFF_CHECK}"
+  if ! RUFF_CHECK=$(cd "$REPO_ROOT" && echo "$PY_FILES" | xargs poetry run ruff check 2>&1); then
+    if echo "$RUFF_CHECK" | grep -qE 'Found [0-9]+ error'; then
+      FAILURES="${FAILURES}\n\n### ruff check failures:\n${RUFF_CHECK}"
+    fi
   fi
-  RUFF_FMT=$(cd "$REPO_ROOT" && echo "$PY_FILES" | xargs poetry run ruff format --check 2>&1) || true
-  RUFF_FMT_EXIT=$?
-  if [ $RUFF_FMT_EXIT -ne 0 ]; then
+  if ! RUFF_FMT=$(cd "$REPO_ROOT" && echo "$PY_FILES" | xargs poetry run ruff format --check 2>&1); then
     FAILURES="${FAILURES}\n\n### ruff format failures:\n${RUFF_FMT}"
   fi
 fi
@@ -63,10 +61,8 @@ fi
 TF_FILES=$(echo "$CHANGED_FILES" | grep -E '\.tf$' || true)
 if [ -n "$TF_FILES" ]; then
   TF_DIRS=$(echo "$TF_FILES" | xargs -I{} dirname {} | sort -u)
-  REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
   for dir in $TF_DIRS; do
-    FMT_OUT=$(cd "$REPO_ROOT/$dir" && terraform fmt -check -diff 2>&1) || true
-    if [ -n "$FMT_OUT" ]; then
+    if ! FMT_OUT=$(cd "$REPO_ROOT/$dir" && terraform fmt -check -diff 2>&1); then
       FAILURES="${FAILURES}\n\n### terraform fmt failures in $dir:\n${FMT_OUT}"
     fi
   done
@@ -75,12 +71,9 @@ fi
 # Shell — shellcheck
 SH_FILES=$(echo "$CHANGED_FILES" | grep -E '\.(sh|bash)$' || true)
 if [ -n "$SH_FILES" ]; then
-  REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
   for f in $SH_FILES; do
     if [ -f "$REPO_ROOT/$f" ]; then
-      SC_OUT=$(shellcheck "$REPO_ROOT/$f" 2>&1) || true
-      SC_EXIT=$?
-      if [ $SC_EXIT -ne 0 ]; then
+      if ! SC_OUT=$(shellcheck "$REPO_ROOT/$f" 2>&1); then
         FAILURES="${FAILURES}\n\n### shellcheck failures in $f:\n${SC_OUT}"
       fi
     fi
@@ -90,12 +83,9 @@ fi
 # Dockerfile — hadolint
 DOCKER_FILES=$(echo "$CHANGED_FILES" | grep -E 'Dockerfile' || true)
 if [ -n "$DOCKER_FILES" ]; then
-  REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
   for f in $DOCKER_FILES; do
     if [ -f "$REPO_ROOT/$f" ]; then
-      HL_OUT=$(hadolint "$REPO_ROOT/$f" 2>&1) || true
-      HL_EXIT=$?
-      if [ $HL_EXIT -ne 0 ]; then
+      if ! HL_OUT=$(hadolint "$REPO_ROOT/$f" 2>&1); then
         FAILURES="${FAILURES}\n\n### hadolint failures in $f:\n${HL_OUT}"
       fi
     fi
@@ -105,9 +95,7 @@ fi
 # GitHub Actions — actionlint
 GHA_FILES=$(echo "$CHANGED_FILES" | grep -E '\.github/workflows/.*\.ya?ml$' || true)
 if [ -n "$GHA_FILES" ]; then
-  AL_OUT=$(actionlint 2>&1) || true
-  AL_EXIT=$?
-  if [ $AL_EXIT -ne 0 ]; then
+  if ! AL_OUT=$(actionlint 2>&1); then
     FAILURES="${FAILURES}\n\n### actionlint failures:\n${AL_OUT}"
   fi
 fi
@@ -115,7 +103,6 @@ fi
 # Stale reference check — deleted .md files still referenced in .claude/ docs
 DELETED_MD=$(echo "$CHANGED_FILES" | grep -E '\.md$' || true)
 if [ -n "$DELETED_MD" ]; then
-  REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
   for f in $DELETED_MD; do
     if [ ! -f "$REPO_ROOT/$f" ]; then
       base=$(basename "$f")

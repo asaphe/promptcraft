@@ -36,7 +36,7 @@ else
       if [ ! -f "$ref" ]; then
         FAILURES="${FAILURES}\n  $md_file → $ref (not found)"
       fi
-    done < <(grep -oE '`[a-zA-Z0-9_./ -]+\.(md|mdc|sh|py|ts|json|yaml|yml)`' "$md_file" 2>/dev/null | tr -d '`' | sort -u || true)
+    done < <(grep -oE '`[a-zA-Z0-9_./. -]+\.(md|mdc|sh|py|ts|json|yaml|yml)`' "$md_file" 2>/dev/null | tr -d '`' | sort -u || true)
   done < <(find .claude/ -name '*.md' -not -path '*/.git/*' 2>/dev/null)
 fi
 

@@ -17,6 +17,9 @@ if [[ -z "$TRANSCRIPT_PATH" || ! -f "$TRANSCRIPT_PATH" ]]; then
 fi
 
 PROJECT_DIR=$(dirname "$TRANSCRIPT_PATH")
+if [[ "$PROJECT_DIR" != *".claude/projects"* ]]; then
+  exit 0
+fi
 while [[ ! -d "$PROJECT_DIR/memory" && "$PROJECT_DIR" == *".claude/projects"* ]]; do
   PROJECT_DIR=$(dirname "$PROJECT_DIR")
 done
