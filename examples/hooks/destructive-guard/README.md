@@ -1,25 +1,40 @@
 # Destructive Operation Guard
 
-PreToolUse hook that hard-blocks destructive git and GitHub CLI operations, forcing Claude to ask the user before proceeding.
+PreToolUse hook with two-tier blocking for destructive operations.
+
+## Two-Tier Design
+
+| Tier | Mechanism | Override by `Bash(*)`? | Use for |
+|------|-----------|------------------------|---------|
+| **Hard block** | `exit 2` + stderr | No — always blocks | Irreversible data loss (AWS deletions, `git reset --hard`) |
+| **Soft block** | JSON `permissionDecision` + `exit 0` | Yes — user can approve | Risky but approvable (PR ops, force-push, terraform destroy) |
+
+Hard blocks stop the tool call before permission rules are evaluated — the user must run the command themselves or explicitly instruct Claude to proceed after seeing the block message.
+
+Soft blocks surface a warning. With `Bash(*)` in the allow list, the user sees the warning and can approve in the permission prompt.
 
 ## What It Blocks
 
-| Command Pattern | Why |
-| --------------- | --- |
-| `gh pr close` | Closes a PR — loses review threads, CI history, linked tickets |
-| `gh pr merge` | Merges a PR — visible shared action that needs explicit approval |
-| `gh pr create` | Creates a PR — visible shared action that needs explicit approval |
-| `gh run delete` | Permanently removes CI run history |
-| `git push origin :branch` | Deletes a remote branch, auto-closing any PR using it |
-| `git push --force` | Rewrites remote history |
-| `git branch -D` | Force-deletes a branch with potentially unmerged work |
-| `git reset --hard` | Discards all uncommitted changes |
-| `git checkout --` | Discards uncommitted file changes |
-| `git restore` (non-staged) | Discards uncommitted file changes |
+### Hard Blocks (irreversible)
+
+| Pattern | Why |
+|---------|-----|
+| `git push` on main/master | Must go through PRs |
+| `git reset --hard` | Permanent loss of uncommitted work |
+| `aws * delete-*`, `aws s3 rm`, `aws ec2 terminate-*` | Cloud resource destruction |
+
+### Soft Blocks (confirm first)
+
+| Pattern | Why |
+|---------|-----|
+| `gh pr create/close/merge` | Visible shared actions |
+| `git push --force` | History rewriting (reversible via reflog) |
+| `git branch -D`, `git checkout --`, `git restore` | Discards local changes |
+| `terraform destroy/state rm/force-unlock` | Infrastructure changes |
+| `kubectl delete/drain/scale/patch` | Live cluster mutations |
+| `helm uninstall/rollback` | Release changes |
 
 ## Installation
-
-Add to your `settings.json` (user or project level):
 
 ```json
 {
@@ -41,51 +56,34 @@ Add to your `settings.json` (user or project level):
 
 Requires `jq` on PATH.
 
-## How It Works
-
-When Claude attempts a blocked command, the hook writes the reason to stderr and exits with code 2. Exit code 2 is a **hard block** — it stops the tool call before permission rules are evaluated, meaning it works even when `Bash(*)` is in the allow list.
-
-The hook does not prevent the user from running these commands directly in their terminal. It only gates Claude's autonomous execution.
-
-## Exit Code 2 vs JSON permissionDecision
-
-There are two ways to block a tool call from a PreToolUse hook:
-
-| Method | Mechanism | Override by `Bash(*)` allow? |
-|--------|-----------|------------------------------|
-| `exit 2` + stderr message | **Hard block** — stops before permission evaluation | No — always blocks |
-| JSON `permissionDecision: "block"` + `exit 0` | **Soft block** — evaluated alongside permissions | Yes — `Bash(*)` overrides it |
-
-**Always use exit code 2 for safety guardrails.** The JSON approach is only appropriate for advisory signals where you want the allow list to have the final say.
-
-This distinction matters because many setups use `Bash(*)` for frictionless operation. Without exit code 2, the destructive guard becomes a no-op — commands execute without any prompt.
-
 ## Customization
 
-Add patterns for your stack. Common additions:
+Move patterns between tiers based on your risk tolerance:
 
 ```bash
-# Terraform destroy
-if echo "$CMD" | grep -qE 'terraform\s+destroy'; then
-  REASON="terraform destroy — destroys infrastructure. Confirm target workspace and resources first."
+# Move terraform destroy to hard block (no approval possible)
+HARD_REASON="terraform destroy — blocked unconditionally."
+
+# Move gh pr close to soft block (user can approve)
+SOFT_REASON="gh pr close — confirm with user first."
+```
+
+Add patterns for your stack:
+
+```bash
+# Docker — soft block
+if echo "$CMD" | grep -qE 'docker\s+(rm|rmi|system\s+prune)'; then
+  SOFT_REASON="docker cleanup — removes containers or images."
 fi
 
-# Terraform state removal
-if echo "$CMD" | grep -qE 'terraform\s+state\s+rm'; then
-  REASON="terraform state rm — removes resources from state, orphaning them."
-fi
-
-# kubectl delete
-if echo "$CMD" | grep -qE 'kubectl\s+delete\s'; then
-  REASON="kubectl delete — permanently removes Kubernetes resources."
-fi
-
-# AWS resource deletion
-if echo "$CMD" | grep -qE 'aws\s+\S+\s+delete-'; then
-  REASON="AWS delete operation — confirm the target resource before proceeding."
+# Database CLI — hard block
+if echo "$CMD" | grep -qE '(psql|mysql|mongo).*DROP\s+(DATABASE|TABLE)'; then
+  HARD_REASON="database DROP — irreversible schema destruction."
 fi
 ```
 
-## Relationship to Rules
+## Why Two Tiers?
 
-This hook enforces behavior that CLAUDE.md rules describe. Rules say "ask before destructive operations" — this hook ensures it happens even when Claude forgets. Both are needed: rules for understanding, hooks for enforcement.
+A single `exit 2` for everything is too strict — it blocks operations the user explicitly asked for (like creating a PR) with no way to approve. A single JSON block is too weak — `Bash(*)` wildcards silently override it for operations that should never be auto-approved (like deleting an RDS instance).
+
+The two-tier approach gives you both: unconditional safety for irreversible operations, and a confirmation prompt for everything else.
