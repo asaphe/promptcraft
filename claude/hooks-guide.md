@@ -224,9 +224,11 @@ See `../examples/hooks/rtk/` for a production implementation.
 
 ### Destructive Operation Guard
 
-A PreToolUse hook that blocks destructive git and GitHub CLI operations (`gh pr close`, `git push --force`, `git reset --hard`, etc.), forcing Claude to ask the user before proceeding. Unlike rules that rely on Claude remembering to check, hooks are enforced by the system — they fire even when the agent skips a rule.
+A two-tier PreToolUse hook for destructive operations. **Hard blocks** (exit 2) for irreversible data loss — cannot be overridden. **Soft blocks** (JSON + exit 0) for risky-but-approvable actions — user sees a warning and can approve in the permission prompt.
 
-See `../examples/hooks/destructive-guard/` for a production implementation with customization examples for Terraform, kubectl, and AWS.
+This solves the tension between safety and usability: `exit 2` for everything is too strict (blocks operations the user explicitly asked for), while JSON-only is too weak (`Bash(*)` silently overrides it).
+
+See `../examples/hooks/destructive-guard/` for a production implementation with two-tier blocking, customization examples for Terraform, kubectl, Helm, and AWS.
 
 ## Hooks vs Rules Decision Framework
 
