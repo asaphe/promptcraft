@@ -1,6 +1,6 @@
 # Destructive Operation Guard
 
-PreToolUse hook that blocks destructive git and GitHub CLI operations, forcing Claude to ask the user before proceeding.
+PreToolUse hook that hard-blocks destructive git and GitHub CLI operations, forcing Claude to ask the user before proceeding.
 
 ## What It Blocks
 
@@ -8,6 +8,7 @@ PreToolUse hook that blocks destructive git and GitHub CLI operations, forcing C
 | --------------- | --- |
 | `gh pr close` | Closes a PR — loses review threads, CI history, linked tickets |
 | `gh pr merge` | Merges a PR — visible shared action that needs explicit approval |
+| `gh pr create` | Creates a PR — visible shared action that needs explicit approval |
 | `gh run delete` | Permanently removes CI run history |
 | `git push origin :branch` | Deletes a remote branch, auto-closing any PR using it |
 | `git push --force` | Rewrites remote history |
@@ -42,9 +43,22 @@ Requires `jq` on PATH.
 
 ## How It Works
 
-When Claude attempts a blocked command, the hook returns `permissionDecision: "block"` with a reason explaining what the command does and suggesting an alternative. Claude sees the block message and must adjust its approach — typically by asking the user for confirmation.
+When Claude attempts a blocked command, the hook writes the reason to stderr and exits with code 2. Exit code 2 is a **hard block** — it stops the tool call before permission rules are evaluated, meaning it works even when `Bash(*)` is in the allow list.
 
 The hook does not prevent the user from running these commands directly in their terminal. It only gates Claude's autonomous execution.
+
+## Exit Code 2 vs JSON permissionDecision
+
+There are two ways to block a tool call from a PreToolUse hook:
+
+| Method | Mechanism | Override by `Bash(*)` allow? |
+|--------|-----------|------------------------------|
+| `exit 2` + stderr message | **Hard block** — stops before permission evaluation | No — always blocks |
+| JSON `permissionDecision: "block"` + `exit 0` | **Soft block** — evaluated alongside permissions | Yes — `Bash(*)` overrides it |
+
+**Always use exit code 2 for safety guardrails.** The JSON approach is only appropriate for advisory signals where you want the allow list to have the final say.
+
+This distinction matters because many setups use `Bash(*)` for frictionless operation. Without exit code 2, the destructive guard becomes a no-op — commands execute without any prompt.
 
 ## Customization
 
@@ -56,9 +70,14 @@ if echo "$CMD" | grep -qE 'terraform\s+destroy'; then
   REASON="terraform destroy — destroys infrastructure. Confirm target workspace and resources first."
 fi
 
-# kubectl delete namespace
-if echo "$CMD" | grep -qE 'kubectl\s+delete\s+namespace'; then
-  REASON="kubectl delete namespace — destroys all resources in the namespace."
+# Terraform state removal
+if echo "$CMD" | grep -qE 'terraform\s+state\s+rm'; then
+  REASON="terraform state rm — removes resources from state, orphaning them."
+fi
+
+# kubectl delete
+if echo "$CMD" | grep -qE 'kubectl\s+delete\s'; then
+  REASON="kubectl delete — permanently removes Kubernetes resources."
 fi
 
 # AWS resource deletion

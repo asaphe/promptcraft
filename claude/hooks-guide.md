@@ -65,13 +65,38 @@ Hooks receive a JSON payload on stdin with context about the event:
 
 ### Hook Output
 
-Hooks communicate back via stdout JSON:
+Hooks communicate back via exit codes and optional stdout/stderr:
 
-| Field | Effect |
-|-------|--------|
-| `"decision": "block"` | Prevents the tool call (PreToolUse only) |
-| `"reason": "..."` | Shown to Claude as the reason for blocking |
-| No output / empty | Tool call proceeds normally |
+| Exit Code | Effect |
+|-----------|--------|
+| `0` | Tool call proceeds (default). Optional JSON stdout for advisory signals. |
+| `2` | **Hard block** — tool call is stopped before permission rules are evaluated. Reason on stderr is shown to Claude. |
+| Other non-zero | Treated as hook error; tool call proceeds. |
+
+#### Hard Blocks (exit 2) vs Soft Blocks (JSON)
+
+This distinction is critical for hooks that coexist with wildcard permissions like `Bash(*)`:
+
+| Method | How | Overridden by allow list? |
+|--------|-----|--------------------------|
+| `exit 2` + stderr | Hard block — stops before permissions | **No** — always blocks |
+| JSON `"decision": "block"` + `exit 0` | Soft signal — evaluated with permissions | **Yes** — `Bash(*)` overrides it |
+
+**Always use exit code 2 for safety guardrails.** If your hook uses JSON `"decision": "block"` with exit 0, and the user has `Bash(*)` in their allow list, the block is silently overridden — the command executes without any prompt.
+
+```bash
+# Hard block pattern (recommended for safety hooks)
+if [ -n "$REASON" ]; then
+  echo "$REASON" >&2
+  exit 2
+fi
+
+# Soft block pattern (for advisory hooks where allow list should win)
+if [ -n "$REASON" ]; then
+  jq -n --arg r "$REASON" '{"decision":"block","reason":$r}'
+  exit 0
+fi
+```
 
 ## Design Patterns
 

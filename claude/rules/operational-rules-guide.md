@@ -135,6 +135,63 @@ Rules accumulate but rarely get pruned. Stale rules waste context tokens and can
 - **Merge into a parent rule** — When multiple narrow rules share a principle, consolidate into one that captures the class.
 - **Delete entirely** — When the underlying system has changed and the rule no longer applies.
 
+## Context Budget Management
+
+Rules are always-loaded — every bullet consumes context tokens on every conversation. The instruction budget is ~150-200 rules (Claude Code's system prompt uses ~50, leaving ~100-150 for your config). Exceeding this degrades instruction-following quality.
+
+### Measure Your Budget
+
+```bash
+# Count always-loaded rule bullets
+grep -c '^- \*\*' .claude/rules/**/*.md | awk -F: '{sum+=$2} END{print "Total:", sum}'
+
+# Estimate token cost
+cat .claude/CLAUDE.md .claude/rules/**/*.md | wc -c | awk '{printf "~%d tokens\n", $1/4}'
+```
+
+### Reduce With paths: Frontmatter
+
+Rules scoped with `paths:` frontmatter only load when working in matching directories:
+
+```markdown
+---
+paths:
+  - "devops/terraform/**"
+---
+# Terraform Apply Safety
+
+- **Always resolve the running image tag** — ...
+```
+
+This rule loads when editing Terraform files but not when working on Python or TypeScript. Without frontmatter, it loads in every conversation regardless of context.
+
+**Impact:** A project with 150 devops rules and 70 general rules (220 total) can drop to ~80 always-loaded by scoping all domain-specific rules. Terraform rules load only for Terraform work, CI rules only for workflow files, etc.
+
+### Move Context-Specific Rules to On-Demand Docs
+
+Some rules are only relevant during specific activities (PR review, doc writing, investigation). Move these from `.claude/rules/` (always-loaded) to `.claude/docs/` (on-demand) and add load pointers:
+
+1. **In CLAUDE.md** — Add an on-demand reference:
+   ```markdown
+   - **Reviewing a PR?** Read `.claude/docs/pr-workflow.md`
+   ```
+
+2. **In skills** — Add a read instruction at the top of the skill:
+   ```markdown
+   Before starting, read `.claude/docs/pr-workflow.md` for behavioral rules.
+   ```
+
+This way the content loads only when the skill is invoked or the user navigates to a relevant task — not on every conversation start.
+
+### Budget Allocation Guidelines
+
+| Category | Target | Notes |
+|----------|--------|-------|
+| Always-loaded general rules | 30-50 | Safety, editing discipline, git workflow |
+| Domain-specific (with paths:) | 80-120 | Only load when working in their domain |
+| On-demand docs | Unlimited | Loaded by skills and CLAUDE.md pointers |
+| CLAUDE.md | 30-40 | Project overview, agent roster, standards |
+
 ## Anti-Patterns
 
 ### Rules that are too vague
