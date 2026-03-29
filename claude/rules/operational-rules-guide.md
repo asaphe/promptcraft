@@ -131,9 +131,21 @@ Rules accumulate but rarely get pruned. Stale rules waste context tokens and can
 
 **Retirement options:**
 
-- **Move to `.claude/docs/`** — Becomes an on-demand reference instead of always-loaded. Good for rules that are valid but rare.
-- **Merge into a parent rule** — When multiple narrow rules share a principle, consolidate into one that captures the class.
+- **Move to `.claude/docs/`** — Becomes an on-demand reference instead of always-loaded. Good for **unscoped** rules that are valid but rare. **Do not move rules that already have `paths:` frontmatter** — they are already not always-loaded. Moving a scope-gated rule to docs loses auto-load behavior (the rule won't surface when editing matching files) without saving any always-loaded tokens. Only move rules that lack `paths:` and load in every conversation.
+- **Merge into a parent rule** — When multiple narrow rules share a principle, consolidate into one that captures the class. See [Consolidation Safety](#consolidation-safety) below for the operational checklist.
 - **Delete entirely** — When the underlying system has changed and the rule no longer applies.
+
+### Consolidation Safety
+
+When merging multiple rule files into one, follow these checks:
+
+**Paths must be the precise union, not a superset.** If source files had `devops/terraform/ecr/**`, `devops/helm-reusable-chart/**`, and `.github/workflows/**`, the merged file's `paths:` should list all three — not `devops/**` as a shorthand. Over-broad paths cause the consolidated rule to load in contexts where the original rules never did, increasing context pressure instead of reducing it.
+
+**Preserve all content — especially concrete examples.** Consolidation is about reducing file count, not trimming bullets. Every rule bullet from every source file must appear in the target. Pay special attention to concrete examples (specific filenames, realistic values, common mistake scenarios) — these are poka-yoke anchors that make rules actionable. A rule that says "search for all image references" is weaker than one that adds "Missing `postgres:15-alpine` in a shell script while only grepping for the ECR-prefixed form is a common mistake."
+
+**Verify cross-references after rename/move.** Agent definitions, skill files, CLAUDE.md on-demand pointers, and README tree listings may reference the old filename. Grep for the old name across `.claude/` after consolidation — stale references silently break agent behavior.
+
+**Check domain fit for inherited content.** When a source file contains rules added by other contributors, verify each rule belongs in the consolidation target's domain. A Terraform operational rule in a GitHub Actions authoring file is a discoverability problem — readers looking for Terraform gotchas won't find it there. Relocate misplaced rules to the correct domain file during consolidation.
 
 ## Context Budget Management
 
