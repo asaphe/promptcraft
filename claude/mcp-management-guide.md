@@ -153,6 +153,54 @@ Having the same server at multiple scopes causes confusion. If a server is added
 
 Each MCP server's tool definitions consume context tokens. A server with 20+ tools can use 5,000-10,000 tokens just for tool descriptions. Follow the principle from the [best practices guide](claude-best-practices.md): keep total MCP tool definitions under 20,000 tokens.
 
+## Cloud-Synced MCP Hygiene
+
+Claude Code syncs MCP servers from your claude.ai account connectors automatically. These cloud-synced servers load tool definitions into every session — even if you never use them.
+
+### Auditing Cloud MCPs
+
+Run `claude mcp list` to see all connected servers. Cloud-synced MCPs appear with a `claude.ai` prefix:
+
+```text
+claude.ai Google Calendar: https://gcal.mcp.claude.com/mcp - ✓ Connected
+claude.ai Slack: https://mcp.slack.com/mcp - ✓ Connected
+claude.ai ClickUp: https://mcp.clickup.com/mcp - ! Needs authentication
+my-local-server: /path/to/server - ✓ Connected
+```
+
+Cloud MCPs come from **claude.ai/settings/connectors** (the web UI), not from any local config file. You cannot remove them with `claude mcp remove` — that only works for local MCPs.
+
+### Disabling Cloud MCPs
+
+To disable all cloud-synced MCPs while keeping your local/custom ones:
+
+```json
+{
+  "env": {
+    "ENABLE_CLAUDEAI_MCP_SERVERS": "false"
+  }
+}
+```
+
+Add this to `~/.claude/settings.json`. Your locally configured MCPs (added via `claude mcp add`) are unaffected.
+
+To re-enable, remove the env var or set it to `"true"`.
+
+### When to Disable
+
+Disable cloud MCPs when:
+- You have **custom MCP servers** that replace the built-in equivalents (e.g., a custom ClickUp MCP replaces the generic one)
+- You **never use** the cloud-synced tools (check `grep -c 'mcp__claude_ai_' ~/.claude/history.jsonl`)
+- You want to **reclaim context tokens** — each unused MCP still loads tool definitions into every session
+
+Keep cloud MCPs enabled when:
+- You actively use cloud-synced tools (Slack messaging, calendar, etc.) through Claude
+- You're evaluating which MCPs to adopt
+
+### Token Impact
+
+Each MCP server's tool definitions consume 1,000-10,000+ tokens depending on how many tools it exposes. Cloud-synced MCPs like Slack, Google Calendar, and ClickUp each add several thousand tokens. If you have 10+ cloud MCPs enabled but only use 1-2, you're burning 10,000-50,000 tokens of context per session on tool definitions that never get called.
+
 ## Team MCP Strategy
 
 ### When to Use Org Connectors

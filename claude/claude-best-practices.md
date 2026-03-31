@@ -336,6 +336,31 @@ These patterns prevent the most common production mistakes:
 
 See: [../core/operational-safety-patterns.md](../core/operational-safety-patterns.md)
 
+### Context Budget Consolidation
+
+As your configuration grows, always-loaded context (CLAUDE.md, rules, agent definitions) can silently consume your token budget. A common trajectory:
+
+1. **Growth phase** — Rules accumulate as you encounter issues. One file per incident is easy to write.
+2. **Bloat phase** — 50-60 rule files, 30-40K tokens of always-on context. Quality degrades because working memory is crowded.
+3. **Consolidation phase** — Merge by domain, scope to directories, migrate niche content to on-demand docs.
+
+A real-world consolidation reduced 60 rule files (~35K tokens) to 14 (~18K tokens) — a 50% reduction in baseline context cost. The approach:
+
+| Action | Token Impact |
+|--------|-------------|
+| Merge related rules into one file per domain | Eliminates duplicate frontmatter and redundant context |
+| Scope rules to directories via `paths:` frontmatter | Rules only load when working in relevant directories |
+| Move niche rules to `.claude/docs/` (on-demand) | Zero cost until explicitly read |
+| Extract workflows to skills | Zero cost until invoked |
+
+**Audit periodically:** Count your always-on token budget with `wc -c .claude/rules/**/*.md CLAUDE.md` (rough: 4 chars ≈ 1 token). If it exceeds 15-20K tokens, consolidate.
+
+### MCP Tool Definition Budget
+
+Each MCP server's tool definitions consume context tokens in every session — even if you never call the tools. Cloud-synced MCPs from claude.ai connectors are particularly insidious: they're enabled by default and load silently.
+
+Audit with `claude mcp list`. If you see servers you never use, remove them or disable cloud MCPs entirely with `ENABLE_CLAUDEAI_MCP_SERVERS=false`. See the [MCP Management Guide](mcp-management-guide.md#cloud-synced-mcp-hygiene) for details.
+
 ---
 
 ## Getting Started
@@ -426,6 +451,7 @@ See: [../core/operational-safety-patterns.md](../core/operational-safety-pattern
 - [Portability Guide](portability-guide.md) — Dotfiles, symlinks, backups, and multi-machine setup
 - [MCP Management Guide](mcp-management-guide.md) — Adding, removing, and managing MCP servers across scopes
 - [Review Agent Trio](agents/review-agent-trio.md) — Specialized reviewer agents for higher-quality PR review
+- [Session Analytics Guide](session-analytics-guide.md) — Mining session history for tool call waste patterns
 - [Hooks Guide](hooks-guide.md) — Designing PreToolUse, PostToolUse, and Stop hooks
 - [Settings JSON Guide](settings-json-guide.md) — Permissions, env vars, hook registration, layering
 - [GitHub Actions Integration](github-actions-integration.md) — Claude Code in CI/CD via claude-code-action

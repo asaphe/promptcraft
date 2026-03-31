@@ -278,6 +278,40 @@ Verify the output is valid JSON and the exit code is 0.
 - **Measure before deploying:** `time echo '{"tool_name":"Bash","tool_input":{"command":"ls"}}' | ./hook.sh`
 - **Total hook overhead** per tool call should stay under 200ms across all matching hooks combined
 
+## POSIX Compatibility in Hook Scripts
+
+macOS ships with BSD `grep`, which uses POSIX Extended Regular Expressions in `-E` mode. PCRE shortcuts silently fail (match nothing), making hooks appear to work in testing but miss real commands.
+
+| PCRE (broken on macOS) | POSIX ERE (works everywhere) |
+|------------------------|------------------------------|
+| `\s` | `[[:space:]]` or literal space |
+| `\d` | `[0-9]` |
+| `\b` | Not available (use `grep -w` or anchoring) |
+| `\S` | `[^[:space:]]` |
+
+**Always test hooks on your actual OS.** A hook that catches `git push --force` with `\s` on Linux will silently miss it on macOS.
+
+```bash
+# Bad (PCRE — fails silently on macOS):
+echo "$CMD" | grep -qE 'git\s+push\s+--force'
+
+# Good (POSIX ERE — works everywhere):
+echo "$CMD" | grep -qE 'git +push +--force'
+# or:
+echo "$CMD" | grep -qE 'git[[:space:]]+push[[:space:]]+--force'
+```
+
+## Data-Driven Hook Development
+
+Instead of guessing which hooks to build, mine session data to find the highest-impact patterns:
+
+1. **Analyze tool call patterns** across all sessions
+2. **Categorize waste** (polling, boilerplate, redundant reads, etc.)
+3. **Build hooks** for the top 3-5 categories
+4. **Measure** reduction after a month
+
+See the [Session Analytics Guide](session-analytics-guide.md) for queries and methodology.
+
 ## Common Mistakes
 
 | Mistake | Fix |
@@ -288,6 +322,46 @@ Verify the output is valid JSON and the exit code is 0.
 | Hook output isn't valid JSON | Validate with `jq` before deploying |
 | Hook path is relative | Use absolute paths or `$CLAUDE_PROJECT_DIR` in settings.json |
 | Hook reads env vars instead of stdin | Claude Code passes hook data on stdin as JSON |
+
+## Hook Catalog
+
+Production-tested hook examples with README documentation:
+
+### Safety & Guardrails
+
+| Hook | Type | Purpose | Blocks? |
+|------|------|---------|---------|
+| [Destructive Guard](../examples/hooks/destructive-guard/) | PreToolUse | Two-tier blocking for irreversible operations | Hard (exit 2) + Soft (JSON) |
+| [Review Verification Guard](../examples/hooks/review-verification-guard/) | PreToolUse | Verification checklist before posting PR reviews/comments | Soft |
+| [Memory Guard](../examples/hooks/memory-guard/) | PreToolUse (Write) | Blocks project memory writes for multi-clone repos | Hard (exit 2) |
+| [1Password Read Guard](../examples/hooks/op-read-guard/) | PreToolUse | Blocks duplicate `op read` calls (prevents repeated biometric prompts) | Soft |
+| [CI Polling Guard](../examples/hooks/ci-polling-guard/) | PreToolUse | Blocks sleep-based CI polling loops | Soft |
+
+### Command Rewriting & Optimization
+
+| Hook | Type | Purpose | Blocks? |
+|------|------|---------|---------|
+| [RTK Rewrite](../examples/hooks/rtk/) | PreToolUse | Token-optimized command rewriting via external binary | No (rewrites) |
+| [kubectl Context Inject](../examples/hooks/kubectl-context-inject/) | PreToolUse | Auto-injects `--context` into kubectl/helm commands | No (rewrites) |
+| [Secretsmanager Proxy](../examples/hooks/secretsmanager-proxy/) | PreToolUse | Auto-wraps secret commands with token-proxy bypass | No (rewrites) |
+
+### Quality Gates
+
+| Hook | Type | Purpose | Blocks? |
+|------|------|---------|---------|
+| [Pre-Push Quality](../examples/hooks/pre-push-quality/) | PreToolUse | Multi-language linting gate before `git push` | Soft |
+| [Auto Lint](../examples/hooks/auto-lint/) | PostToolUse | Run linter/formatter after file edits | No (auto-fix) |
+| [Stale Ref Detection](../examples/hooks/stale-ref-detection/) | PreToolUse | Detect deleted files still referenced in docs | Soft |
+| [PR Edit Counter](../examples/hooks/pr-edit-counter/) | PreToolUse | Warns after 2+ body edits on same PR | No (advisory) |
+
+### Context Injection & Metrics
+
+| Hook | Type | Purpose | Blocks? |
+|------|------|---------|---------|
+| [AWS Auth Check](../examples/hooks/aws-auth-check/) | UserPromptSubmit | Validates SSO sessions, injects auth status into context | No (context) |
+| [Clone ID Inject](../examples/hooks/clone-id-inject/) | UserPromptSubmit | Injects repo clone identity for multi-clone setups | No (context) |
+| [Learning Capture](../examples/hooks/learning-capture/) | SessionStart/End | Capture and inject session learnings | No |
+| [Session Quality Capture](../examples/hooks/session-quality-capture/) | Stop | Record session metrics (tool calls, corrections, PR edits) | No (metrics) |
 
 ## Related Resources
 
