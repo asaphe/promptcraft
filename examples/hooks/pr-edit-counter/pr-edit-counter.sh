@@ -13,12 +13,12 @@ if [ -z "$CMD" ]; then
 fi
 
 # Only match gh pr edit with --body
-if ! echo "$CMD" | grep -qE 'gh\s+pr\s+edit\s+.*--body'; then
+if ! echo "$CMD" | grep -qE 'gh +pr +edit +.*--body'; then
   exit 0
 fi
 
 # Extract PR number from the command (gh pr edit <number> --body ...)
-PR_NUM=$(echo "$CMD" | grep -oE 'gh\s+pr\s+edit\s+([0-9]+)' | grep -oE '[0-9]+')
+PR_NUM=$(echo "$CMD" | grep -oE 'gh +pr +edit +([0-9]+)' | grep -oE '[0-9]+')
 if [ -z "$PR_NUM" ]; then
   PR_NUM="current"
 fi

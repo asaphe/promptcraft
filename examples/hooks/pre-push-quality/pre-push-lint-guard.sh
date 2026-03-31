@@ -19,10 +19,10 @@ if [ -z "$CMD" ]; then
 fi
 
 # Only match git push (skip force push — handled by destructive-guard)
-if ! echo "$CMD" | grep -qE 'git\s+push(\s|$)'; then
+if ! echo "$CMD" | grep -qE 'git +push([[:space:]]|$)'; then
   exit 0
 fi
-if echo "$CMD" | grep -qE 'git\s+push\s+.*--(force|force-with-lease)'; then
+if echo "$CMD" | grep -qE 'git +push +.*--(force|force-with-lease)'; then
   exit 0
 fi
 
