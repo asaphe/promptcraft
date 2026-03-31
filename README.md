@@ -62,7 +62,8 @@ This repository contains carefully curated rules and standards that can be used 
 │   ├── learning-system-guide.md   # Automated learning capture with hooks and plugins
 │   ├── global-claude-md-guide.md  # How to design personal ~/.claude/CLAUDE.md
 │   ├── portability-guide.md       # Dotfiles, symlinks, backups, Desktop vs Code config
-│   ├── mcp-management-guide.md    # MCP server lifecycle: add, remove, team connectors
+│   ├── mcp-management-guide.md    # MCP server lifecycle: add, remove, team connectors, cloud MCP hygiene
+│   ├── session-analytics-guide.md # Mining session history for tool call waste patterns
 │   ├── pr-review-protocol.md      # Structured PR review routing and posting
 │   ├── CLAUDE.md                  # Example project CLAUDE.md
 │   └── README.md                 # Claude section overview
