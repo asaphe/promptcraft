@@ -120,7 +120,35 @@ For bot inline threads: use **both** `resolveReviewThread` (hides the thread) **
 | Severity | Meaning | Examples |
 | -------- | ------- | -------- |
 | **Blocking** | PR should not merge without fixing this | Security vulnerability, data loss risk, broken functionality, clear spec violation |
+| **Issue** | Real problem, should fix — not merge-blocking | Silent failures, privilege escalation, fragile patterns, error handling gaps |
 | **Suggestion** | Worth considering but not merge-blocking | Performance optimization, code style improvement, future-proofing, migration opportunity |
+
+**Issue vs Suggestion:** If you'd file a bug for it, it's at least an Issue. Suggestions are "nice to have" — Issues are real problems that won't prevent merge but deserve attention.
+
+### Finding Type Classification
+
+Every finding title should include both severity and finding type:
+
+```
+ISSUE-1: Wrong value — image tag doesn't match deployed version
+BLOCKING-1: Missing port — service unreachable on health check endpoint
+SUGGESTION-1: Pattern violation — naming inconsistent with sibling modules
+```
+
+Standard finding types (each maps to specific verification steps):
+
+| Type | Verify by |
+|------|-----------|
+| Wrong value | Query the real system for the actual value |
+| Missing X | Grep codebase + check 3+ sibling files |
+| Security issue | Trace data flow, show concrete attack vector |
+| Config mismatch | Read both sides, show the comparison |
+| Pre-existing issue | `git blame` to confirm, downgrade to Issue |
+| Dead code | Grep all consumers including dynamic references |
+| Pattern violation | Check 3+ siblings for established convention |
+| Performance issue | Identify the code path, estimate production scale |
+
+This classification serves two purposes: it forces the reviewer to think about *what kind* of problem they're reporting (which determines how to verify it), and it gives the author an immediate signal about what's wrong.
 
 ### Hypothetical-Future Observations = Suggestions
 

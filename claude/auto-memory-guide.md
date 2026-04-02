@@ -137,6 +137,39 @@ Don't load all memories at session start — only access what's relevant to the 
 | **CLAUDE.md** | Every session, all users | Team-wide rules and standards |
 | **Dev docs** (markdown files) | Cross-session | Detailed handoff between sessions |
 
+## Multi-Clone Memory Strategy
+
+Auto memory is scoped to the project path: `~/.claude/projects/-Users-you-project/memory/`. If you have multiple checkouts of the same repo (e.g., `~/project`, `~/project-2`, `~/project-3` for parallel work), each clone gets its own independent memory directory. This means:
+
+- Memory saved in `project-2` is invisible to `project-3`
+- Feedback corrections accumulate in whichever clone you happened to be using
+- Over time, learnings fragment across clones instead of consolidating
+
+### Recommended Architecture
+
+Store behavioral rules and preferences in locations that are clone-agnostic:
+
+| Content Type | Where | Why |
+|-------------|-------|-----|
+| Personal behavioral rules | `~/.claude/CLAUDE.md` (global) | Loads in every conversation, every clone |
+| Team-wide rules | `.claude/rules/` (in repo) | Shared via git, same across all clones |
+| On-demand reference | `~/.claude/docs/` or `.claude/docs/` | Read when relevant, not always-loaded |
+| Auto memory | Avoid for multi-clone setups | Only loads for one specific path |
+
+### Periodic Audit
+
+If you do accumulate project memory across clones, periodically audit all directories:
+
+1. List all project memory dirs: `ls ~/.claude/projects/-*-<repo-name>*/memory/`
+2. Read each memory file — classify as: promote (to global/repo rules), already covered, or delete
+3. Promote valuable learnings to `~/.claude/CLAUDE.md` or `.claude/rules/`
+4. Delete redundant files and clear pending learnings
+5. Update `MEMORY.md` indexes
+
+### Dream Mode Limitation
+
+Claude Code's dream mode (auto memory consolidation) operates within a single project memory directory. It cannot consolidate across clones. If you rely on multi-clone workflows, dream mode won't help — use the manual audit pattern above or the global rules architecture.
+
 ## Related Resources
 
 - [Global CLAUDE.md Guide](global-claude-md-guide.md) — What belongs in CLAUDE.md vs memory

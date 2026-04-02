@@ -273,6 +273,32 @@ When running `/scan-history`, cross-reference existing rules against recent sess
 - Rules that were **violated frequently** may need strengthening or better placement
 - Rules that reference **deprecated tools or patterns** should be updated or removed
 
+### Cross-Clone Memory Audit
+
+If you use multiple checkouts of the same repo (see [Auto Memory Guide — Multi-Clone Strategy](auto-memory-guide.md#multi-clone-memory-strategy)), learnings fragment across clone-specific memory directories. A periodic audit consolidates them:
+
+**1. Discover all memory directories:**
+
+```bash
+ls -d ~/.claude/projects/-*-<repo-name>*/memory/
+```
+
+**2. Read every memory file (not just MEMORY.md indexes) and pending-learnings.md across all clones.**
+
+**3. For each memory file, classify:**
+
+| Verdict | Action |
+|---------|--------|
+| **PROMOTE** | Rule is valuable — move to `~/.claude/CLAUDE.md` (personal) or `.claude/rules/` (team-wide) |
+| **ALREADY COVERED** | Existing rule handles this — delete the memory file |
+| **DELETE** | Stale, incorrect, or project-state data stored as memory |
+
+**4. For pending-learnings.md files:** Most contain noise (false positives from hooks, retry patterns without clear corrections). Look for cross-clone recurring signals — the same correction appearing in 3+ clones is a strong indicator of a real gap.
+
+**5. Clean up:** Delete promoted/redundant memory files, clear pending-learnings, update MEMORY.md indexes.
+
+**Frequency:** Monthly, or whenever the startup hook reports pending learnings from multiple prior sessions.
+
 ## Rules Organization
 
 As rules accumulate, a flat `.claude/rules/` directory creates token pressure — every rule loads into every session regardless of relevance. Organize rules into subdirectories with conditional loading using the `paths:` frontmatter feature.

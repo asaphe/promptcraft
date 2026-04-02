@@ -87,6 +87,36 @@ Pass environment variables to Claude Code sessions:
 
 Use project-level settings for variables the whole team needs. Use local settings for personal values.
 
+### Claude Code Runtime Variables
+
+Claude Code exposes 100+ `CLAUDE_CODE_*` environment variables. Most are niche, but a handful meaningfully improve the experience:
+
+| Variable | Recommended | What It Does |
+|----------|-------------|-------------|
+| `CLAUDE_CODE_EFFORT_LEVEL` | `auto` | Adaptive reasoning depth. `auto` lets Claude self-calibrate per request — conserves tokens on simple reads, goes deep on architecture. Options: `low`, `medium` (default), `high`, `max`, `auto`. Also settable per-session with `/effort`. |
+| `CLAUDE_CODE_UNDERCOVER` | `1` | Suppresses AI attribution (model versions, "Co-Authored-By" lines) in commits and PRs. Use when contributing to repos where AI authorship hints are unwanted. |
+| `CLAUDE_AUTO_BACKGROUND_TASKS` | `1` | Auto-moves long-running tasks to background execution. Prevents blocking the conversation on slow operations. |
+| `CLAUDE_CODE_NO_FLICKER` | `0` or `1` | Experimental fullscreen rendering (~85% less flicker). Trade-offs: no native cmd-f search, limited native copy-paste. Research preview. |
+
+**Variables to leave alone:**
+
+| Variable | Why |
+|----------|-----|
+| `MAX_THINKING_TOKENS` | Superseded by `CLAUDE_CODE_EFFORT_LEVEL` on modern models. Only relevant if you disable adaptive thinking. |
+| `BASH_MAX_OUTPUT_LENGTH` | Default (30,000 chars) works for most commands. Increasing it consumes more context per command. Only raise if you regularly need full output from very long commands. |
+| `DISABLE_PROMPT_CACHING` | Prompt caching saves cost and latency. Disabling it makes every request more expensive. Some versions throw auth errors when disabled. |
+| `CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING` | Disabling saves minor I/O but you lose `/rewind` — not worth the trade-off. |
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_EFFORT_LEVEL": "auto",
+    "CLAUDE_CODE_UNDERCOVER": "1",
+    "CLAUDE_AUTO_BACKGROUND_TASKS": "1"
+  }
+}
+```
+
 ## Hooks
 
 See [hooks-guide.md](hooks-guide.md) for detailed hook design patterns. The settings structure:

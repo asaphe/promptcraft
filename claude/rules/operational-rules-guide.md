@@ -226,6 +226,23 @@ If a rule exceeds 3-4 lines, it's probably a doc, not a rule. Split it into mult
 
 This is reference material, not a behavioral rule. Put it in a doc and reference it.
 
+### Domain content leaking into shared files
+
+When multiple contributors maintain `.claude/` config, domain-specific content can leak into shared infrastructure:
+
+**Skills absorbing domain gates.** A domain-specific workflow (e.g., an SDLC pipeline) adds a "step 0" to a general-purpose skill (e.g., PR finalization) that loads domain preferences and runs domain-specific checks. Users who never use the domain workflow now run through its gates on every invocation.
+
+**Rules re-added after intentional removal.** Contributor A consolidates 60 rules into 14, intentionally removing verbose entries. Contributor B adds the removed rules back, claiming they were "accidentally dropped." The commit message frames consolidation as a mistake rather than a design decision.
+
+**On-demand pointers for niche domains in CLAUDE.md.** Adding a pointer like `"Configuring X preferences? /x-config"` to the always-loaded CLAUDE.md when X is a domain that only one team member uses. Every conversation pays the token cost.
+
+**Prevention:**
+
+- Skills should be self-contained — a general-purpose skill should never `read` domain-specific templates or preference files
+- Before re-adding rules someone removed, check the commit that removed them — it was likely intentional consolidation
+- CLAUDE.md pointers should only reference content relevant to the majority of conversations
+- Scope niche content to domain-specific directories (e.g., `.claude/sdlc/`) where it loads only when explicitly invoked
+
 ### Rules without a trigger condition
 
 ```markdown
