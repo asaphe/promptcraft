@@ -32,7 +32,29 @@ OUTPUT=""
 if [[ -f "$PENDING_FILE" && -s "$PENDING_FILE" ]]; then
   CANDIDATE_COUNT=$(grep -cE '^## (Session|Pre-compaction)' "$PENDING_FILE" 2>/dev/null || echo "0")
   if [[ "$CANDIDATE_COUNT" -gt 0 ]]; then
-    OUTPUT+="[Learning System] $CANDIDATE_COUNT pending learning candidate(s) from previous sessions."
+    # Check age of oldest entry for urgency
+    OLDEST_DATE=$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' "$PENDING_FILE" 2>/dev/null | head -1 || true)
+    AGE_NOTE=""
+    if [[ -n "$OLDEST_DATE" ]]; then
+      # Portable date parsing: macOS uses -j -f, Linux uses -d
+      if date -j -f "%Y-%m-%d" "$OLDEST_DATE" "+%s" >/dev/null 2>&1; then
+        OLDEST_TS=$(date -j -f "%Y-%m-%d" "$OLDEST_DATE" "+%s")
+      elif date -d "$OLDEST_DATE" "+%s" >/dev/null 2>&1; then
+        OLDEST_TS=$(date -d "$OLDEST_DATE" "+%s")
+      else
+        OLDEST_TS=0
+      fi
+      NOW_TS=$(date "+%s")
+      AGE_DAYS=$(( (NOW_TS - OLDEST_TS) / 86400 ))
+      if [[ "$AGE_DAYS" -ge 3 ]]; then
+        AGE_NOTE=" Oldest entry is ${AGE_DAYS} days old — corrections are being lost."
+      fi
+    fi
+    if [[ "$CANDIDATE_COUNT" -ge 5 ]]; then
+      OUTPUT+="[Learning System] PRIORITY: $CANDIDATE_COUNT pending learning candidate(s) from previous sessions.${AGE_NOTE}"
+    else
+      OUTPUT+="[Learning System] $CANDIDATE_COUNT pending learning candidate(s) from previous sessions.${AGE_NOTE}"
+    fi
     OUTPUT+=" File: $PENDING_FILE"
     OUTPUT+=" When appropriate during this session, read the file and propose rules for any valid patterns."
     OUTPUT+=" After processing, clear the file. Classify: team-wide → .claude/rules/, agent-specific → .claude/agents/\${agent}.md, personal → auto memory."
