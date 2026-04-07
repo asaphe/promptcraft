@@ -1,0 +1,45 @@
+{
+  "permissions": {
+    "allow": ["Bash(git add *)"]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/session-start-learnings.sh",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/session-end-learnings.sh",
+            "async": true,
+            "timeout": 30000
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/precompact-preserve.sh",
+            "async": true,
+            "timeout": 15000
+          }
+        ]
+      }
+    ]
+  }
+}
