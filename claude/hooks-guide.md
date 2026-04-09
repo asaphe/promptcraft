@@ -4,13 +4,17 @@ Hooks are shell commands that execute automatically in response to Claude Code e
 
 ## Hook Types
 
-| Hook | When It Fires | Use Cases |
-|------|--------------|-----------|
-| `PreToolUse` | Before a tool call executes | Block dangerous commands, validate parameters, inject context |
-| `PostToolUse` | After a tool call completes | Verify results, capture learnings, trigger follow-up actions |
-| `Notification` | When Claude Code sends a notification | Custom alerting, logging, external integrations |
-| `Stop` | When Claude finishes a response | Self-check reminders, structured output, handoff prompts |
-| `SubagentStop` | When a subagent completes | Aggregate results, chain to next agent |
+| Hook | When It Fires | Context Injection | Use Cases |
+|------|--------------|-------------------|-----------|
+| `UserPromptSubmit` | Before Claude processes a user message | `additionalContext` | Inject environment state, validate prompts |
+| `PreToolUse` | Before a tool call executes | `additionalContext` | Block dangerous commands, validate parameters, rewrite commands |
+| `PostToolUse` | After a tool call completes | `additionalContext` | Verify results, capture learnings, trigger follow-up actions |
+| `SessionStart` | When a session begins (matcher: `"compact"` for post-compaction) | stdout (plain text) | Re-inject critical context after compaction, load session state |
+| `PreCompact` | Before context compaction (matcher: `"auto"` or `"manual"`) | Side-effects only | Preserve corrections/learnings before context is compressed |
+| `Notification` | When Claude Code sends a notification | None | Custom alerting, logging, external integrations |
+| `Stop` | When Claude finishes a response | None | Self-check reminders, structured output, handoff prompts |
+| `SubagentStop` | When a subagent completes | None | Aggregate results, chain to next agent |
+| `SessionEnd` | When a session ends | Side-effects only | Capture session metrics, export learnings |
 
 ## Registration
 
@@ -171,6 +175,38 @@ INPUT=$(cat)
 TOOL=$(echo "$INPUT" | jq -r '.tool_name // empty')
 echo "[$(date -Iseconds)] $TOOL" >> ~/.claude/tool-usage.log
 ```
+
+### 6. Post-Compaction State Injection (SessionStart)
+
+Inject live git state that compaction loses and always-loaded config can't restore. Behavioral rules survive compaction (they're in `.claude/rules/` and `CLAUDE.md`), but dynamic state like uncommitted changes, active worktrees, and stashes does not.
+
+```bash
+#!/bin/bash
+# post-compact-reinject.sh — Inject dynamic git state after compaction
+DIRTY=$(git status --short 2>/dev/null)
+[ -n "$DIRTY" ] && echo "Uncommitted changes:" && echo "$DIRTY" | head -20
+WORKTREES=$(git worktree list 2>/dev/null | grep -v "$(git rev-parse --show-toplevel)")
+[ -n "$WORKTREES" ] && echo "Active worktrees:" && echo "$WORKTREES"
+# Zero output when clean — no wasted tokens
+```
+
+**Important:** This must use `SessionStart` with `matcher: "compact"`, **not** `PostCompact`. `PostCompact` is a side-effects-only event with no context injection capability. Output must be plain text to stdout (not JSON) — `SessionStart` adds stdout directly to Claude's context.
+
+```json
+{
+  "hooks": {
+    "SessionStart": [{
+      "matcher": "compact",
+      "hooks": [{
+        "type": "command",
+        "command": "/path/to/post-compact-reinject.sh"
+      }]
+    }]
+  }
+}
+```
+
+See `../examples/hooks/post-compact-reinject/` for a production implementation.
 
 ## Testing Hooks
 
@@ -361,6 +397,7 @@ Production-tested hook examples with README documentation:
 | [AWS Auth Check](../examples/hooks/aws-auth-check/) | UserPromptSubmit | Validates SSO sessions, injects auth status into context | No (context) |
 | [Clone ID Inject](../examples/hooks/clone-id-inject/) | UserPromptSubmit | Injects repo clone identity for multi-clone setups | No (context) |
 | [Learning Capture](../examples/hooks/learning-capture/) | SessionStart/End | Capture and inject session learnings | No |
+| [Post-Compact Reinject](../examples/hooks/post-compact-reinject/) | SessionStart (compact) | Re-inject critical context after compaction | No (context) |
 | [Session Quality Capture](../examples/hooks/session-quality-capture/) | Stop | Record session metrics (tool calls, corrections, PR edits) | No (metrics) |
 
 ## Related Resources
