@@ -176,17 +176,18 @@ TOOL=$(echo "$INPUT" | jq -r '.tool_name // empty')
 echo "[$(date -Iseconds)] $TOOL" >> ~/.claude/tool-usage.log
 ```
 
-### 6. Post-Compaction Context Re-injection (SessionStart)
+### 6. Post-Compaction State Injection (SessionStart)
 
-Re-inject critical context after compaction. Context compaction compresses prior messages, which can lose behavioral rules, branch state, and active PR info. A `SessionStart` hook with `matcher: "compact"` fires after every compaction, and its stdout is added directly to Claude's context.
+Inject live git state that compaction loses and always-loaded config can't restore. Behavioral rules survive compaction (they're in `.claude/rules/` and `CLAUDE.md`), but dynamic state like uncommitted changes, active worktrees, and stashes does not.
 
 ```bash
 #!/bin/bash
-# post-compact-reinject.sh — Re-inject state after compaction
-BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
-echo "Post-compaction context refresh:"
-echo "- Branch: $BRANCH"
-echo "- Key rules: <your critical behavioral rules here>"
+# post-compact-reinject.sh — Inject dynamic git state after compaction
+DIRTY=$(git status --short 2>/dev/null)
+[ -n "$DIRTY" ] && echo "Uncommitted changes:" && echo "$DIRTY" | head -20
+WORKTREES=$(git worktree list 2>/dev/null | grep -v "$(git rev-parse --show-toplevel)")
+[ -n "$WORKTREES" ] && echo "Active worktrees:" && echo "$WORKTREES"
+# Zero output when clean — no wasted tokens
 ```
 
 **Important:** This must use `SessionStart` with `matcher: "compact"`, **not** `PostCompact`. `PostCompact` is a side-effects-only event with no context injection capability. Output must be plain text to stdout (not JSON) — `SessionStart` adds stdout directly to Claude's context.
