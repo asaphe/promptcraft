@@ -27,6 +27,10 @@ Supporting documentation referenced by agents and skills — PR review methodolo
 - **`pr-create-guard/`** — PreToolUse hook that blocks `gh pr create` when prerequisites are missing (zero diff, unpushed commits, uncommitted changes) and emits a verification checklist when they pass.
 - **`statusline/`** — Statusline command showing directory, git branch, AWS profile, model name, and context window usage with color-coded thresholds.
 
+### `evals/`
+
+Skill evaluation framework — validates that Claude Code routes queries to the correct skill and that skills produce expected behavior. Includes a Python runner that prints manual test checklists, example trigger/functional eval JSON schemas, and a CI workflow pattern for PR reminders when skill files change.
+
 ### `rules/`
 
 Operational rules captured from production incidents and repeated corrections. Organized by domain:
