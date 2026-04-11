@@ -1,0 +1,122 @@
+[
+  {
+    "label": "git push origin main → hard block",
+    "command": "git push origin main",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "git push origin feature-branch → allow",
+    "command": "git push origin feature-branch",
+    "expected_exit": 0
+  },
+  {
+    "label": "git push origin main-hotfix → allow (hyphenated, not main)",
+    "command": "git push origin main-hotfix",
+    "expected_exit": 0
+  },
+  {
+    "label": "git push -u origin feature-branch → allow",
+    "command": "git push -u origin feature-branch",
+    "expected_exit": 0
+  },
+  {
+    "label": "git push origin local:remote → allow (explicit refspec)",
+    "command": "git push origin local-branch:remote-branch",
+    "expected_exit": 0
+  },
+  {
+    "label": "git push origin feature:main → hard block (refspec targets main)",
+    "command": "git push origin feature:main",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "git push --force origin main → hard block",
+    "command": "git push --force origin main",
+    "expected_exit": 2,
+    "expected_output": "force"
+  },
+  {
+    "label": "git push --force-with-lease origin main → hard block",
+    "command": "git push --force-with-lease origin main",
+    "expected_exit": 2,
+    "expected_output": "force"
+  },
+  {
+    "label": "git push --force origin feature → soft block (force but not main)",
+    "command": "git push --force origin feature-branch",
+    "expected_exit": 0,
+    "expected_output": "force"
+  },
+  {
+    "label": "cd worktree + push with refspec → allow",
+    "command": "cd /tmp/worktree && git add . && git push origin dev-123:dev-123-remote",
+    "expected_exit": 0
+  },
+  {
+    "label": "git reset --hard → hard block",
+    "command": "git reset --hard HEAD~1",
+    "expected_exit": 2,
+    "expected_output": "reset --hard"
+  },
+  {
+    "label": "aws s3 rm → hard block",
+    "command": "aws s3 rm s3://bucket/key",
+    "expected_exit": 2,
+    "expected_output": "AWS"
+  },
+  {
+    "label": "aws iam delete-role → hard block",
+    "command": "aws iam delete-role --role-name test",
+    "expected_exit": 2,
+    "expected_output": "AWS"
+  },
+  {
+    "label": "gh pr create → soft block",
+    "command": "gh pr create --title test --body test",
+    "expected_exit": 0,
+    "expected_output": "pr create"
+  },
+  {
+    "label": "gh pr close → soft block with verification checklist",
+    "command": "gh pr close 123",
+    "expected_exit": 0,
+    "expected_output": "verify before closing"
+  },
+  {
+    "label": "gh pr merge → soft block",
+    "command": "gh pr merge 123",
+    "expected_exit": 0,
+    "expected_output": "pr merge"
+  },
+  {
+    "label": "terraform destroy → soft block",
+    "command": "terraform destroy -auto-approve",
+    "expected_exit": 0,
+    "expected_output": "terraform"
+  },
+  {
+    "label": "kubectl delete → soft block",
+    "command": "kubectl delete pod my-pod -n default",
+    "expected_exit": 0,
+    "expected_output": "kubectl"
+  },
+  {
+    "label": "helm uninstall → soft block",
+    "command": "helm uninstall my-release",
+    "expected_exit": 0,
+    "expected_output": "helm"
+  },
+  {
+    "label": "safe command → allow silently",
+    "command": "git status",
+    "expected_exit": 0
+  },
+  {
+    "label": "git push origin master → hard block (master variant)",
+    "command": "git push origin master",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  }
+]

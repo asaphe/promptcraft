@@ -1,0 +1,14 @@
+[
+  {
+    "label": "non-pr command → pass through silently",
+    "command": "git status",
+    "expected_exit": 0
+  },
+  {
+    "label": "gh pr create on main → block",
+    "command": "gh pr create --title test --body test",
+    "expected_exit": 2,
+    "expected_output": "PR CREATE BLOCKED",
+    "note": "Blocks on zero diff or uncommitted changes — both are valid block reasons"
+  }
+]
