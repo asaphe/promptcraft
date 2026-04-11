@@ -32,6 +32,7 @@ This repo is a knowledge base — getting a pattern wrong teaches it wrong to ev
 
 This repo uses its own example hooks in `.claude/hooks/`:
 
+- `stateful-op-reminder.sh` — Nudges (never blocks) on mutations to external systems. Copied from `examples/hooks/stateful-op-reminder/`.
 - `destructive-guard.sh` — Two-tier blocking (hard: push to main, AWS deletions; soft: PR ops, force-push). Copied from `examples/hooks/destructive-guard/`.
 - `pr-create-guard.sh` — Blocks PR creation on missing prerequisites. Copied from `examples/hooks/pr-create-guard/`.
 - Learning-capture hooks — Session start/end/precompact learnings.

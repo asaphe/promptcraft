@@ -39,7 +39,7 @@ if echo "$CMD" | grep -qE 'git +push +.*--(force|force-with-lease)'; then
   FORCE_REF=$(echo "$FORCE_PORTION" | sed 's/git *push *//' | awk 'BEGIN{n=0} {for(i=1;i<=NF;i++) if(substr($i,1,1)!="-") {n++; if(n==2) {print $i; exit}}}')
   if [ "$FORCE_REF" = "main" ] || [ "$FORCE_REF" = "master" ]; then
     HARD_REASON="git push --force to main — rewrites shared history on the default branch."
-  elif echo "$FORCE_REF" | grep -qE '(^|:)(main|master)$'; then
+  elif echo "$FORCE_REF" | grep -qE '(^|[/:])(main|master)$'; then
     HARD_REASON="git push --force to main — rewrites shared history on the default branch."
   fi
 fi
@@ -72,7 +72,7 @@ if [ -z "$HARD_REASON" ] && echo "$CMD" | grep -qE 'git +push([[:space:]]|$)' &&
     fi
   elif [ "$PUSH_REF" = "main" ] || [ "$PUSH_REF" = "master" ]; then
     WILL_PUSH_MAIN=1
-  elif echo "$PUSH_REF" | grep -qE '(^|:)(main|master)$'; then
+  elif echo "$PUSH_REF" | grep -qE '(^|[/:])(main|master)$'; then
     # Refspec pushing TO main (e.g., feature:main)
     WILL_PUSH_MAIN=1
   fi
@@ -85,6 +85,16 @@ fi
 # git reset --hard (permanent loss of uncommitted work)
 if echo "$CMD" | grep -qE 'git +reset +--hard'; then
   HARD_REASON="git reset --hard — discards all uncommitted changes permanently."
+fi
+
+# git clean -f (permanent deletion of untracked files)
+if echo "$CMD" | grep -qE 'git +clean +-[a-zA-Z]*f'; then
+  HARD_REASON="git clean -f — permanently deletes untracked files."
+fi
+
+# git stash drop/clear (permanent loss of stashed work)
+if echo "$CMD" | grep -qE 'git +stash +(drop|clear)'; then
+  HARD_REASON="git stash drop/clear — permanently discards stashed changes."
 fi
 
 # AWS resource deletion

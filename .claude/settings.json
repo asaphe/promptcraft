@@ -15,12 +15,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": ".claude/hooks/stateful-op-reminder.sh"
+          },
+          {
+            "type": "command",
             "command": ".claude/hooks/destructive-guard.sh"
           },
           {
             "type": "command",
-            "command": ".claude/hooks/pr-create-guard.sh",
-            "if": "Bash(gh pr create*)"
+            "command": ".claude/hooks/pr-create-guard.sh"
           }
         ]
       }

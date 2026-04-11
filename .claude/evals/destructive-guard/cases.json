@@ -118,5 +118,40 @@
     "command": "git push origin master",
     "expected_exit": 2,
     "expected_output": "git push on main"
+  },
+  {
+    "label": "git push origin HEAD:refs/heads/main → hard block (full refspec)",
+    "command": "git push origin HEAD:refs/heads/main",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "git push --force origin HEAD:refs/heads/main → hard block",
+    "command": "git push --force origin HEAD:refs/heads/main",
+    "expected_exit": 2,
+    "expected_output": "force"
+  },
+  {
+    "label": "git push --set-upstream origin feature-branch → allow",
+    "command": "git push --set-upstream origin feature-branch",
+    "expected_exit": 0
+  },
+  {
+    "label": "git clean -fd → hard block",
+    "command": "git clean -fd",
+    "expected_exit": 2,
+    "expected_output": "clean"
+  },
+  {
+    "label": "git stash drop → hard block",
+    "command": "git stash drop stash@{0}",
+    "expected_exit": 2,
+    "expected_output": "stash"
+  },
+  {
+    "label": "git stash clear → hard block",
+    "command": "git stash clear",
+    "expected_exit": 2,
+    "expected_output": "stash"
   }
 ]

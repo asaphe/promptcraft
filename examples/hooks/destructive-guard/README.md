@@ -22,6 +22,8 @@ Soft blocks surface a warning. With `Bash(*)` in the allow list, the user sees t
 | `git push` to main/master | Must go through PRs |
 | `git push --force` to main/master | Rewrites shared history on default branch |
 | `git reset --hard` | Permanent loss of uncommitted work |
+| `git clean -f` | Permanently deletes untracked files |
+| `git stash drop/clear` | Permanently discards stashed changes |
 | `aws * delete-*`, `aws s3 rm`, `aws ec2 terminate-*` | Cloud resource destruction |
 
 ### Soft Blocks (confirm first)
@@ -30,10 +32,11 @@ Soft blocks surface a warning. With `Bash(*)` in the allow list, the user sees t
 |---------|-----|
 | `gh pr create/merge` | Visible shared actions |
 | `gh pr close` | Loses PR context — verify reason and check for unmerged work |
+| `gh run delete` | Permanently removes CI run history |
 | `git push --force` | History rewriting (reversible via reflog) |
 | `git branch -D`, `git checkout --`, `git restore` | Discards local changes |
-| `terraform destroy/state rm/force-unlock` | Infrastructure changes |
-| `kubectl delete/drain/scale/patch` | Live cluster mutations |
+| `terraform destroy/state rm/force-unlock/workspace delete` | Infrastructure changes |
+| `kubectl delete/drain/cordon/scale/rollout undo/patch` | Live cluster mutations |
 | `helm uninstall/rollback` | Release changes |
 
 ## Worktree-Aware Push Detection

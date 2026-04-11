@@ -39,8 +39,7 @@ The model sees this and is expected to verify each item before proceeding. The u
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/pr-create-guard.sh",
-            "if": "Bash(gh pr create*)"
+            "command": "/path/to/pr-create-guard.sh"
           }
         ]
       }
@@ -49,7 +48,7 @@ The model sees this and is expected to verify each item before proceeding. The u
 }
 ```
 
-The `"if"` matcher ensures the hook only runs for PR creation commands, avoiding unnecessary git operations on every Bash call.
+The script early-exits (before any git operations) if the command isn't `gh pr create`, so the overhead on non-PR commands is minimal (jq + grep).
 
 Requires `jq` and `git` on PATH.
 

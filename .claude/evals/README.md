@@ -48,7 +48,12 @@ python .claude/evals/runner.py --hook <modified-hook-name>
 | Hook | Cases | Tests |
 |------|:-----:|-------|
 | destructive-guard | 21 | push-to-main variants, refspec, hyphenated branches, force-push, AWS, GH CLI, terraform, kubectl, helm |
-| pr-create-guard | 2 | pass-through, block on main |
+| stateful-op-reminder | 9 | kubectl apply/get, terraform apply/plan, helm upgrade/dry-run, IAM attach/list, safe command |
+| pr-create-guard | 2 | pass-through, block on zero diff/missing prerequisites |
+
+## See Also
+
+For **skill routing validation** (manual testing of which Claude Code skill activates for a given query), see `examples/evals/`.
 
 ## Adding Cases
 

@@ -127,7 +127,7 @@ jobs:
                 ...skillFiles,
                 '',
                 '```bash',
-                'python .claude/evals/runner.py --type trigger',
+                'python examples/evals/runner.py --type trigger',
                 '```',
                 '',
                 'Check that trigger routing is still correct, and update `trigger_eval.json` if skill descriptions changed.',
@@ -151,3 +151,7 @@ Fires once on PR open — not on every push — to avoid comment spam.
 **Phase 2:** CI reminder — GHA workflow warns when skill files change without eval updates.
 
 **Phase 3:** Automated runner via Claude Code SDK — send each trigger query to Claude Code, observe which skill activates, pattern-match expectations against tool call traces, output timestamped JSON + markdown report.
+
+## See Also
+
+For **automated hook testing** (pipe JSON through PreToolUse hooks, check exit codes), see `.claude/evals/`.
