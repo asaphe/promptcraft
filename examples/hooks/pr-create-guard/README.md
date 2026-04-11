@@ -4,7 +4,7 @@ PreToolUse hook that verifies pre-creation conditions before allowing `gh pr cre
 
 ## What It Checks
 
-### Hard Blocks (exit 1 — command stopped)
+### Hard Blocks (exit 2 — command blocked)
 
 | Check | Why |
 |-------|-----|

@@ -30,7 +30,7 @@ This hook bridges the gap: it detects mutations to external systems and reminds 
 
 ## Installation
 
-Place **before** `destructive-guard.sh` in the hook chain so the reminder fires first:
+Place **before** `destructive-guard.sh` in the hook chain so the reminder fires first. If destructive-guard runs first and soft-blocks, the user sees only the generic block reason without the protocol reminder context. With this ordering, the model sees the protocol steps before any block decision:
 
 ```json
 {

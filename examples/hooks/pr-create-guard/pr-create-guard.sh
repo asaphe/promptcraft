@@ -33,7 +33,7 @@ DIFF_STAT=$(git diff --stat origin/main...HEAD 2>/dev/null)
 if [ -z "$DIFF_STAT" ]; then
   BRANCH=$(git branch --show-current 2>/dev/null)
   echo "PR CREATE BLOCKED — branch '$BRANCH' has zero diff vs origin/main. All changes already exist on main." >&2
-  exit 1
+  exit 2
 fi
 
 # 2. Branch not pushed to remote
@@ -55,7 +55,7 @@ fi
 # Block on hard issues
 if [ -n "$ISSUES" ]; then
   printf "PR CREATE BLOCKED — fix before creating:\n%b\n" "$ISSUES" >&2
-  exit 1
+  exit 2
 fi
 
 # --- Verification checklist (emit as reminder, do not block) ---

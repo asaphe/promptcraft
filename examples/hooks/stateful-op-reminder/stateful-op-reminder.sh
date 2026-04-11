@@ -25,7 +25,7 @@ REMINDER=""
 
 # --- Identity/auth provider management API mutations ---
 # Customize: replace with your provider's management API path
-if echo "$CMD" | grep -qiE '(descope|auth0|okta|entra|cognito).*(mgmt|admin|api).*(user|tenant|role|group)'; then
+if echo "$CMD" | grep -qiE '(auth0|cognito|descope|entra|okta).*(mgmt|admin|api).*(user|tenant|role|group)'; then
   REMINDER="STATEFUL OP: Identity provider user/role mutation detected. Follow the Stateful Operations Protocol: (1) Query current state of affected AND unaffected users, (2) Capture baseline, (3) Execute, (4) Verify from admin API AND end-user login perspective, (5) Spot-check unaffected users for collateral damage."
 fi
 
@@ -61,7 +61,8 @@ if [ -z "$REMINDER" ] && echo "$CMD" | grep -qE 'terraform +apply' && ! echo "$C
 fi
 
 # --- Generic curl POST/PUT/PATCH/DELETE to production APIs ---
-if [ -z "$REMINDER" ] && echo "$CMD" | grep -qE 'curl .* -X +(POST|PUT|PATCH|DELETE)' && echo "$CMD" | grep -qiE '(prod|production|api\.)'; then
+# Note: also misses implicit POST via -d/--json (known limitation).
+if [ -z "$REMINDER" ] && echo "$CMD" | grep -qE 'curl [^|;&]*-X +(POST|PUT|PATCH|DELETE)' && echo "$CMD" | grep -qiE '(prod|production|api\.)'; then
   REMINDER="STATEFUL OP: HTTP mutation to a production API detected. Follow the Stateful Operations Protocol: (1) Query current state via GET first, (2) Capture baseline, (3) Execute, (4) Verify via GET, (5) Check consumer perspective."
 fi
 

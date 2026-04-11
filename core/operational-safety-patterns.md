@@ -265,7 +265,7 @@ The recurring failure mode in production incidents is:
 ### Phase 1: Pre-Action — STOP and Verify
 
 1. **State the hypothesis explicitly** — "I believe the current state is X, and this action will change it to Y." Write it out. If you can't articulate it, you don't understand what you're about to do.
-2. **Query the system to verify current state** — Do not rely on memory, prior conversation context, IaC state, or assumptions. Query the live system. Compare what you see against your hypothesis. If they don't match, STOP and reassess.
+2. **Query the system to verify current state** — Do not rely on memory, prior conversation context, IaC state, or assumptions. Query the live system. Compare what you see against your hypothesis. If they don't match, STOP — update your hypothesis to match reality and re-present to the user before proceeding.
 3. **Capture baseline** — Save the current state (API response, resource list, user roles, pod status) so it can be diffed after the action. For user/role operations: capture a representative sample of affected AND unaffected entities.
 4. **Identify blast radius** — List who/what will be affected. For user operations: how many users? Which tenants? For infrastructure: which services/environments?
 5. **Dry-run if possible** — `terraform plan`, `--dry-run`, `--what-if`, read-only API call. If no dry-run exists, explain what the command will do step by step.

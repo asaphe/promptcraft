@@ -9,7 +9,7 @@ PreToolUse hook with two-tier blocking for destructive operations.
 | **Hard block** | `exit 2` + stderr | No — always blocks | Irreversible data loss (AWS deletions, push to main) |
 | **Soft block** | JSON `permissionDecision` + `exit 0` | Yes — user can approve | Risky but approvable (PR ops, force-push, terraform destroy) |
 
-Hard blocks stop the tool call before permission rules are evaluated — the user must run the command themselves or explicitly instruct Claude to proceed after seeing the block message.
+Hard blocks stop the tool call unconditionally — no override is possible. The user must run the command themselves in their terminal.
 
 Soft blocks surface a warning. With `Bash(*)` in the allow list, the user sees the warning and can approve in the permission prompt.
 
@@ -20,6 +20,7 @@ Soft blocks surface a warning. With `Bash(*)` in the allow list, the user sees t
 | Pattern | Why |
 |---------|-----|
 | `git push` to main/master | Must go through PRs |
+| `git push --force` to main/master | Rewrites shared history on default branch |
 | `git reset --hard` | Permanent loss of uncommitted work |
 | `aws * delete-*`, `aws s3 rm`, `aws ec2 terminate-*` | Cloud resource destruction |
 

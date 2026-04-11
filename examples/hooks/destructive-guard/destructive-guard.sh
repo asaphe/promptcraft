@@ -32,27 +32,40 @@ SOFT_REASON=""
 # git push to main/master (bypass PR process)
 # Worktree-aware: if the command does "cd /tmp/worktree && ... && git push",
 # check the branch in that directory, not the hook's CWD.
+# Force-push to main/master is even worse than regular push — hard block it separately.
+# Reuse awk parsing to skip flags and extract the positional ref argument.
+if echo "$CMD" | grep -qE 'git +push +.*--(force|force-with-lease)'; then
+  FORCE_PORTION=$(echo "$CMD" | grep -oE 'git +push[^;&|]*' | head -1)
+  FORCE_REF=$(echo "$FORCE_PORTION" | sed 's/git *push *//' | awk 'BEGIN{n=0} {for(i=1;i<=NF;i++) if(substr($i,1,1)!="-") {n++; if(n==2) {print $i; exit}}}')
+  if [ "$FORCE_REF" = "main" ] || [ "$FORCE_REF" = "master" ]; then
+    HARD_REASON="git push --force to main — rewrites shared history on the default branch."
+  elif echo "$FORCE_REF" | grep -qE '(^|:)(main|master)$'; then
+    HARD_REASON="git push --force to main — rewrites shared history on the default branch."
+  fi
+fi
+
 # Refspec-aware: "git push origin feature:remote" and "git push origin branch"
 # (where branch is not main) are safe — they push a specific ref, not current branch.
-if echo "$CMD" | grep -qE 'git +push([[:space:]]|$)' && ! echo "$CMD" | grep -qE 'git +push +.*--(force|force-with-lease)'; then
+if [ -z "$HARD_REASON" ] && echo "$CMD" | grep -qE 'git +push([[:space:]]|$)' && ! echo "$CMD" | grep -qE 'git +push +.*--(force|force-with-lease)'; then
   PUSH_DIR=""
   if echo "$CMD" | grep -qE 'cd +[^ ;&]+ *[;&].*git +push'; then
     PUSH_DIR=$(echo "$CMD" | grep -oE 'cd +[^ ;&]+' | tail -1 | sed 's/^cd *//')
   fi
 
   # Extract the git push portion and parse positional args (remote, refspec).
+  # Use awk to keep only words that don't start with "-" (flags like -u, --set-upstream).
+  # Plain sed 's/--*[^ ]*//g' would corrupt hyphenated branch names (main-hotfix → main).
   PUSH_PORTION=$(echo "$CMD" | grep -oE 'git +push[^;&|]*' | head -1)
-  PUSH_POSITIONAL=$(echo "$PUSH_PORTION" | sed 's/git *push *//' | sed 's/ *--*[^ ]*//g' | sed 's/^ *//;s/ *$//' | tr -s ' ')
-  PUSH_REMOTE=$(echo "$PUSH_POSITIONAL" | awk '{print $1}')
-  PUSH_REF=$(echo "$PUSH_POSITIONAL" | awk '{print $2}')
+  PUSH_REMOTE=$(echo "$PUSH_PORTION" | sed 's/git *push *//' | awk '{for(i=1;i<=NF;i++) if(substr($i,1,1)!="-") {print $i; exit}}')
+  PUSH_REF=$(echo "$PUSH_PORTION" | sed 's/git *push *//' | awk 'BEGIN{n=0} {for(i=1;i<=NF;i++) if(substr($i,1,1)!="-") {n++; if(n==2) {print $i; exit}}}')
 
   WILL_PUSH_MAIN=""
   if [ -z "$PUSH_REF" ]; then
     # No explicit ref — pushes current branch. Check which branch we're on.
     if [ -n "$PUSH_DIR" ]; then
-      BRANCH=$(git -C "$PUSH_DIR" branch --show-current 2>/dev/null)
+      BRANCH=$(git -C "$PUSH_DIR" branch --show-current 2>/dev/null || true)
     else
-      BRANCH=$(git branch --show-current 2>/dev/null)
+      BRANCH=$(git branch --show-current 2>/dev/null || true)
     fi
     if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
       WILL_PUSH_MAIN=1
