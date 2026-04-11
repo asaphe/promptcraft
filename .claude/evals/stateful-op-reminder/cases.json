@@ -1,0 +1,51 @@
+[
+  {
+    "label": "kubectl apply → reminder",
+    "command": "kubectl apply -f deployment.yaml",
+    "expected_exit": 0,
+    "expected_output": "STATEFUL OP"
+  },
+  {
+    "label": "kubectl get → silent (read-only)",
+    "command": "kubectl get pods -n default",
+    "expected_exit": 0
+  },
+  {
+    "label": "terraform apply → reminder",
+    "command": "terraform apply -auto-approve",
+    "expected_exit": 0,
+    "expected_output": "STATEFUL OP"
+  },
+  {
+    "label": "terraform plan → silent (read-only)",
+    "command": "terraform plan",
+    "expected_exit": 0
+  },
+  {
+    "label": "helm upgrade → reminder",
+    "command": "helm upgrade my-release ./chart",
+    "expected_exit": 0,
+    "expected_output": "STATEFUL OP"
+  },
+  {
+    "label": "helm upgrade --dry-run → silent",
+    "command": "helm upgrade --dry-run my-release ./chart",
+    "expected_exit": 0
+  },
+  {
+    "label": "aws iam attach-role-policy → reminder",
+    "command": "aws iam attach-role-policy --role-name test --policy-arn arn:aws:iam::aws:policy/test",
+    "expected_exit": 0,
+    "expected_output": "STATEFUL OP"
+  },
+  {
+    "label": "aws iam list-roles → silent (read-only)",
+    "command": "aws iam list-roles",
+    "expected_exit": 0
+  },
+  {
+    "label": "safe command → silent",
+    "command": "git status",
+    "expected_exit": 0
+  }
+]

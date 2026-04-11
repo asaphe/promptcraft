@@ -1,8 +1,33 @@
 {
   "permissions": {
-    "allow": ["Bash(git add *)"]
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git status *)",
+      "Bash(git fetch *)"
+    ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/stateful-op-reminder.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/destructive-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/pr-create-guard.sh"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "",

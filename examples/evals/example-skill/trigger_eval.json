@@ -1,0 +1,12 @@
+[
+  {"query": "deploy the app to staging", "should_trigger": true},
+  {"query": "/deploy webapp", "should_trigger": true},
+  {"query": "push to staging environment", "should_trigger": true},
+  {"query": "deploy the latest build", "should_trigger": true},
+  {"query": "roll out the new version", "should_trigger": true},
+  {"query": "check the deployment status", "should_trigger": false, "expected_skill": "verify-deploy", "note": "status check, not a deployment action"},
+  {"query": "what's running on staging?", "should_trigger": false, "expected_skill": "verify-deploy"},
+  {"query": "review the deployment PR", "should_trigger": false, "expected_skill": "pr-review", "note": "reviewing code, not deploying it"},
+  {"query": "rollback the last deployment", "should_trigger": false, "expected_skill": "rollback", "note": "undo action, separate skill"},
+  {"query": "show me the deploy workflow", "should_trigger": false, "expected_skill": "none", "note": "informational query, no skill should activate"}
+]

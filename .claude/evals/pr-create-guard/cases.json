@@ -1,0 +1,13 @@
+[
+  {
+    "label": "non-pr command → pass through silently",
+    "command": "git status",
+    "expected_exit": 0
+  },
+  {
+    "label": "gh pr create → never silent (blocks or emits checklist)",
+    "command": "gh pr create --title test --body test",
+    "expected_output": "PR",
+    "note": "Exit code depends on git state: exit 2 (block) when uncommitted changes or zero diff exist, exit 0 (checklist) on a clean pushed branch. Both outputs contain 'PR'. Omit expected_exit to accept either."
+  }
+]
