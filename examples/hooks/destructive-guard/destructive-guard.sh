@@ -29,10 +29,42 @@ SOFT_REASON=""
 # Cannot be overridden by Bash(*) or any allow-list permission.
 # =====================================================================
 
-# git push to main (bypass PR process)
+# git push to main/master (bypass PR process)
+# Worktree-aware: if the command does "cd /tmp/worktree && ... && git push",
+# check the branch in that directory, not the hook's CWD.
+# Refspec-aware: "git push origin feature:remote" and "git push origin branch"
+# (where branch is not main) are safe — they push a specific ref, not current branch.
 if echo "$CMD" | grep -qE 'git +push([[:space:]]|$)' && ! echo "$CMD" | grep -qE 'git +push +.*--(force|force-with-lease)'; then
-  BRANCH=$(git branch --show-current 2>/dev/null)
-  if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
+  PUSH_DIR=""
+  if echo "$CMD" | grep -qE 'cd +[^ ;&]+ *[;&].*git +push'; then
+    PUSH_DIR=$(echo "$CMD" | grep -oE 'cd +[^ ;&]+' | tail -1 | sed 's/^cd *//')
+  fi
+
+  # Extract the git push portion and parse positional args (remote, refspec).
+  PUSH_PORTION=$(echo "$CMD" | grep -oE 'git +push[^;&|]*' | head -1)
+  PUSH_POSITIONAL=$(echo "$PUSH_PORTION" | sed 's/git *push *//' | sed 's/ *--*[^ ]*//g' | sed 's/^ *//;s/ *$//' | tr -s ' ')
+  PUSH_REMOTE=$(echo "$PUSH_POSITIONAL" | awk '{print $1}')
+  PUSH_REF=$(echo "$PUSH_POSITIONAL" | awk '{print $2}')
+
+  WILL_PUSH_MAIN=""
+  if [ -z "$PUSH_REF" ]; then
+    # No explicit ref — pushes current branch. Check which branch we're on.
+    if [ -n "$PUSH_DIR" ]; then
+      BRANCH=$(git -C "$PUSH_DIR" branch --show-current 2>/dev/null)
+    else
+      BRANCH=$(git branch --show-current 2>/dev/null)
+    fi
+    if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
+      WILL_PUSH_MAIN=1
+    fi
+  elif [ "$PUSH_REF" = "main" ] || [ "$PUSH_REF" = "master" ]; then
+    WILL_PUSH_MAIN=1
+  elif echo "$PUSH_REF" | grep -qE '(^|:)(main|master)$'; then
+    # Refspec pushing TO main (e.g., feature:main)
+    WILL_PUSH_MAIN=1
+  fi
+
+  if [ -n "$WILL_PUSH_MAIN" ]; then
     HARD_REASON="git push on main — changes must go through a PR."
   fi
 fi
@@ -53,8 +85,16 @@ fi
 # =====================================================================
 
 # GitHub CLI — visible shared actions
-if echo "$CMD" | grep -qE 'gh +pr +(create|close|merge)'; then
-  SOFT_REASON="gh pr operation — visible shared action. Confirm with the user first."
+if echo "$CMD" | grep -qE 'gh +pr +create'; then
+  SOFT_REASON="gh pr create — visible shared action. Confirm with user."
+fi
+
+if echo "$CMD" | grep -qE 'gh +pr +close'; then
+  SOFT_REASON="gh pr close — verify before closing: read the PR fully, check for open review threads, confirm the reason, verify no unmerged work will be lost."
+fi
+
+if echo "$CMD" | grep -qE 'gh +pr +merge'; then
+  SOFT_REASON="gh pr merge — visible shared action. Confirm with user."
 fi
 
 if echo "$CMD" | grep -qE 'gh +run +delete'; then

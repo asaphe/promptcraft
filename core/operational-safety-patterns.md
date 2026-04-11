@@ -246,6 +246,55 @@ git diff --staged | grep -iE '(company|internal-domain|username|account-id)'
 
 If a leak is discovered after push, rewrite history immediately (`git filter-repo`) and force-push — do not just add a cleanup commit on top, as the secret remains in git history.
 
+## Stateful Operations Protocol
+
+Any action that modifies state in an external system — identity providers, IAM/SSO, Kubernetes, databases, DNS, Helm releases, or any API call that changes user permissions, roles, access, or data — requires this protocol.
+
+The Destructive Operation Protocol (above) catches overtly dangerous commands. This protocol catches **plausible-looking mutations based on wrong assumptions** — the kind that break production without triggering any guard.
+
+### Common Failure Pattern
+
+The recurring failure mode in production incidents is:
+
+1. **Acted on assumed state** — derived facts from naming, context, or partial knowledge instead of querying the live system
+2. **No baseline captured** — couldn't compare before/after because "before" was never recorded
+3. **No post-action verification** — assumed the action worked and moved on
+4. **Compounding errors during rollback** — rushed to fix the first mistake, made it worse (e.g., removing permissions from users while trying to restore them)
+5. **Admin-only verification** — checked from the API/admin view but never tested from the end-user's perspective
+
+### Phase 1: Pre-Action — STOP and Verify
+
+1. **State the hypothesis explicitly** — "I believe the current state is X, and this action will change it to Y." Write it out. If you can't articulate it, you don't understand what you're about to do.
+2. **Query the system to verify current state** — Do not rely on memory, prior conversation context, IaC state, or assumptions. Query the live system. Compare what you see against your hypothesis. If they don't match, STOP and reassess.
+3. **Capture baseline** — Save the current state (API response, resource list, user roles, pod status) so it can be diffed after the action. For user/role operations: capture a representative sample of affected AND unaffected entities.
+4. **Identify blast radius** — List who/what will be affected. For user operations: how many users? Which tenants? For infrastructure: which services/environments?
+5. **Dry-run if possible** — `terraform plan`, `--dry-run`, `--what-if`, read-only API call. If no dry-run exists, explain what the command will do step by step.
+6. **Present the plan to the user** — Show the hypothesis, current state, expected outcome, and blast radius. Get explicit approval before proceeding.
+
+### Phase 2: Action — Smallest Possible Change
+
+7. **One change at a time** — Do not batch unrelated mutations. Verify after each.
+8. **One system at a time** — Do not modify multiple systems in sequence without verifying each.
+9. **Staging first when applicable** — If the system has environments, apply to staging, verify, then production.
+
+### Phase 3: Post-Action — VERIFY Before Declaring Success
+
+10. **Query the system again** — Confirm the change took effect as intended. Compare against baseline from step 3.
+11. **Verify from the consumer's perspective** — Can users still log in? Can services still connect? Check from the end-user's view, not just the admin API.
+12. **Verify no collateral damage** — Spot-check entities you did NOT intend to change. For role operations: check 2-3 users who should NOT have been affected.
+13. **Report what was verified** — Don't say "done". Say what you checked, what the actual results were, and how they compare to the baseline.
+
+### Phase 4: Rollback — Treat as Its Own Stateful Operation
+
+14. **STOP before fixing** — When something goes wrong, the instinct is to fix immediately. Resist it. Assess what actually happened first.
+15. **Re-run Phase 1 for the rollback** — The system is now in an unknown state. Query it. Capture it. Understand it before acting.
+16. **Get explicit user approval for rollback steps** — Rollback is not "undo". It's a new mutation that can compound the original error.
+17. **Verify after rollback** — Same as Phase 3. The rollback itself can fail or cause collateral damage.
+
+### Hook Support
+
+The `stateful-op-reminder` hook (see `examples/hooks/stateful-op-reminder/`) detects mutations to external systems and emits a protocol reminder. It complements the `destructive-guard` hook: destructive-guard blocks dangerous commands, stateful-op-reminder nudges on plausible-looking mutations.
+
 ## State Management Safety
 
 ### Workspaces and Environments
