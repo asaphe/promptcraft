@@ -5,10 +5,9 @@
     "expected_exit": 0
   },
   {
-    "label": "gh pr create → blocks or emits checklist (never silent)",
+    "label": "gh pr create → never silent (blocks or emits checklist)",
     "command": "gh pr create --title test --body test",
-    "expected_exit": 2,
-    "expected_output": "PR CREATE BLOCKED",
-    "note": "Blocks on zero diff, unpushed branch, or uncommitted changes. On a clean feature branch with pushed commits, exits 0 with a verification checklist instead. This case reliably blocks in repos with uncommitted eval files."
+    "expected_output": "PR",
+    "note": "Exit code depends on git state: exit 2 (block) when uncommitted changes or zero diff exist, exit 0 (checklist) on a clean pushed branch. Both outputs contain 'PR'. Omit expected_exit to accept either."
   }
 ]

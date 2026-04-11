@@ -53,7 +53,7 @@ def run_hook(hook_path: Path, command: str) -> tuple[int, str]:
 def check_case(hook_path: Path, case: dict) -> tuple[bool, str]:
     """Run one test case and return (passed, detail)."""
     command = case["command"]
-    expected_exit = case["expected_exit"]
+    expected_exit = case.get("expected_exit")
     expected_output = case.get("expected_output")
 
     try:
@@ -63,7 +63,7 @@ def check_case(hook_path: Path, case: dict) -> tuple[bool, str]:
     except FileNotFoundError:
         return False, f"Hook not found: {hook_path}"
 
-    if exit_code != expected_exit:
+    if expected_exit is not None and exit_code != expected_exit:
         return False, f"exit {exit_code} (expected {expected_exit}), output: {combined}"
 
     if expected_output and expected_output not in combined:

@@ -31,7 +31,7 @@ Each hook has a `cases.json`:
 ]
 ```
 
-- `expected_exit`: 0 = allow, 2 = hard block. Soft blocks (JSON output) also exit 0.
+- `expected_exit`: optional — 0 = allow, 2 = hard block. Soft blocks (JSON output) also exit 0. Omit to accept any exit code (useful for environment-dependent cases).
 - `expected_output`: optional — if set, combined stdout+stderr must contain this substring. Covers both hard blocks (stderr) and soft blocks (JSON on stdout).
 - `note`: not checked by the runner, just documentation.
 
