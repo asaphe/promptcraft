@@ -54,17 +54,26 @@ Most meaningful customization lives in Claude Code's `~/.claude/` directory, not
 
 ### What to Symlink
 
-These files contain your accumulated configuration and should live in your dotfiles repo:
+These files contain your accumulated configuration and should live in your dotfiles repo.
+
+In the table and scripts below, `$DOTFILES_DIR` is the `claude/` subdirectory of your dotfiles repo. Common layouts:
+
+| Convention | `$DOTFILES_DIR` |
+|-----------|----------------|
+| `~/.dotfiles` (hidden) | `~/.dotfiles/claude` |
+| `~/dotfiles` (visible) | `~/dotfiles/claude` |
+| `~/code/dotfiles` | `~/code/dotfiles/claude` |
 
 | File/Directory | Purpose | Symlink Target |
 |---------------|---------|---------------|
-| `CLAUDE.md` | Global behavioral rules | `~/.dotfiles/claude/CLAUDE.md` |
-| `settings.json` | Permissions, hooks, env vars | `~/.dotfiles/claude/settings.json` |
-| `docs/` | On-demand reference docs | `~/.dotfiles/claude/docs/` |
-| `commands/` | Custom slash commands | `~/.dotfiles/claude/commands/` |
-| `statusline-command.sh` | Status line customization | `~/.dotfiles/claude/statusline-command.sh` |
-| `LOCAL_SENSITIVE.md` | Machine-local sensitive reference (see below) | `~/.dotfiles/claude/LOCAL_SENSITIVE.md` |
-| `memory/` | Persistent auto-memory | `~/.dotfiles/claude/memory/` |
+| `CLAUDE.md` | Global behavioral rules | `$DOTFILES_DIR/CLAUDE.md` |
+| `settings.json` | Permissions, hooks, env vars | `$DOTFILES_DIR/settings.json` |
+| `docs/` | On-demand reference docs | `$DOTFILES_DIR/docs/` |
+| `commands/` | Custom slash commands | `$DOTFILES_DIR/commands/` |
+| `statusline-command.sh` | Status line customization | `$DOTFILES_DIR/statusline-command.sh` |
+| `LOCAL_SENSITIVE.md` | Machine-local sensitive reference (see below) | `$DOTFILES_DIR/LOCAL_SENSITIVE.md` |
+| `memory/` | Persistent auto-memory | `$DOTFILES_DIR/memory/` |
+| `scripts/` | Utility scripts used by hooks | `$DOTFILES_DIR/scripts/` |
 
 ### What NOT to Symlink
 
@@ -87,10 +96,12 @@ These are ephemeral, machine-specific, or auto-generated:
 #!/usr/bin/env bash
 set -euo pipefail
 
-DOTFILES_DIR="$HOME/.dotfiles/claude"
+# Set to the claude/ subdirectory of your dotfiles repo.
+# Common: "$HOME/.dotfiles/claude" or "$HOME/dotfiles/claude"
+DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles/claude}"
 CLAUDE_DIR="$HOME/.claude"
 
-mkdir -p "$DOTFILES_DIR/docs" "$DOTFILES_DIR/commands" "$DOTFILES_DIR/memory"
+mkdir -p "$DOTFILES_DIR/docs" "$DOTFILES_DIR/commands" "$DOTFILES_DIR/memory" "$DOTFILES_DIR/scripts"
 
 # Files to symlink
 SYMLINKS=(
@@ -101,6 +112,7 @@ SYMLINKS=(
   "statusline-command.sh"
   "LOCAL_SENSITIVE.md"
   "memory"
+  "scripts"
 )
 
 for item in "${SYMLINKS[@]}"; do
