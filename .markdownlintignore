@@ -1,10 +1,16 @@
 # Pre-existing files with lint violations — fix separately
-claude/agents/review-agent-trio.md
-claude/claude-best-practices.md
-claude/learning-system-guide.md
-claude/mcp-management-guide.md
-claude/portability-guide.md
-claude/specs/ci-cd-specification.md
-core/agent-design-patterns.md
-cursor/multi-tool-coexistence.md
-cursor/user-rules/general-principles.md
+tools/claude/templates/agents/review-agent-trio.md
+tools/claude/guides/claude-best-practices.md
+tools/claude/guides/learning-system-guide.md
+tools/claude/guides/mcp-management-guide.md
+tools/claude/guides/portability-guide.md
+tools/claude/guides/pr-review-protocol.md
+tools/claude/specs/ci-cd-specification.md
+tools/claude/examples/evals/README.md
+tools/claude/examples/hooks/post-compact-reinject/README.md
+tools/claude/examples/hooks/pr-create-guard/README.md
+tools/claude/templates/rules/operational-rules-guide.md
+shared/principles/agent-design-patterns.md
+shared/principles/operational-safety-patterns.md
+tools/cursor/multi-tool-coexistence.md
+tools/cursor/rules/user/general-principles.md

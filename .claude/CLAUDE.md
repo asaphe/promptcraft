@@ -1,40 +1,27 @@
-# CLAUDE.md
+# CLAUDE.md — Contributor Config
 
-Promptcraft — open-source prompt engineering knowledge base and toolkit for Claude Code, ChatGPT, and Cursor.
+This file is Claude Code's project-level instructions **for working on promptcraft itself**. It is not example content. Readers looking for patterns to adopt should start at the repo root `README.md`.
 
-## Public Repo — Zero Tolerance
+General contribution rules live in `../AGENTS.md` (loaded by every AI assistant). This file adds only Claude-Code-specific guidance.
 
-- All commits are permanent, visible, and indexed. No PII, company names, internal service names, workspace/account IDs, or token prefixes in any content.
-- Scan every diff for PII before committing. `git diff --staged | grep -iE '(company|internal|username|account-id)'`
-- No internal references — this is a standalone public project. Content should read as if written by an independent contributor.
+## Dogfooding Note
 
-## Code Standards
+This repo runs its own example hooks from `../tools/claude/examples/hooks/`, copied into `.claude/hooks/`:
 
-- Conventional commits: `type(scope): description` — `feat:`, `fix:`, `docs:`, etc.
-- Always work via PRs — never push directly to main.
-- Shell scripts must use POSIX ERE only (no `\s`, `\d`, `\b`). macOS `grep -E` doesn't support PCRE.
+- `stateful-op-reminder.sh` — nudges (never blocks) on mutations to external systems.
+- `destructive-guard.sh` — two-tier blocking (hard: push to main, destructive AWS; soft: PR ops, force-push).
+- `pr-create-guard.sh` — blocks PR creation on missing prerequisites.
+- Learning-capture hooks — session start/end/precompact learnings.
 
-## Content Accuracy
+When updating a hook in `../tools/claude/examples/hooks/`, sync the `.claude/hooks/` copy too. Breaking dogfood = broken examples.
 
-This repo is a knowledge base — getting a pattern wrong teaches it wrong to every reader who copies it.
+## Rules
 
-- Verify every code example works if copied verbatim. Hook exit codes must match Claude Code's actual behavior. Settings JSON must use valid configuration fields.
-- Cross-reference before adding. Check if content exists elsewhere before duplicating. Verify file paths in cross-references actually exist.
-- Keep `examples/` and `claude/scaffolding/` in sync — when updating a pattern in one, check the other.
+Contributor-scoped rules live under `.claude/rules/`:
 
-## Review Posture
+- `git-discipline.md` — branching, fetch-before-assert, no-stacking, PII scan.
+- `content-quality.md` — accuracy discipline for a knowledge-base repo.
+- `operational-discipline.md` — cross-platform and post-push hygiene.
+- `pii-discipline.md` — zero-PII for a public repo.
 
-- Multiple self-review passes before presenting changes.
-- Adversarial pass: challenge every example against a real shell, real Claude Code, real edge case.
-- When adding hooks: test with `echo '{"tool_input":{"command":"..."}}' | ./hook.sh` for every documented case.
-
-## Hooks (dogfooding)
-
-This repo uses its own example hooks in `.claude/hooks/`:
-
-- `stateful-op-reminder.sh` — Nudges (never blocks) on mutations to external systems. Copied from `examples/hooks/stateful-op-reminder/`.
-- `destructive-guard.sh` — Two-tier blocking (hard: push to main, AWS deletions; soft: PR ops, force-push). Copied from `examples/hooks/destructive-guard/`.
-- `pr-create-guard.sh` — Blocks PR creation on missing prerequisites. Copied from `examples/hooks/pr-create-guard/`.
-- Learning-capture hooks — Session start/end/precompact learnings.
-
-When updating a hook in `examples/`, sync the `.claude/hooks/` copy too.
+Every change loads these into the Claude Code session automatically.

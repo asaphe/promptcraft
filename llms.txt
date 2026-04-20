@@ -1,0 +1,56 @@
+# promptcraft
+
+> Rules, agents, skills, and configs for AI coding assistants — Claude Code, Cursor, ChatGPT. Tool-agnostic universal content under `shared/`, tool-specific adaptations under `tools/`.
+
+A reference library meant for humans and AI assistants to browse, copy, and adapt. Not a package or runtime — nothing is installed.
+
+## Entry points
+
+- [README.md](README.md): human-facing entry point with persona-based routing.
+- [AGENTS.md](AGENTS.md): contributor instructions per [agents.md](https://agents.md) convention — read this before editing the repo.
+- [ADOPTION.md](ADOPTION.md): step-by-step guide to copying content into your own assistant setup.
+- [CONVENTIONS.md](CONVENTIONS.md): file naming, structure, link format conventions used throughout.
+- [DECISIONS.md](DECISIONS.md): rationale for the current structure.
+
+## Universal content (shared/)
+
+Tool-agnostic — applies to any AI coding assistant.
+
+- [shared/principles/](shared/principles/): communication style, tool safety, agent design, prompting examples, CLI tool design, personal conventions.
+- [shared/languages/](shared/languages/): TypeScript, Python, Bash, Java, Go, general cross-language standards.
+- [shared/infrastructure/](shared/infrastructure/): Terraform, Kubernetes/Helm, Docker, AWS, Ansible, cost optimization.
+- [shared/workflows/](shared/workflows/): CI/CD patterns, GitHub Actions, version management.
+- [shared/quality/](shared/quality/): code quality, documentation, research standards.
+
+## Claude Code (tools/claude/)
+
+- [tools/claude/guides/](tools/claude/guides/): end-to-end guides — best practices, hooks, skills, agents, PR review, learning systems, GHA integration, MCP management.
+- [tools/claude/templates/](tools/claude/templates/): starter files — agent templates, skill templates, rule file templates, project-level doc templates.
+- [tools/claude/examples/](tools/claude/examples/): complete reference `.claude/` directory — hooks, agents, rules, skills, evals, config, docs.
+- [tools/claude/scaffolding/](tools/claude/scaffolding/): ready-to-copy `.claude/` skeleton for a new repo.
+- [tools/claude/specs/](tools/claude/specs/): RFC-style specifications (CI/CD standard).
+
+## Cursor (tools/cursor/)
+
+- [tools/cursor/rules/user/](tools/cursor/rules/user/): markdown for Cursor's User Rules UI (Settings → Rules).
+- [tools/cursor/rules/mdc/](tools/cursor/rules/mdc/): `.mdc` files for `.cursor/rules/` project-rule directories.
+- [tools/cursor/mcp/](tools/cursor/mcp/): MCP server configuration for Cursor.
+- [tools/cursor/recovery/](tools/cursor/recovery/): utility to recover conversation history across workspaces.
+
+## ChatGPT (tools/chatgpt/)
+
+- [tools/chatgpt/global/](tools/chatgpt/global/): Custom Instructions for Settings → Personalization (apply globally).
+- [tools/chatgpt/projects/](tools/chatgpt/projects/): Project-scoped instructions for specific stacks.
+- [tools/chatgpt/implementation-guide.md](tools/chatgpt/implementation-guide.md): setup walkthrough.
+
+## Repo contributor config (.claude/)
+
+- [.claude/README.md](.claude/README.md): explains that `.claude/` is contributor config — not example content.
+- [.claude/CLAUDE.md](.claude/CLAUDE.md): project instructions loaded when editing promptcraft itself.
+- [.claude/rules/](.claude/rules/): contributor rules (PII, git, content quality, operational).
+- [.claude/hooks/](.claude/hooks/): live safety hooks dogfooded from `tools/claude/examples/hooks/`.
+
+## Optional
+
+- [docs/index.html](docs/index.html): GitHub Pages landing page (branding, hero). **Do not edit without a Pages plan.**
+- [.github/](.github/): CI workflows, issue/PR templates.
