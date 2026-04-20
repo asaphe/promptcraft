@@ -10,6 +10,8 @@ Specialist agent definitions — operational agents (deployment, Terraform, K8s 
 
 ### `config/`
 
+- **`global-CLAUDE.md`** ⭐ — A production `~/.claude/CLAUDE.md` template: ~250 lines covering behavioral constraints, operational safety, review quality, AWS/K8s rules, git discipline, and CI/CD gotchas. **Start here if you're a DevOps or infra engineer.** Drop it at `~/.claude/CLAUDE.md` — no placeholder customization required for the behavioral sections.
+
 Annotated `settings.json` excerpts showing two key patterns:
 
 - **`settings-permissions.jsonc`** — Permission allowlists using Bash wildcards, MCP tool namespaces, WebFetch domain restrictions, and Skill permissions. Demonstrates the "wildcard + CLAUDE.md rules" approach to safety.

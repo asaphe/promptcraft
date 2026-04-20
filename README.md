@@ -137,6 +137,22 @@ If uncertain about which context applies, ask for clarification rather than assu
 
 ## Quick Start
 
+### ⭐ Fastest path: production-ready global CLAUDE.md
+
+If you use **Claude Code** and work in DevOps or infrastructure, the single highest-leverage thing in this repo is [`examples/config/global-CLAUDE.md`](examples/config/global-CLAUDE.md).
+
+It's a ~250-line `~/.claude/CLAUDE.md` derived from a production DevOps setup — covering behavioral guardrails, operational safety protocols, review quality standards, AWS/K8s rules, git discipline, and CI/CD gotchas. It loads into every Claude Code session across all your projects.
+
+**To use it:**
+
+```bash
+cp examples/config/global-CLAUDE.md ~/.claude/CLAUDE.md
+```
+
+Remove sections that don't apply to your stack. The behavioral sections (Agent Behavioral Constraints, Safety, Review Quality, Bash Command Patterns) need no customization and are universally useful.
+
+---
+
 ### For AI Assistant Configuration
 
 1. **Choose relevant sections** based on your work focus:
@@ -188,10 +204,11 @@ If uncertain about which context applies, ask for clarification rather than assu
 
 **For Claude Code:**
 
-- Start with `claude/claude-best-practices.md` for the end-to-end workflow
-- Use `claude/hooks-guide.md` and `claude/settings-json-guide.md` for runtime configuration
-- See `claude/github-actions-integration.md` for CI/CD automation
-- Use `claude/scaffolding/` as a starting template for your `.claude/` directory
+- **Global config (DevOps/infra):** `examples/config/global-CLAUDE.md` → `~/.claude/CLAUDE.md` ⭐
+- End-to-end workflow guide: `claude/claude-best-practices.md`
+- Runtime configuration: `claude/hooks-guide.md` and `claude/settings-json-guide.md`
+- CI/CD automation: `claude/github-actions-integration.md`
+- Starter project template: `claude/scaffolding/`
 
 **For Cursor with MCP:**
 
