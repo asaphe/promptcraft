@@ -53,7 +53,7 @@ python .claude/evals/runner.py --hook <modified-hook-name>
 
 ## See Also
 
-For **skill routing validation** (manual testing of which Claude Code skill activates for a given query), see `examples/evals/`.
+For **skill routing validation** (manual testing of which Claude Code skill activates for a given query), see `../../tools/claude/examples/evals/`.
 
 ## Adding Cases
 
