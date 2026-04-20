@@ -1,0 +1,5 @@
+# promptcraft
+
+> Placeholder — content lands in commit 5.
+
+Machine-readable index of the repo contents per the [llms.txt](https://llmstxt.org/) convention. Generated from repo state, not hand-edited.
