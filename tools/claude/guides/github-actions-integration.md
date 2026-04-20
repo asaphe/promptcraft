@@ -276,7 +276,7 @@ Reusable composite GitHub Actions for common CI/CD patterns:
 
 ## Related Resources
 
-- [GitHub Actions Patterns](../workflows/github-actions.md) — General GHA development protocol
-- [CI/CD Patterns](../workflows/ci-cd-patterns.md) — Deployment strategies and pipeline design
+- [GitHub Actions Patterns](../../../shared/workflows/github-actions.md) — General GHA development protocol
+- [CI/CD Patterns](../../../shared/workflows/ci-cd-patterns.md) — Deployment strategies and pipeline design
 - [PR Review Protocol](pr-review-protocol.md) — Structured review methodology
 - [Best Practices](claude-best-practices.md) — Headless mode and automation patterns

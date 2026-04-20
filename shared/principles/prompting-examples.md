@@ -262,5 +262,5 @@ path, and handler function. Output as a table. Do not write any code yet.
 ## Related Resources
 
 - [Tone and Style](tone-and-style.md) — Communication standards that apply to all prompts
-- [Claude Best Practices](../claude/claude-best-practices.md) — The Explore/Plan/Code/Commit workflow
-- [Agent Design Guide](../claude/agents/agent-design-guide.md) — Prompt design for agent system prompts
+- [Claude Best Practices](../../tools/claude/guides/claude-best-practices.md) — The Explore/Plan/Code/Commit workflow
+- [Agent Design Guide](../../tools/claude/templates/agents/agent-design-guide.md) — Prompt design for agent system prompts

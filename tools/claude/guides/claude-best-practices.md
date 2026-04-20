@@ -73,7 +73,7 @@ Beyond token counts, how you write instructions determines whether they're follo
 
 **Primacy and Recency Effects** — Instructions at the beginning and end of a config file receive disproportionate attention under context pressure. Place highest-priority rules (safety guards, destructive-operation blocks) at the top of CLAUDE.md and at the top of each agent's behavioral section. Place less critical preferences in the middle. Ordering within the file matters as much as total size.
 
-**Progressive Disclosure** — Not everything needs to be in context at once. Three mechanisms reduce baseline token cost: (a) subdirectory CLAUDE.md files load only when working in that directory, (b) `.claude/docs/` files are read on-demand via pointers in CLAUDE.md, (c) agent `skills` field loads skill descriptions (~24 tokens each) until the full body is needed on invocation. See the [skill design guide](skills/skill-design-guide.md) for the three-level disclosure model.
+**Progressive Disclosure** — Not everything needs to be in context at once. Three mechanisms reduce baseline token cost: (a) subdirectory CLAUDE.md files load only when working in that directory, (b) `.claude/docs/` files are read on-demand via pointers in CLAUDE.md, (c) agent `skills` field loads skill descriptions (~24 tokens each) until the full body is needed on invocation. See the [skill design guide](../templates/skills/skill-design-guide.md) for the three-level disclosure model.
 
 **Poka-Yoke (Mistake-Proofing)** — Design configurations that make mistakes structurally harder rather than relying on the agent remembering a rule. Preference order: hooks (deterministic, blocks the action) > tool scoping in `allowed-tools` (structural, prevents access) > rules (judgment-dependent, can be forgotten). If a behavior must happen 100% of the time, it belongs in a hook, not a rule. See the [hooks guide](hooks-guide.md#hooks-vs-rules-decision-framework) for the decision framework.
 
@@ -119,7 +119,7 @@ For complex tasks that exceed a single prompt's effective scope, break them into
 - **Feature:** Explore patterns → Plan → Implement backend → Implement frontend → Integration test
 - **Review:** Summarize changes → Check security → Verify tests → Write summary
 
-See [prompting-examples.md](../core/prompting-examples.md) for concrete examples with input/output pairs.
+See [prompting-examples.md](../../../shared/principles/prompting-examples.md) for concrete examples with input/output pairs.
 
 ### Dev Docs Pattern
 
@@ -198,7 +198,7 @@ Skills (slash commands) are the primary way to codify reusable workflows. Keep t
 - **UserPromptSubmit hook**: Analyzes the prompt for keywords/intent, injects a reminder to use the relevant skill before Claude processes the message.
 - **Stop event hook**: Analyzes edited files for risky patterns (try-catch, DB ops, async), displays a non-blocking self-check reminder.
 
-See: [skills/skill-design-guide.md](skills/skill-design-guide.md) for design patterns.
+See: [../templates/skills/skill-design-guide.md](../templates/skills/skill-design-guide.md) for design patterns.
 
 ### MCP Strategy
 
@@ -223,7 +223,7 @@ Two approaches to delegation:
 | **Custom specialized subagents** | Highly specific, narrow tasks (PR review, build error resolution) with clear domain boundaries |
 | **Clone pattern** (Task spawning) | Most other delegation; preserves full context, more flexible |
 
-Default to the clone pattern. Custom subagents make sense when you need strict tool scoping or domain-specific system prompts. See: [agents/agent-design-guide.md](agents/agent-design-guide.md)
+Default to the clone pattern. Custom subagents make sense when you need strict tool scoping or domain-specific system prompts. See: [../templates/agents/agent-design-guide.md](../templates/agents/agent-design-guide.md)
 
 ### Simple Control Loops
 
@@ -334,7 +334,7 @@ These patterns prevent the most common production mistakes:
 - **Fix diagnostics immediately** — Every warning is a finding; don't classify them as "minor" to avoid fixing them
 - **Never dismiss unexpected diffs** — An unexpected diff means something WILL change on the next apply
 
-See: [../core/operational-safety-patterns.md](../core/operational-safety-patterns.md)
+See: [../../../shared/principles/operational-safety-patterns.md](../../../shared/principles/operational-safety-patterns.md)
 
 ### Context Budget Consolidation
 
@@ -443,20 +443,20 @@ Audit with `claude mcp list`. If you see servers you never use, remove them or d
 - [Issue Writing Guide](issue-writing-guide.md) — Structuring effective issues and proposals
 - [PII Prevention Guide](pii-prevention-guide.md) — Preventing sensitive data leakage in public repos
 - [CLAUDE.md Design Guide](global-claude-md-guide.md) — How to structure your personal and project CLAUDE.md files
-- [Agent Design Guide](agents/agent-design-guide.md) — Building specialized subagents with proper boundaries
-- [Skill Design Guide](skills/skill-design-guide.md) — Creating slash commands for reusable workflows
+- [Agent Design Guide](../templates/agents/agent-design-guide.md) — Building specialized subagents with proper boundaries
+- [Skill Design Guide](../templates/skills/skill-design-guide.md) — Creating slash commands for reusable workflows
 - [Learning System Guide](learning-system-guide.md) — Automated knowledge capture from sessions
 - [PR Review Protocol](pr-review-protocol.md) — Structured review with finding verification
-- [Operational Safety Patterns](../core/operational-safety-patterns.md) — Session safety and destructive operation protocols
+- [Operational Safety Patterns](../../../shared/principles/operational-safety-patterns.md) — Session safety and destructive operation protocols
 - [Portability Guide](portability-guide.md) — Dotfiles, symlinks, backups, and multi-machine setup
 - [MCP Management Guide](mcp-management-guide.md) — Adding, removing, and managing MCP servers across scopes
-- [Review Agent Trio](agents/review-agent-trio.md) — Specialized reviewer agents for higher-quality PR review
+- [Review Agent Trio](../templates/agents/review-agent-trio.md) — Specialized reviewer agents for higher-quality PR review
 - [Session Analytics Guide](session-analytics-guide.md) — Mining session history for tool call waste patterns
 - [Hooks Guide](hooks-guide.md) — Designing PreToolUse, PostToolUse, and Stop hooks
 - [Settings JSON Guide](settings-json-guide.md) — Permissions, env vars, hook registration, layering
 - [GitHub Actions Integration](github-actions-integration.md) — Claude Code in CI/CD via claude-code-action
-- [Prompting Examples](../core/prompting-examples.md) — Multishot examples, XML structuring, prompt chaining demos
-- [Scaffolding Directory](scaffolding/) — Complete example `.claude/` directory ready to customize
+- [Prompting Examples](../../../shared/principles/prompting-examples.md) — Multishot examples, XML structuring, prompt chaining demos
+- [Scaffolding Directory](../scaffolding/) — Complete example `.claude/` directory ready to customize
 
 ---
 

@@ -26,8 +26,8 @@ mcp/
 ## Quick Start
 
 1. **Choose your tools**: Review `tools/` directory for available MCP servers
-2. **Configure Cursor**: Follow `cursor/setup-guide.md` for installation
-3. **Adapt configuration**: Use `cursor/configuration.json` as template
+2. **Configure Cursor**: Follow [`setup-guide.md`](setup-guide.md) for installation
+3. **Adapt configuration**: Use [`configuration.json`](configuration.json) as template
 4. **Set up credentials**: Follow `security/` guides for secure token management
 
 ## Supported MCP Servers

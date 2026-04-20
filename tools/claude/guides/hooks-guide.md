@@ -404,5 +404,5 @@ Production-tested hook examples with README documentation:
 
 - [Learning System Guide](learning-system-guide.md) — Hooks for automated knowledge capture
 - [Settings JSON Guide](settings-json-guide.md) — Where hooks are registered and how layering works
-- [Skill Design Guide](skills/skill-design-guide.md) — Skills that hooks can auto-activate
+- [Skill Design Guide](../templates/skills/skill-design-guide.md) — Skills that hooks can auto-activate
 - [Best Practices](claude-best-practices.md) — Quality gates and hook integration patterns
