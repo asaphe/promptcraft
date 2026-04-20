@@ -9,7 +9,7 @@ Distilled from real production use. Copy what fits, ignore what doesn't, adapt t
 Pick your assistant:
 
 - **Claude Code** → [`tools/claude/`](tools/claude/) — CLAUDE.md patterns, hooks, agents, skills, full example config.
-- **Cursor** → [`tools/cursor/`](tools/cursor/) — `.cursorrules`, `.cursor/rules/*.mdc`, user-rules UI copy-paste.
+- **Cursor** → [`tools/cursor/`](tools/cursor/) — `.cursor/rules/*.mdc` project rules, user-rules UI copy-paste, MCP configuration.
 - **ChatGPT** → [`tools/chatgpt/`](tools/chatgpt/) — Custom Instructions (global) and Project Instructions (scoped).
 
 The universal content — principles, language standards, infra patterns, CI/CD, quality — lives in [`shared/`](shared/) and is referenced by all three tool directories.

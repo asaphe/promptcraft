@@ -140,4 +140,4 @@ A `.claude/README.md` disambiguates the two for anyone who lands there by accide
 1. Move to `.github/` or delete — assumed it was stale documentation.
 2. Repurpose `docs/` for new restructure docs.
 
-**Why this one:** A grep revealed `docs/index.html` is the rendered social preview card (OG tags, branding). Moving or deleting it would break the GitHub preview. Fresh documentation goes to the repo root where it's easier to find.
+**Why this one:** Inspecting the file revealed it's a full GitHub Pages landing page (hero, branding, styling) — served at `<user>.github.io/promptcraft/` when Pages is enabled from the `docs/` folder. Moving or deleting it would break the published Pages site. Fresh documentation goes to the repo root where it's easier to find.

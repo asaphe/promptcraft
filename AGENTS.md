@@ -13,7 +13,7 @@ For content to *adopt* into your own projects, see `README.md` and the `shared/`
   - `tools/<tool>/` — tool-specific adaptations (Claude Code, Cursor, ChatGPT).
   - `.claude/` — contributor config for working on this repo with Claude Code (not example content).
   - `.github/` — CI, issue/PR templates.
-  - `docs/index.html` — social preview card. **Do not edit without a Pages plan.**
+  - `docs/index.html` — GitHub Pages landing page (branding, hero). **Do not edit without a Pages plan.**
   - Root files: `README.md` (entry), `AGENTS.md` (this file), `ADOPTION.md`, `CONVENTIONS.md`, `DECISIONS.md`, `llms.txt`.
 
 ## Adding Content — Where Does It Go?
@@ -56,6 +56,6 @@ Per the [agents.md](https://agents.md) convention, large subprojects may carry t
 
 ## Out of Scope
 
-- `docs/index.html` — promotional asset; do not re-purpose without a Pages plan.
+- `docs/index.html` — GitHub Pages landing page; do not re-purpose without a Pages plan.
 - `.claude/` hooks — these are maintenance config for the repo itself, not example content.
 - Private/personal paths, company names, or PII in any file. See `CONVENTIONS.md`.

@@ -52,5 +52,5 @@ Tool-agnostic — applies to any AI coding assistant.
 
 ## Optional
 
-- [docs/index.html](docs/index.html): GitHub social preview card. **Do not edit without a Pages plan.**
+- [docs/index.html](docs/index.html): GitHub Pages landing page (branding, hero). **Do not edit without a Pages plan.**
 - [.github/](.github/): CI workflows, issue/PR templates.

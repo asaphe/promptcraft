@@ -293,7 +293,7 @@ The recurring failure mode in production incidents is:
 
 ### Hook Support
 
-The `stateful-op-reminder` hook (see `examples/hooks/stateful-op-reminder/`) detects mutations to external systems and emits a protocol reminder. It complements the `destructive-guard` hook: destructive-guard blocks dangerous commands, stateful-op-reminder nudges on plausible-looking mutations.
+The `stateful-op-reminder` hook (see `tools/claude/examples/hooks/stateful-op-reminder/`) detects mutations to external systems and emits a protocol reminder. It complements the `destructive-guard` hook: destructive-guard blocks dangerous commands, stateful-op-reminder nudges on plausible-looking mutations.
 
 ## State Management Safety
 
