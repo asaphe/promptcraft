@@ -334,6 +334,25 @@ These patterns prevent the most common production mistakes:
 - **Fix diagnostics immediately** — Every warning is a finding; don't classify them as "minor" to avoid fixing them
 - **Never dismiss unexpected diffs** — An unexpected diff means something WILL change on the next apply
 
+### List Completeness Audit
+
+When fixing or adding a property to one item in a list, audit **every** item in that list for the same gap before declaring done. Models default to "fix what's in front of me" and skip homogeneous siblings; bot reviewers consistently catch what self-review misses precisely because they enumerate the list.
+
+The pattern applies at multiple scopes:
+
+- **Sibling functions in the same file** — adding input sanitization to one handler? Every parallel handler that processes the same input class needs the same treatment.
+- **Sibling jobs in a YAML workflow** — adding `environment: production` to one job for OIDC trust? The other downstream jobs calling the same reusable workflow probably need it too.
+- **Sibling services in a config** — adding a secret reference to one service's helm values? Every service that consumes the same secret family needs the same reference.
+- **Sibling modules in a Terraform directory** — bumping a provider version in one module's lockfile? Every module in the directory that pins the same provider needs the bump.
+- **Sibling consumers of a renamed artifact** — renaming a function, image, or path? Every caller and every doc reference needs to be updated.
+
+Two specific cases that recur:
+
+- **Lint/validation scope ≠ diff scope.** When fixing a CI lint failure, the linter usually scans a directory or namespace, not just the changed files. Identify what the checker actually scans (read its config) and run it on that scope before declaring "fixed."
+- **Implicit dependencies aren't in the diff.** A code change in a service may require rebuilding its container image, bumping the chart version, updating a Dockerfile, or refreshing a lockfile — none of which appear in the original diff. Before declaring done, enumerate the implicit artifacts and update them too.
+
+A useful pre-flight question: *what is the FULL set of items affected by this change, and have I touched each one?* Naming the set explicitly forces the audit.
+
 See: [../../../shared/principles/operational-safety-patterns.md](../../../shared/principles/operational-safety-patterns.md)
 
 ### Context Budget Consolidation
