@@ -67,6 +67,18 @@ gh api repos/{owner}/{repo}/pulls/comments/{id} --method DELETE
 
 Replying to your own comment with "actually, this was wrong" creates noise and confusion. Delete the incorrect comment and post a new one if a corrected finding is needed.
 
+### Atomic Comment Resolution
+
+When you change code in response to a review comment, the unit of work is **fix + reply + resolve**, performed atomically — never just the code fix. The most common review-followup mistake is a model that pushes the code change and stops, leaving the reviewer to scroll through a wall of unresolved threads to figure out which were addressed.
+
+The three actions in order:
+
+1. **Fix the code** — change the file, commit, push.
+2. **Reply on the thread** — one short comment per thread explaining what was done. For comments not relevant to the diff or already addressed by other changes, reply with that verdict. Don't leave a fixed thread without a reply — the reviewer can't tell from a `git diff` alone.
+3. **Resolve the thread** — `resolveReviewThread` GraphQL mutation (see below). `gh pr comment` does NOT resolve threads; resolution is a distinct API call.
+
+A useful shorthand: "address all review comments" is shorthand for **all three actions per comment**, not just the code change. Treating the code change as the whole task is the bug.
+
 ### Resolve Threads via GraphQL
 
 The GitHub REST API does not support resolving PR review threads. Use GraphQL:

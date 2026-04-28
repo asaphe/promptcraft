@@ -208,6 +208,92 @@ WORKTREES=$(git worktree list 2>/dev/null | grep -v "$(git rev-parse --show-topl
 
 See `../examples/hooks/post-compact-reinject/` for a production implementation.
 
+### 7. Flag-Permissive Command Matching
+
+The naive pattern `<cmd> +<verb>` (e.g., `kubectl +delete`, `gh +pr +create`) silently misses real-world commands because users interpose flags between the binary and the verb. Examples that bypass naive matchers:
+
+```
+kubectl --context my-cluster delete pod foo     # → does NOT match `kubectl +delete`
+gh --repo owner/repo pr create --title "..."    # → does NOT match `gh +pr +create`
+git -C /path push origin main                   # → does NOT match `git +push`
+aws --profile prod s3 rm s3://bucket/key        # → does NOT match `aws +s3 +rm`
+```
+
+The fix is a regex shape that allows arbitrary tokens between the command and the verb while excluding command separators that would let a downstream pipe smuggle a false positive:
+
+```
+<cmd>[[:space:]]([^|;&]* )?<verb>([[:space:]]|$)
+```
+
+- `[[:space:]]` after `<cmd>` — anchor on a real boundary, not a substring like `kubectl-helper`.
+- `([^|;&]* )?` — zero or more whitespace-delimited tokens (flags, values, paths) that don't contain a pipe / semicolon / ampersand. Excluding those means `cmd | grep verb` and `cmd; otherverb` won't false-positive.
+- `([[:space:]]|$)` after `<verb>` — anchor again so `delete` doesn't match `delete-flag` substrings inside another verb.
+
+Applied to the examples above:
+
+```bash
+# Hard-block kubectl delete in any form
+echo "$CMD" | grep -qE 'kubectl[[:space:]]([^|;&]* )?delete([[:space:]]|$)'
+
+# Match gh pr create regardless of repo flag position
+echo "$CMD" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +create([[:space:]]|$)'
+
+# Match git push, including `git -C dir push` and `git --git-dir=foo push`
+echo "$CMD" | grep -qE 'git[[:space:]]([^|;&]* )?push([[:space:]]|$)'
+```
+
+Audit existing hooks with `grep -nE "[a-z]+ \+[a-z]+" *.sh` — any `<cmd> +<verb>` pattern probably has this bug.
+
+### 8. Strip Command-Message Text Before Matching
+
+Hooks that fire on broad matchers (e.g., `Bash` with no `if:` filter, or `Bash(git *)`) see the full command including any heredoc bodies and `-m`/`--message` argument contents. A regex looking for `git checkout` will fire on a *commit message* that documents the rule:
+
+```bash
+git commit -m "$(cat <<'EOF'
+docs: explain why we forbid git checkout into another repo
+EOF
+)"
+```
+
+The hook reads the entire command string. The substring `git checkout into another repo` lives inside the `-m` argument — but a naive `grep -qE 'git +(checkout|switch)'` matches it and triggers a hard-block on a commit that's actually about explaining the rule.
+
+Solution: a shared utility that produces a normalized command string with heredoc bodies and `-m` contents replaced by placeholders. Hooks pattern-match against the stripped version; argument extraction (paths, branch names) still uses the raw command.
+
+```bash
+# strip-cmd.sh — sourced by hooks that pattern-match broadly
+strip_cmd() {
+  printf '%s' "$1" | perl -0777 -pe '
+    s/<<-?["\x27]?([A-Za-z_][A-Za-z0-9_]*)["\x27]?\s*\n.*?\n[ \t]*\1\b/<<STRIPPED_HEREDOC>>/gs;
+    s/(-m|--message)([ =]+)"((?:\\.|[^"\\])*)"/\1\2"STRIPPED_MSG"/g;
+    s/(-m|--message)([ =]+)\x27[^\x27]*\x27/\1\2\x27STRIPPED_MSG\x27/g;
+  '
+}
+```
+
+Usage in a hook:
+
+```bash
+INPUT=$(cat)
+CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
+[ -z "$CMD" ] && exit 0
+
+source ~/.claude/hooks/strip-cmd.sh
+CMD_STRIPPED=$(strip_cmd "$CMD")
+
+# Now pattern-match the stripped version
+if echo "$CMD_STRIPPED" | grep -qE 'kubectl[[:space:]]([^|;&]* )?delete([[:space:]]|$)'; then
+  echo "BLOCKED: kubectl delete" >&2
+  exit 2
+fi
+```
+
+**When to use it:**
+
+- ✅ Hooks with broad matchers (`Bash`, `Bash(git *)`, `Bash(gh *)`).
+- ✅ Hooks that hard-block (exit 2) — false positives have outsized cost.
+- ❌ Hooks where the message body itself is what you want to inspect (e.g., a guard that scans commit messages for forbidden attribution markers — that hook should look at the raw `-m` content, not the stripped version).
+- ❌ Hooks with narrow `if:` matchers (`Bash(git push*)`, `Bash(gh pr create*)`) — the harness already filters at the matcher level, so the hook can't see unrelated commands.
+
 ## Testing Hooks
 
 Test hooks by piping sample JSON:
@@ -358,6 +444,8 @@ See the [Session Analytics Guide](session-analytics-guide.md) for queries and me
 | Hook output isn't valid JSON | Validate with `jq` before deploying |
 | Hook path is relative | Use absolute paths or `$CLAUDE_PROJECT_DIR` in settings.json |
 | Hook reads env vars instead of stdin | Claude Code passes hook data on stdin as JSON |
+| `<cmd> +<verb>` regex misses real-world commands | Real CLIs interpose flags between binary and verb (`kubectl --context X delete`, `gh --repo Y pr create`). Use the flag-permissive shape — see "Flag-Permissive Command Matching" below |
+| Pattern fires on text inside heredoc/`-m` bodies | A commit-message body that mentions `git push --force` triggers any hook with that pattern. Strip heredoc bodies and `-m` argument contents before matching — see "Strip Command-Message Text Before Matching" below |
 
 ## Hook Catalog
 

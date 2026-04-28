@@ -79,6 +79,55 @@ find ~/.claude/projects -name "*.jsonl" -not -path "*/subagents/*" \
 4. **Measure** — Re-run the same queries after a month to verify reduction
 5. **Repeat** — Quarterly cadence is sufficient; patterns change slowly
 
+## Behavioral Analysis: Multi-Agent Pattern
+
+Tool-call waste analysis (above) is the easy half: it surfaces *what Claude does too much of*. The harder half is *what Claude gets wrong* — recurring corrections, repeated user asks, review misses. That data is in the same JSONL files but harder to query because it lives in the conversation, not in tool calls.
+
+A repeatable approach is to run four analyses in parallel as background subagents, each with a focused brief:
+
+| Track | What it mines | Output |
+|-------|---------------|--------|
+| **Frustrations** | User correction patterns (`"no, wrong"`, `"stop"`, `"why did you"`, `"I told you"`) in `history.jsonl`, then session-context lookup for top themes | List of recurring corrections, each cross-referenced against existing `CLAUDE.md` rules |
+| **Repeated asks** | Topics queried across multiple distinct sessions in `history.jsonl` (same question 3+ times in 90 days) | Themes signaling missing docs, missing memory, or recurring operational tasks ripe for automation |
+| **Review misses** | Patterns like `"you missed"`, `"what about"`, `"did you check"` in transcripts; correlate to what was being reviewed/fixed | Categories of miss (sibling files, list-completeness, post-push verification, etc.) |
+| **Self-investigation** | Hook fire counts, session-size outliers, command frequency, failure rates — fills gaps the agent tracks miss | Quantitative baseline + cross-cutting evidence |
+
+Run them as background jobs (each on Sonnet 4.6 is plenty), let them write to separate `/tmp/*-analysis.md` files, then synthesize the four reports into one prioritized findings doc. A single human-driven analysis takes a few hours; this approach gives equivalent depth in ~20 minutes of wall time.
+
+### Recency-Verification Step
+
+Before acting on any finding, re-grep `history.jsonl` with date cutoffs:
+
+```bash
+python3 -c "
+from datetime import datetime, timezone, timedelta
+now = datetime.now(timezone.utc)
+for days in [7, 14, 30, 60]:
+    print(f'{days}d ago: {int((now - timedelta(days=days)).timestamp() * 1000)}')
+"
+```
+
+For each finding, count occurrences in the last 14 / 30 / 60 days and tier:
+
+| Tier | Last hit | Last 14d | Action |
+|------|----------|----------|--------|
+| **Active** | Today / yesterday | ≥1 occurrence | Fix now — the rule isn't sticking |
+| **Recent** | < 30 days | 0–4 occurrences | Watch — rule may be working slowly |
+| **Cooling** | 30–60 days | 0 occurrences | Skip unless it recurs |
+| **Stale** | > 60 days, 0 in last 30 | 0 | Drop or backlog — pattern naturally cooled OR a previous rule already worked |
+
+This step prevents "ghost-fixing" — adding a rule for a pattern that stopped happening months ago because a previous fix already addressed it. Cross-reference with `git log` on the rules file: if a relevant rule was committed *between* the latest occurrence and today, the rule is likely working and the finding is stale.
+
+### What to Expect
+
+Realistic baseline from one analysis (~80 unique sessions over 30 days):
+
+- 100–200 corrections across all sessions (~1.5–2 per session)
+- 5–10 distinct recurring themes worth a rule
+- 1–2 themes already addressed by a prior rule (the rule is working, drop the finding)
+- 3–5 themes need a new rule or a hook
+- 1–2 themes need a script or skill (operational repetition, not a knowledge gap)
+
 ### Example Baseline
 
 From an analysis of 716 sessions / 86,693 tool calls:
