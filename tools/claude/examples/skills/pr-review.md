@@ -106,19 +106,21 @@ If the user wants to edit, apply their changes. If they say no, stop.
 
 ### 8. Build and post review payload
 
-Follow `.claude/docs/pr-review-posting.md` exactly:
+Follow `.claude/docs/pr-review-posting.md` exactly. **Prefer the per-comment endpoint over the bulk-review payload** — `POST /pulls/{n}/reviews` with `comments[]` can silently drop inline comments. See `pr-review-posting.md` for the per-comment recipe; use the bulk path only when you need a single atomic post (e.g., CI runtime) and accept the silent-drop risk.
+
+The high-level shape:
 
 1. Get the latest commit SHA:
 
    ```bash
-   gh pr view $PR_NUMBER --repo <org>/<repo> --json commits --jq '.commits[-1].oid'
+   gh pr view $PR_NUMBER --json commits --jq '.commits[-1].oid'
    ```
 
-1. Build the JSON payload:
-   - Every finding that maps to a file+line in the diff goes in `comments[]`
-   - Findings that can't map to a diff line go in `body`
-   - `event` = `REQUEST_CHANGES` if any BLOCKING findings, else `COMMENT` (ISSUE findings use COMMENT, not REQUEST_CHANGES)
-   - `body` = brief summary with finding counts
+1. **Per-comment posts (recommended)** — for each finding that maps to a diff line, `POST /pulls/{n}/comments` with `commit_id`, `path`, `line`, `side: RIGHT`, `body`. Then submit a single `gh pr review --request-changes|--comment --body` to set the overall state.
+
+1. Findings that can't map to a diff line go in the final review `--body` summary.
+
+1. `event` = `REQUEST_CHANGES` if any BLOCKING findings, else `COMMENT` (ISSUE findings use COMMENT, not REQUEST_CHANGES).
 
 1. Validate the payload:
 

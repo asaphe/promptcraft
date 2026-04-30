@@ -18,11 +18,12 @@ if [ -z "$CMD" ]; then
   exit 0
 fi
 
-# Only match git push (skip force push — handled by destructive-guard)
-if ! echo "$CMD" | grep -qE 'git +push([[:space:]]|$)'; then
+# Only match git push (skip force push — handled by destructive-guard).
+# Flag-permissive pattern catches `git -C dir push`, `git --no-pager push`, etc.
+if ! echo "$CMD" | grep -qE 'git[[:space:]]([^|;&]* )?push([[:space:]]|$)'; then
   exit 0
 fi
-if echo "$CMD" | grep -qE 'git +push +.*--(force|force-with-lease)'; then
+if echo "$CMD" | grep -qE 'git[[:space:]]([^|;&]* )?push.*--(force|force-with-lease)'; then
   exit 0
 fi
 

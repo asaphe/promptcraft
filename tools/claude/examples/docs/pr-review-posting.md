@@ -36,11 +36,64 @@ gh pr diff "$PR_NUMBER"
 
 If a finding cannot be mapped to a specific diff line (e.g., a missing file or a repo-wide consistency issue), include it in the `body` summary instead.
 
-## Build the Review Payload
+## Posting strategy — per-comment endpoint primary, bulk-review only for the summary
+
+> **Important:** the `POST /pulls/{n}/reviews` endpoint with a `comments[]` array (the "bulk" path) is known to **silently drop inline comments** in some cases — comments don't appear on the PR even when the API returns 201. The reliable pattern is:
+>
+> 1. Post each inline finding via `POST /pulls/{n}/comments` per-comment with `commit_id`, `path`, `line`, `side: "RIGHT"`.
+> 2. Then submit a final review with `gh pr review --request-changes` / `--comment` and a `--body` that summarizes counts. This sets the review state visible on the PR page; without it, the inline comments aren't grouped under a "review" event.
+>
+> The bulk path (`POST /reviews` with `comments[]`) is shown below for reference and remains useful for **CI contexts** where a single atomic API call is preferred and the silent-drop risk is acceptable, or for posting a summary with zero inline comments. For interactive review by an agent, prefer the per-comment path.
+
+## Build the per-comment posts (recommended)
+
+For each finding that maps to a diff line:
+
+```bash
+COMMIT_SHA=$(gh pr view "$PR_NUMBER" --json commits --jq '.commits[-1].oid')
+
+gh api repos/{owner}/{repo}/pulls/$PR_NUMBER/comments \
+  --method POST \
+  -f commit_id="$COMMIT_SHA" \
+  -f path="<file in diff>" \
+  -F line=<right-side line number> \
+  -f side="RIGHT" \
+  -f body="**BLOCKING:** <finding text>"
+```
+
+Then submit a single review event to set the overall state:
+
+```bash
+gh pr review "$PR_NUMBER" --request-changes --body "$(cat <<'REVIEWEOF'
+3 inline findings posted (1 BLOCKING, 1 ISSUE, 1 SUGGESTION). See file comments.
+REVIEWEOF
+)"
+# or --comment for advisory-only review
+```
+
+## Bulk-review payload (alternative, with caveat above)
 
 Write the review payload to a temp file — this avoids shell quoting issues with the `gh api` call.
 
-**Every finding that maps to a changed file and line MUST go in the `comments` array as an inline comment — not in the `body`.** The `body` is only for a brief summary and any findings that don't map to specific diff lines.
+**If using the bulk path:** every finding that maps to a changed file and line goes in the `comments` array. The `body` is only for a brief summary and any findings that don't map to specific diff lines.
+
+The payload structure:
+
+```json
+{
+  "event": "COMMENT | REQUEST_CHANGES",
+  "body": "<summary text + findings that don't map to a diff line>",
+  "comments": [
+    {
+      "path": "<file path in the diff>",
+      "line": <line number on the RIGHT side of the diff>,
+      "body": "<severity-prefixed finding text>"
+    }
+  ]
+}
+```
+
+Concrete example with adversarial-looking entries:
 
 ```bash
 cat > /tmp/pr-review-payload.json <<'ENDOFPAYLOAD'
