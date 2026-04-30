@@ -1,0 +1,14 @@
+{
+  "phases": [
+    {
+      "pattern": "pr.?review|security.?(audit|review)|cross.?repo.?audit|architecture.?(review|design)|threat.?model",
+      "model": "opus",
+      "note": "Deep review, security, and architecture benefit from Opus"
+    },
+    {
+      "pattern": "sprint.?(report|status|tasks)|my.?tasks|ticket.?(status|update)|what.?(is|does|are)|how.?(does|do|to)|explain",
+      "model": "sonnet",
+      "note": "Q&A, status, and lookups don't need Opus"
+    }
+  ]
+}

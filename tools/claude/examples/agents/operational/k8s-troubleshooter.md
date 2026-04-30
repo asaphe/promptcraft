@@ -176,11 +176,11 @@ kubectl get hpa -n {ns}
 | Situation | Defer To |
 |-----------|----------|
 | ESO sync errors, wrong secret path, IAM, ExternalSecret format | **secrets-expert** |
-| TF misconfigured NodePool, deployment workspace issues | **terraform-deployment-expert** |
+| Karpenter NodePool config, instance sizing, scheduling failures from pool misconfig | **karpenter-expert** |
 | TF misconfigured cluster-wide infra (EKS, operators) | **terraform-expert** |
-| Pipeline failures, re-triggering deploys | **pipeline-expert** |
 | Helm release issues, rollback | **deployment-expert** |
-| Dagster run failures, data pipeline issues, ClickHouse query/migration problems | **data-platform-expert** |
+| GHA workflow / CI failures | **devops-reviewer** (for review) |
+| ClickHouse query / schema problems | **clickhouse-reviewer** |
 
 ## Per-Deployment / Per-Tenant Ingress Patterns
 

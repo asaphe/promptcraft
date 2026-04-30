@@ -1,6 +1,8 @@
 # Comment Resolution Procedure
 
-Shared procedure for triaging and resolving PR review comments. Referenced by `/pr-check` and `/pr-resolver`.
+> **GitHub-specific:** uses the `gh` CLI and GitHub's GraphQL `reviewThreads` / `resolveReviewThread` / `minimizeComment` / `dismissPullRequestReview` mutations. Adapt for GitLab / Bitbucket / Gerrit by mapping each step to their thread-resolution APIs (note that some platforms don't expose a programmatic equivalent of GitHub's `minimizeComment`).
+
+Shared procedure for triaging and resolving PR review comments. Referenced by `/pr-check`, `/pr-resolver`, and `/pr-finalize`.
 
 ## 1. Fetch unresolved threads
 
@@ -31,14 +33,14 @@ gh api graphql -f query='
 
 Replace `PR_NUMBER` with the actual number. Filter to `isResolved == false` only.
 
-Also fetch review bodies and PR conversation comments — findings that can't map to a diff line live there:
+**Also always fetch review bodies** — findings that can't map to a diff line are posted as review body comments and are invisible to `reviewThreads`. This is not optional:
 
 ```bash
 gh api repos/<org>/<repo>/pulls/$PR_NUMBER/reviews \
-  --jq '.[] | select(.state != "DISMISSED" and .body != "" and .body != " ") | {id: .id, user: .user.login, state: .state, body: .body}'
+  --jq '.[] | select(.state != "DISMISSED" and .body != "" and .body != " ") | {id: .id, user: .user.login, state: .state, body: .body[0:300]}'
 
 gh api repos/<org>/<repo>/issues/$PR_NUMBER/comments \
-  --jq '.[] | {id: .id, user: .user.login, body: .body}'
+  --jq '.[] | {id: .id, user: .user.login, body: .body[0:300]}'
 ```
 
 If no unresolved threads, no actionable review bodies, and no conversation comments, report "No unresolved review comments" and stop.
@@ -138,7 +140,46 @@ mutation {
 }'
 ```
 
-## 6. Dismiss bot reviews
+## 6. Minimize addressed review body comments (mandatory — do not skip)
+
+After all threads are resolved, sweep for review body comments that are addressed but not yet hidden. **This step is mandatory — do not skip even when there are no open threads.** Note: step 5 handles inline `PRRC_` comments alongside thread resolution; this step targets review body nodes (`PRR_` prefix).
+
+```bash
+gh api graphql -f query='
+{
+  repository(owner: "<org>", name: "<repo>") {
+    pullRequest(number: PR_NUMBER) {
+      reviews(first: 50) {
+        nodes {
+          id
+          author { login }
+          body
+          isMinimized
+        }
+      }
+    }
+  }
+}'
+```
+
+Filter to `body != ""` AND `isMinimized == false`. For each:
+
+- Findings now addressed → minimize with `classifier: RESOLVED`
+- Pure bot markup header with no actionable body → minimize with `classifier: RESOLVED`
+- Open human review with unaddressed content → do NOT minimize; flag to user
+
+Batch all in one mutation:
+
+```graphql
+mutation {
+  m1: minimizeComment(input: {subjectId: "PRR_xxx", classifier: RESOLVED}) { minimizedComment { isMinimized } }
+  m2: minimizeComment(input: {subjectId: "PRR_yyy", classifier: RESOLVED}) { minimizedComment { isMinimized } }
+}
+```
+
+**Why**: findings on the PR body are invisible to `reviewThreads` GraphQL — only the `/reviews` endpoint exposes them. Skipping this step leaves addressed bot reviews visually open and allows unaddressed body findings to go unnoticed.
+
+## 7. Dismiss bot reviews
 
 Check for "Changes Requested" reviews that are now fully addressed:
 

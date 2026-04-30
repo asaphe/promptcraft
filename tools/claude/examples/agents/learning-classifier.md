@@ -38,12 +38,13 @@ You are a learning classifier for the monorepo. Given a proposed learning (a cor
 
 | Domain keywords | Agent |
 |----------------|-------|
-| terraform, tfvars, workspace, state, module, hcl | terraform-expert or terraform-deployment-expert |
+| terraform, tfvars, workspace, state, module, hcl | terraform-expert |
 | kubectl, pod, deployment, ingress, karpenter, node | k8s-troubleshooter |
 | secret, externalsecret, aws-sm, tenant-secrets | secrets-expert |
-| workflow, action, github, dispatch, pipeline, ecr | pipeline-expert |
 | helm, rollout, image_tag, health check, rollback | deployment-expert |
-| dagster, dbt, clickhouse, migration, ingestion, databricks | data-platform-expert |
+| clickhouse, sql, schema | clickhouse-reviewer |
+| datadog, monitor, dashboard, on-call | datadog-reviewer |
+| workflow, action, github actions, ci, dockerfile, terraform-config | devops-reviewer |
 
 ## Output Format
 

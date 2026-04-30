@@ -17,26 +17,25 @@ if [ -z "$CMD" ]; then
   exit 0
 fi
 
-if ! echo "$CMD" | grep -qE 'gh +pr +create'; then
+if ! echo "$CMD" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +create([[:space:]]|$)'; then
   exit 0
 fi
 
 ISSUES=""
 
-# --- Hard checks (block if failed) ---
+# Detect default branch name. Falls back to `main` when origin/HEAD is not set.
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||' || true)
+DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
 
-# Fetch latest main for accurate comparison
-git fetch origin main --quiet 2>/dev/null
+git fetch origin "$DEFAULT_BRANCH" --quiet 2>/dev/null
 
-# 1. Zero diff vs main — PR would be empty
-DIFF_STAT=$(git diff --stat origin/main...HEAD 2>/dev/null)
+DIFF_STAT=$(git diff --stat "origin/${DEFAULT_BRANCH}...HEAD" 2>/dev/null)
 if [ -z "$DIFF_STAT" ]; then
   BRANCH=$(git branch --show-current 2>/dev/null)
-  echo "PR CREATE BLOCKED — branch '$BRANCH' has zero diff vs origin/main. All changes already exist on main." >&2
+  echo "PR CREATE BLOCKED — branch '$BRANCH' has zero diff vs origin/${DEFAULT_BRANCH}. All changes already exist on the default branch." >&2
   exit 2
 fi
 
-# 2. Branch not pushed to remote
 BRANCH=$(git branch --show-current 2>/dev/null)
 REMOTE_REF=$(git rev-parse "origin/$BRANCH" 2>/dev/null)
 LOCAL_REF=$(git rev-parse HEAD 2>/dev/null)

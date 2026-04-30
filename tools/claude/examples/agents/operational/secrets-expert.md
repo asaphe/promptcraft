@@ -197,21 +197,19 @@ Use `/check-secret {app} {namespace}` for automated drift detection. It compares
 
 | Situation | Defer To |
 |-----------|----------|
-| PR review of secret tfvars, helm template secret refs, naming convention | **secrets-config-reviewer** |
-| TF plan/apply for secret stores or helm values modules | **terraform-deployment-expert** |
+| PR review of secret tfvars, helm template secret refs, naming convention | **devops-reviewer** |
+| TF plan/apply for secret stores or helm values modules | **terraform-expert** |
 | Pod crashes after secret sync succeeds | **k8s-troubleshooter** |
-| Pipeline failures in deployment TF step | **terraform-deployment-expert** |
-| Pipeline failures in non-deployment TF step | **terraform-expert** |
 | Pipeline fails in Helm step | **deployment-expert** |
 | Post-deploy health verification | **deployment-expert** |
-| Workflow authoring or re-triggering | **pipeline-expert** |
-| Dagster run failures, ClickHouse query/migration issues, ingestion debugging | **data-platform-expert** |
+| Cross-cutting security review | **security-reviewer** |
+| ClickHouse query / schema problems | **clickhouse-reviewer** |
 
-### AWS Accounts
+## AWS Accounts
 
-- **Production:** <PROD_ACCOUNT>
-- **Development:** <DEV_ACCOUNT>
-- **Region:** us-east-1
+- **Production:** `<PROD_ACCOUNT>`
+- **Development:** `<DEV_ACCOUNT>`
+- **Region:** us-east-1 (or your primary region)
 
 ## Decision Checkpoints (STOP and confirm before proceeding)
 

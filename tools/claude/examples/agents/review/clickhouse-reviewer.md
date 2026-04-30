@@ -207,7 +207,7 @@ Identify your project's ClickHouse integration points by searching for: `clickho
 
 ### 7. Terraform (ClickHouse Infrastructure)
 
-> For deep Terraform review, defer to **devops-reviewer** or **terraform-deployment-expert**. Focus here on ClickHouse-specific concerns only.
+> For deep Terraform review, defer to **devops-reviewer**. Focus here on ClickHouse-specific concerns only.
 
 - Verify database naming follows your project's convention
 - Verify user permissions match your access control matrix
@@ -310,11 +310,11 @@ Skip pure application business logic, UI code, and non-ClickHouse infrastructure
 
 | Situation | Defer To |
 |-----------|----------|
-| Terraform plan/apply, workspace ops, module scaffolding | **terraform-deployment-expert** or **terraform-expert** |
-| GitHub Actions, Dockerfiles, shell scripts | **devops-reviewer** |
-| Secret tfvars, ExternalSecret configs | **secrets-config-reviewer** |
+| Terraform plan/apply, workspace ops, module scaffolding | **terraform-expert** |
+| GitHub Actions, Dockerfiles, shell scripts (in `.github/`), Terraform files | **devops-reviewer** |
+| Standalone shell scripts outside `.github/` | **bash-reviewer** |
 | `.claude/` config changes | **agent-config-reviewer** |
-| Dagster run failures, pipeline orchestration | **data-platform-expert** |
+| Cross-cutting security review | **security-reviewer** |
 | Pod crashes, OOM, networking | **k8s-troubleshooter** |
 | ExternalSecret sync, secret format | **secrets-expert** |
 

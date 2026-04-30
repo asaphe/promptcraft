@@ -11,7 +11,7 @@ argument-hint: "[task-title]"
 Create a ticket in the current sprint and open a git branch for it.
 This is the most common workflow — optimize for speed with smart defaults.
 
-**Prerequisite:** The project management MCP server must be registered. See `.claude/docs/project-mgmt-mcp.md` for setup instructions.
+**Prerequisite:** This skill assumes you have an MCP server registered for your project / issue tracker (named `mcp__project-mgmt__*` in this example, but adapt the tool calls below to your tracker's MCP — ClickUp, Linear, Jira, GitHub Issues, etc.). The MCP must expose tools for creating a sprint task, getting the current sprint, getting the current user, and listing teams.
 
 ## Safety: Duplicate Prevention
 
@@ -96,4 +96,4 @@ Branch:  dev-{number}-{short-description}
 
 ## Reference
 
-Read `.claude/docs/project-mgmt-mcp.md` for workspace IDs, sprint conventions, and user resolution patterns.
+Document your tracker MCP's workspace IDs, sprint conventions, and user-resolution patterns alongside the MCP itself (e.g., a README in the MCP server's repo). This skill calls the MCP — it doesn't replicate the MCP's setup instructions.

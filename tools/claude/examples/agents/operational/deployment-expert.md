@@ -108,9 +108,9 @@ Don't wait for Helm to report success/failure. Check for early failure signals:
 | `ImagePullBackOff` | Image tag doesn't exist in ECR | Verify locally, then fix tag |
 | `CrashLoopBackOff` | App crashes on startup | **k8s-troubleshooter** |
 | ExternalSecret `SecretSyncedError` | ESO sync issue: IAM policy gap, wrong path, missing SM secret, token not substituted | **secrets-expert** |
-| `Pending` for >30s | No node capacity | **k8s-troubleshooter** (Karpenter) |
-| TF plan/apply step fails (deployment modules) | Wrong workspace, state lock | **terraform-deployment-expert** |
-| Workflow step fails | Action config, permissions | **pipeline-expert** |
+| `Pending` for >30s due to Karpenter NodePool config | NodePool CPU limit / instance-size mismatch | **karpenter-expert** |
+| `Pending` for >30s otherwise | No node capacity | **k8s-troubleshooter** |
+| TF plan/apply step fails | Wrong workspace, state lock, drift | **terraform-expert** |
 
 **Quick pre-flight before Helm installs:**
 
@@ -125,7 +125,7 @@ kubectl get pods -n {deployment_name} -l app={application} -w --timeout=60
 2. NEVER deploy to production without explicit user confirmation.
 3. NEVER default to production — always ask which environment.
 4. When troubleshooting, check pod status, events, and logs before making assumptions.
-5. If a deployment fails at the pipeline level, defer to **pipeline-expert**.
+5. If a deployment fails because of a CI / pipeline issue (workflow authoring, runner availability, action config), defer to **devops-reviewer** for the review or to your project's CI on-call for the fix.
 6. For infrastructure issues, verify the Terraform workspace and state before making changes.
 7. Always confirm the deployment name matches the environment (staging deployments use `staging*` prefix).
 8. If AWS credentials are expired, run `aws sso login --profile prod` automatically and continue.
@@ -166,13 +166,12 @@ Present as a GREEN/YELLOW/RED summary.
 
 For deep dives into specific layers, defer to the appropriate specialist:
 
-- Need to trigger/monitor a pipeline -> **pipeline-expert**
-- Workflow authoring, CI failures -> **pipeline-expert**
-- TF plan/apply on deployment/ modules -> **terraform-deployment-expert**
-- TF plan/apply on non-deployment modules (VPC, EKS, operators) -> **terraform-expert**
+- TF plan/apply -> **terraform-expert**
+- Karpenter NodePool config, instance sizing, scheduling failures -> **karpenter-expert**
 - Pod crashes, scheduling, networking -> **k8s-troubleshooter**
 - Secret sync, format, drift -> **secrets-expert**
-- Data pipeline failures, database migrations, ingestion issues -> **data-platform-expert**
+- ClickHouse query / schema problems -> **clickhouse-reviewer**
+- Workflow / CI review -> **devops-reviewer**
 
 See your project's agent roster for the full list.
 
