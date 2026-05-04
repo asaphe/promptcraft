@@ -24,6 +24,9 @@ REPO_NAME=$(git remote get-url origin 2>/dev/null | sed 's|.*/||' | sed 's|\.git
 if [ -n "$BRANCH" ] && [ "$BRANCH" != "main" ] && [ "$BRANCH" != "master" ] && [ -n "$REPO_NAME" ]; then
   SAFE_BRANCH=$(printf '%s' "$BRANCH" | tr '/' '_' | tr ' ' '-')
   rm -f "/tmp/claude-pr-cache-${REPO_NAME}-${SAFE_BRANCH}"
+  # Delete the inject stamp so next prompt re-fetches the new/updated PR number.
+  # Without this, the stamp prevents re-injection even after cache deletion.
+  rm -f "/tmp/claude-pr-inject-${CLAUDE_SESSION_ID:-}"
 fi
 
 TF_LINE=""
