@@ -16,9 +16,13 @@ The model has no automatic prompt to do these — they have to be remembered. Th
 
 1. Triggered by any successful `git push` (flag-permissive: `git -C dir push`, `git --no-pager push`, etc.)
 2. Skips if the push output contains failure markers (`rejected`, `error`, `fatal`, `failed`)
-3. Invalidates a repo+branch-scoped PR cache (if you maintain one) so subsequent reads fetch fresh PR state
+3. Invalidates the repo+branch-scoped PR cache **and** the session inject stamp — so the next prompt re-fetches fresh PR state, including the new PR number if one was just created
 4. If `.tf` files are in the diff vs `origin/main`, adds a Terraform-specific line about apply timing
 5. Emits the checklist as `additionalContext`
+
+### Why the stamp matters
+
+A `UserPromptSubmit` inject hook typically uses a per-session stamp file to prevent calling `gh pr view` on every prompt. Without also deleting the stamp here, the PR cache would be empty (deleted) but the inject would never re-run to repopulate it — leaving the statusline badge blank for the rest of the session. Deleting both together ensures the badge reappears after the next prompt.
 
 ## Configuration
 
