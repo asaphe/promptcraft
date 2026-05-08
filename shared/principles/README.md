@@ -5,6 +5,7 @@ Universal principles — apply to any AI coding assistant.
 ## Contents
 
 - `development-principles.md` — goal orientation, surgical changes, verification before action.
+- `modular-composition.md` — the Lego principle: sharp module boundaries, typed contracts, replaceability, module-as-agent-task-boundary.
 - `tone-and-style.md` — communication discipline (terse, direct, no hedging).
 - `tool-safety.md` — destructive commands, approval gates, blast radius.
 - `operational-safety-patterns.md` — state-before-mutate, backups, consumer verification.

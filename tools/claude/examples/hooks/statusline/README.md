@@ -4,7 +4,7 @@ Custom statusline command that displays contextual engineering state in the Clau
 
 ## What it shows
 
-```
+```text
 [svc] ~/code/services | dev-123-feature* | PR#456 | prod-eks-01 | tf:prod | aws:prod | py:3.12 | wt:my-task | Claude Sonnet 4.6 | ctx:42% | rl:62% | $1.24
 ```
 

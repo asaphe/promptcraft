@@ -52,6 +52,29 @@ A full `terraform apply` against a workspace whose existing resources don't matc
 - Use locals, variables, and outputs effectively to simplify logic and reuse
 - Separate environments using workspaces or directory structure
 
+### Single-Purpose Modules (the Lego shape)
+
+Prefer composing single-purpose modules over building one mega-module gated by conditional flags. HashiCorp's published style guide nudges in this direction — it advises grouping "logically related resources" into modules — but stops short of explicitly opposing flag-gated mega-modules. This guide takes the stronger position: single-purpose modules combined into a workflow, rather than a monolith with `count = var.enable_*` switches gating each sub-resource.
+
+The canonical split for an EKS stack is structural, not flag-driven:
+
+```text
+.
+├── aws-eks
+│   ├── cluster
+│   ├── node_groups
+│   ├── addons
+│   └── access_entries
+```
+
+The consumer composes only the modules they need. Each child module is independently testable, replaceable, and named by what it does.
+
+**The flag-as-smell rule:** if you reach for `count = var.enable_X ? 1 : 0` to gate a sub-resource inside an existing module, that flag is a new module asking to be extracted. Composition over flags.
+
+**Minimal variables.** HashiCorp's style guide cautions against over-parameterizing modules — every variable adds a degree of freedom the consumer has to understand and the maintainer has to support. Expose what genuinely varies between consumers; hide what doesn't. Every variable gets a `type`, a `description`, and `validation` where appropriate.
+
+See [`../principles/modular-composition.md`](../principles/modular-composition.md) for the broader principle this applies across stacks.
+
 ## Security & Best Practices
 
 - Always pin provider versions and module sources
