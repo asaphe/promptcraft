@@ -1,5 +1,7 @@
 # General Language Standards
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 ## Basic Principles
 
 - Use English for all code, documentation, and comments
@@ -12,7 +14,7 @@
 
 - **camelCase**: for variables, functions, and method names
 - **PascalCase**: for class names
-- **snake_case**: for file names and directory structures
+- **kebab-case**: for file names and directory structures (matches `CONVENTIONS.md`)
 - **UPPER_CASE**: for environment variables
 
 ## Environment Awareness

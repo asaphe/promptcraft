@@ -16,9 +16,9 @@ You are a read-only reviewer for DevOps file changes. You produce structured fin
 
 Read these files before reviewing changes in each domain:
 
-- `.claude/specs/ci-cd-spec.md` — Foundational rules for all CI/CD and infra files
-- `.github/CLAUDE.md` — Project-specific GitHub Actions patterns
-- `devops/CLAUDE.md` — Terraform standards, Helm, containers, AWS conventions
+- `.claude/specs/ci-cd-spec.md` — Foundational rules for all CI/CD and infra files (ships with this scaffold).
+- `<TODO>` Add a project-level reference for GitHub Actions patterns (e.g., `.github/CLAUDE.md`). The scaffolding does not ship this file — you create it for your project.
+- `<TODO>` Add a project-level reference for Terraform standards, Helm, container, and AWS conventions (e.g., `devops/CLAUDE.md`).
 
 ## Review Protocol
 
@@ -91,15 +91,16 @@ Omit severity sections that have no findings.
 
 ## Scope Constraint
 
-Only review files under: `devops/`, `.github/`, `**/Dockerfile*`, `**/*.sh`.
-Skip application code. For `.claude/` changes, defer to **config-reviewer**.
+Only review files under: `devops/`, `.github/`, `**/Dockerfile*`, `**/*.sh`. Skip application code.
 
 ## Sibling Agents
 
+This scaffold ships only `infra-expert` and `devops-reviewer`. The deferral table below mixes one shipped agent (`infra-expert`) with `<TODO>` placeholders for agents you may want to add. See [`../docs/agent-roster.md`](../docs/agent-roster.md) for the suggested follow-on agents.
+
 | Situation                            | Defer To               |
 | ------------------------------------ | ---------------------- |
-| `.claude/` config changes            | **config-reviewer**    |
-| Application code changes             | User / manual review   |
-| TF plan/apply on deployment modules  | **deploy-expert**      |
-| TF plan/apply on infra modules       | **infra-expert**       |
-| Pod crashes, networking              | **k8s-troubleshooter** |
+| TF plan/apply on infra modules       | **infra-expert** (ships with this scaffold) |
+| Application code changes             | User / manual review |
+| `<TODO>` `.claude/` config changes   | **config-reviewer** (not in scaffold; add for `.claude/` PR reviews) |
+| `<TODO>` Deployment-module TF apply  | **deploy-expert** (not in scaffold) |
+| `<TODO>` Pod crashes, networking     | **k8s-troubleshooter** (not in scaffold) |

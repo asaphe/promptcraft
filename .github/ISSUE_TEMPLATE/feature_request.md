@@ -16,7 +16,7 @@ What real-world problem does this solve? Include context from production experie
 
 ## Proposed Location
 
-Where in the repository structure should this live? (e.g., `core/`, `claude/`, `infrastructure/`)
+Where in the repository structure should this live? (e.g., `shared/principles/`, `shared/infrastructure/`, `tools/claude/`, `tools/cursor/`)
 
 ## Examples
 

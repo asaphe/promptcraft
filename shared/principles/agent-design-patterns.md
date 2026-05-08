@@ -1,5 +1,7 @@
 # Agent Design Patterns
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 General principles for designing, structuring, and evolving AI coding agent systems. These patterns apply regardless of the specific tool (Claude Code, Cursor, Copilot Agents, custom agents).
 
 ## Foundation: Modular Composition

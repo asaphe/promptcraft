@@ -1,190 +1,105 @@
-# CLAUDE.md
+# Designing a Project `CLAUDE.md`
 
-This directory contains comprehensive guidance for Claude Code (claude.ai/code).
+How to structure a repo-level `CLAUDE.md` so Claude Code loads useful context on every session without bloating the context window.
 
----
+## What it is
 
-## Documentation Organization
+`CLAUDE.md` at a repo root is the project-level instruction file Claude Code reads automatically when a session starts in that directory. It is appended to the system prompt for every conversation. That makes it the single highest-leverage configuration surface — and the easiest place to leak token budget if you let it sprawl.
 
-### Core Guides
+There are two distinct flavors:
 
-#### [CODEBASE.md](CODEBASE.md) - Development Workflows & Architecture
+- **Project `CLAUDE.md`** (lives at the repo root or in subdirectories). Scoped to that codebase. Concrete: file paths, build commands, deploy targets, named conventions.
+- **Global `CLAUDE.md`** (lives at `~/.claude/CLAUDE.md`). Personal preferences applied across every project. See [`global-claude-md-guide.md`](global-claude-md-guide.md) for that flavor.
 
-Essential guide for daily development work:
+This guide is about the project flavor.
 
-- **Essential Commands** - Python, TypeScript, Java, build commands
-- **Architecture Overview** - Monorepo structure, key patterns
-- **Technology Stack** - Python 3.12, TypeScript/Node 22+, Java 21, Go
-- **Local Development** - Docker Compose, environment setup
-- **Common Workflows** - Adding services, debugging, testing
+## What belongs in a project `CLAUDE.md`
 
-**Use when:** Starting development, understanding architecture, running commands
+Include facts the agent cannot derive from reading the code in 30 seconds:
 
-#### [specs/ci-cd-spec.md](specs/ci-cd-spec.md) - RFC-Style CI/CD Specification
+- **Repo orientation.** What this project is, what stack, where the entry points are, which directories matter.
+- **Build / test / deploy commands.** The exact commands to run locally and in CI. Agents waste turns guessing if these aren't named.
+- **Conventions the codebase enforces.** Naming, structure, branch format, commit style — anything that has a "right answer" reviewers will flag.
+- **Pointers, not content.** Reference rule files in `.claude/rules/`, runbooks in `.claude/docs/`, and templates in `.claude/templates/`. Don't inline what's already on disk.
+- **Domain-specific guardrails.** "Never run X against prod", "always quote shell paths", "this codebase uses Y, not Z" — facts that prevent recurrent mistakes.
 
-Comprehensive RFC-style specification for infrastructure and CI/CD:
+## What does NOT belong
 
-- **Iron Rules** - Act testing, path validation, naming protocols
-- **GitHub Actions Standards** - Workflow development, version pinning
-- **Terraform Standards** - Infrastructure as code best practices
-- **Docker Standards** - Multi-stage builds, security
-- **Validation Protocols** - Linting, testing, quality gates
+- **Storytelling, history, rationale.** Belongs in PR bodies, ADRs, or a changelog — not loaded every session.
+- **Content already in `.claude/rules/`.** Pointer once; let the rule file load itself when relevant.
+- **Long lists of things the agent could grep for.** If a `find` would surface it in seconds, don't pre-load it.
+- **PII, account IDs, secrets, internal service names.** A `CLAUDE.md` ends up in version control and (often) in screenshots — treat it as semi-public.
+- **Stale dates, version numbers, "last reviewed" markers.** They rot fast and get loaded as fact every session.
 
-**Use when:** Modifying GitHub Actions, Terraform, Dockerfiles, bash scripts
+## Length budget
 
----
+- **Aim for under ~200 lines** of actual content. Above that, split into subdirectory `CLAUDE.md` files (Claude Code loads the nearest one based on cwd).
+- **Every line loads on every session.** Multiply by your session count to see the token cost. A line that earns its place once a month is cheaper to look up than to pre-load.
+- **If you find yourself scrolling past sections to find what you want, the agent will too.** That's the cue to split.
 
-## Directory-Specific Guides
+## Imperative voice, not narrative
 
-### [.github/CLAUDE.md](../.github/CLAUDE.md) - GitHub Actions Workflows
+Project `CLAUDE.md` is read by an agent that needs to act. Write rules and pointers, not paragraphs.
 
-Focused guidance for workflow development:
+```text
+Bad:  "Historically this project used npm but we migrated to pnpm
+       in early 2025 because of the workspace handling. As of now,
+       all package management goes through pnpm."
 
-- Mandatory testing protocols (act, path validation)
-- Project-specific patterns (change detection, container builds)
-- Deployment workflows and security integration
-- AWS integration patterns
-- Troubleshooting workflows
+Good: "Use `pnpm` for all package operations. Never run `npm install`."
+```
 
-**Use when:** Working in `.github/workflows/`
+Imperative bullets are denser and easier for the agent to extract.
 
-### [devops/CLAUDE.md](../devops/CLAUDE.md) - Infrastructure & Kubernetes
+## Layered loading: subdirectory `CLAUDE.md`
 
-Infrastructure and deployment guidance:
+Claude Code loads the nearest `CLAUDE.md` walking up from the cwd. Use this:
 
-- Terraform module organization and standards
-- Kubernetes & Helm best practices
-- Container standards and ECR management
-- AWS resources and IAM patterns
-- Monitoring and troubleshooting
+- Root `CLAUDE.md` — universal project facts.
+- `frontend/CLAUDE.md` — TypeScript / React conventions, design system pointers.
+- `infrastructure/CLAUDE.md` — Terraform module structure, workspace naming, apply discipline.
+- `.github/CLAUDE.md` — workflow conventions, reusable action references.
 
-**Use when:** Working in `devops/terraform/` or `devops/helm-reusable-chart/`
+Each is loaded only when the agent is working in that subtree, so frontend devs don't pay token cost for infrastructure rules and vice versa. This keeps the root file lean.
 
----
+## Pointer pattern
 
-## Cursor IDE Integration
+Instead of inlining a rule body, reference the file:
 
-### [.cursor/rules/](../.cursor/rules/) - MDC Format Rules
+```text
+- Branch naming, commit format, PR body shape: see `.claude/rules/git.md`.
+- Production safety checklist: `.claude/docs/production-safety.md`.
+- Available specialist agents: `.claude/agents/` (see `.claude/docs/agent-roster.md` for the index).
+```
 
-Project-level rules for Cursor IDE in `.mdc` format:
+Pointers cost ~one line; the agent only loads the target when it needs to.
 
-- `devops-core-principles.mdc` - Core DevOps standards
-- `terraform-standards.mdc` - Terraform specific rules
-- `github-actions-standards.mdc` - Workflow standards
-- `bash-scripting-standards.mdc` - Shell script standards
-- `dockerfile-standards.mdc` - Container best practices
-- `kubernetes-helm-standards.mdc` - K8s and Helm patterns
+## Common mistakes
 
-**Auto-applied by Cursor IDE** based on file glob patterns
+- **Pasting in `claude init` output and never editing it.** The default contains placeholder language ("This directory contains comprehensive guidance for...") that's misleading without project-specific facts. Replace it.
+- **Listing files instead of describing structure.** Agents can `ls`. They can't infer "this is the build entry point."
+- **Mixing global preferences with project facts.** Personal preferences (review style, communication tone) belong in `~/.claude/CLAUDE.md`, not in every project file.
+- **Referencing files that don't exist.** A pointer to `.claude/docs/build-commands.md` is broken if that file isn't shipped. Audit cross-references when you edit.
+- **Leaking internal context.** Tech-stack version numbers, account IDs, internal service names — all end up in `git log` and screenshots. Keep the file public-safe.
 
----
+## Maintenance signals
 
-## Quick Start
+Update the `CLAUDE.md` when:
 
-### For New Team Members
+- A new convention takes hold that the agent should follow.
+- A previously-stable command changes (`pytest` → `pytest -p test`, `deploy` → `deploy --env`).
+- A rule file is added/renamed/removed (update pointers).
+- A common mistake recurs that would have been prevented by an explicit rule.
 
-1. **Read** [CODEBASE.md](CODEBASE.md) - Understand architecture and development setup
-2. **Review** [specs/ci-cd-spec.md](specs/ci-cd-spec.md) - Learn CI/CD standards
-3. **Reference** directory-specific guides as needed
+Don't update it just because time passed. Stale rules are worse than absent ones.
 
-### For GitHub Actions Work
+## Examples in this repo
 
-1. **Read** [specs/ci-cd-spec.md](specs/ci-cd-spec.md) - Section 2.1 (Act Testing)
-2. **Follow** [.github/CLAUDE.md](../.github/CLAUDE.md) - Workflow protocols
-3. **Test** with `act` before pushing
+- [`../scaffolding/.claude/CLAUDE.md`](../scaffolding/.claude/CLAUDE.md) — a starter project `CLAUDE.md` you can copy and edit.
+- [`../examples/config/global-CLAUDE.md`](../examples/config/global-CLAUDE.md) — the *global* flavor for comparison; note the different tone and scope.
 
-### For Infrastructure Work
-
-1. **Read** [specs/ci-cd-spec.md](specs/ci-cd-spec.md) - Section 12.0 (Terraform)
-2. **Follow** [devops/CLAUDE.md](../devops/CLAUDE.md) - Module standards
-3. **Validate** with `terraform fmt`, `tflint`, `terraform validate`
-
----
-
-## Key Principles
-
-### Quality First
-
-- Always specify model and confidence level in responses
-- Do not leave obvious comments in code
-- Follow 12-Factor App design principles where applicable
-
-### Testing & Validation
-
-- Test ALL workflow changes with `act` before implementation
-- Validate ALL paths before use - never assume directory structure
-- Run appropriate linters and fix all issues before completion
-
-### Security
-
-- Never hardcode secrets, API keys, or sensitive data
-- Use proper secret management (AWS Secrets Manager, External Secrets Operator)
-- Apply principle of least privilege for all access patterns
-- Pin versions for reproducibility (actions, base images, providers)
-
-### Naming Conventions
-
-**CRITICAL:** Use only safe, portable identifiers:
-
-- ✅ Valid: `a-zA-Z0-9_` (alphanumeric + underscore)
-- ❌ Invalid: hyphens, dots, special characters in identifiers
-- Exception: File names can use kebab-case
-
----
-
-## Technology Stack
-
-**Backend Services:**
-
-- Python 3.12.8 (Poetry, FastAPI, Dagster, Celery, Temporal)
-- TypeScript/Node.js 22+ (pnpm, NestJS, React 19)
-- Java 21 (Maven, Spring Boot, Flowable)
-- Go (High-performance services)
-
-**Infrastructure:**
-
-- AWS (EKS, ECR, RDS, S3, Secrets Manager)
-- Kubernetes (Helm charts, ArgoCD)
-- Terraform (~40 modules)
-- Docker (Multi-stage builds)
-
-**Databases:**
-
-- PostgreSQL 17 (Multiple logical databases)
-- ClickHouse 25.9.3 (Analytics)
-- RabbitMQ 4.1.0, AWS SQS (Messaging)
-
----
-
-## Architecture Patterns
-
-1. **Event-Driven** - Async communication via SQS queues
-2. **Multi-Database** - Separate logical databases for domains
-3. **Microservices** - ~40 services across 4 languages
-4. **Schema-Driven** - JSON schemas as single source of truth
-5. **Infrastructure as Code** - All AWS resources via Terraform
-6. **GitOps** - Declarative K8s deployments via ArgoCD
-
----
-
-## Getting Help
-
-- **Codebase Questions** → [CODEBASE.md](CODEBASE.md)
-- **CI/CD Standards** → [specs/ci-cd-spec.md](specs/ci-cd-spec.md)
-- **Workflow Issues** → [.github/CLAUDE.md](../.github/CLAUDE.md)
-- **Infrastructure Issues** → [devops/CLAUDE.md](../devops/CLAUDE.md)
-- **Contributing** → See `/CONTRIBUTING.md` in repository root
-
----
-
-## Document Maintenance
-
-**Primary Maintainer:** DevOps/Platform Team
-**Review Frequency:** Quarterly or when major patterns change
-**Contribution:** Submit PRs for improvements
-
----
-
-**Model**: Claude Sonnet 4.5
-**Last Updated**: 2025-12-16
-**Version**: 2.0 (Reorganized with selective git tracking)
+## See also
+
+- [`global-claude-md-guide.md`](global-claude-md-guide.md) — designing the personal `~/.claude/CLAUDE.md`.
+- [`auto-memory-guide.md`](auto-memory-guide.md) — when to use persistent memory vs. inline `CLAUDE.md` content.
+- [`../../../shared/principles/modular-composition.md`](../../../shared/principles/modular-composition.md) — single-purpose modular rule files instead of one mega-CLAUDE.md.

@@ -1,10 +1,17 @@
 # Claude Code Global Rules
 
+> _Each `##` section is tagged with a scope marker._
+> _**universal** — applies to any setup. **opinionated** — author's preference; adapt if it doesn't fit. **author-specific** — clearly tied to the author's environment; skip or replace._
+
 ## Priority
+
+_Scope: universal._
 
 When rules conflict: **Safety** > **Behavioral Constraints** > **Domain Defaults** > **Preferences**.
 
 ## Core Principles
+
+_Scope: universal._
 
 - **Verify before asserting** — Query the actual system (API, file, CLI) before stating a fact about code, infra, or external state. Memory, cached state, and naming conventions are not sources.
 - **When uncertain, name it** — State what you don't know and give the verification step. Never hedge with probability language or invented confidence scores.
@@ -12,10 +19,14 @@ When rules conflict: **Safety** > **Behavioral Constraints** > **Domain Defaults
 
 ## Code Standards
 
-- **No obvious comments** — Only comment when the *why* is non-obvious: a hidden constraint, a subtle invariant, a specific bug workaround. If removing the comment wouldn't confuse a future reader, don't write it.
+_Scope: universal._
+
+- **No obvious comments** — Only comment when the _why_ is non-obvious: a hidden constraint, a subtle invariant, a specific bug workaround. If removing the comment wouldn't confuse a future reader, don't write it.
 - **Comments: 1–2 lines maximum** — Longer explanations belong in README or `.claude/docs/`, not inline. If a comment exceeds two lines, shrink it and move the content elsewhere.
 
 ## Working Style
+
+_Scope: mostly universal; the model-tier and subagent-tier bullets are opinionated (they assume an environment that exposes multiple model tiers). Adapt or skip those if your setup is single-tier._
 
 - **Suggest the right model at conversation start** — If your environment offers multiple model tiers, propose a smaller / cheaper model for Q&A, explanation, or simple git ops; propose a larger model for PR review, security analysis, or complex architecture.
 - **Suggest a larger model when a session escalates mid-conversation** — Tasks that start simple can expand. Proactively suggest a model upgrade when a session grows into cross-repo audit, large refactor with many interdependencies, multi-file synthesis requiring judgment calls, or any task where missing nuance has meaningful consequences. Don't wait for the next session start — flag it at the inflection point.
@@ -32,6 +43,8 @@ When rules conflict: **Safety** > **Behavioral Constraints** > **Domain Defaults
 - **Multi-repo research scope** — When the user's message references another repo ("see in infrastructure", "check gha-workflows"), that repo must be included in the research agent's scope before any recommendation. Scoping to one repo when the system spans multiple produces wrong conclusions.
 
 ## Behavioral Constraints
+
+_Scope: universal._
 
 - **Answer before acting** — "Can this break?" = answer only. Never revert or fix without explicit instruction.
 - **Surface ambiguity before implementing** — Multiple valid interpretations: present them and ask. Never pick one silently. If something is unclear, stop and name what's unclear.
@@ -55,6 +68,8 @@ When rules conflict: **Safety** > **Behavioral Constraints** > **Domain Defaults
 
 ## Safety
 
+_Scope: universal._
+
 **Get explicit approval before any destructive or irreversible command**: `delete`, `destroy`, `rm`, `prune`, `force`, `hard`, `terminate`, or anything affecting production resources or state history. Stop and ask first.
 
 **Create a backup branch before rebase, squash, or force-push.** Verify key files are byte-identical against the backup before deleting it.
@@ -64,6 +79,8 @@ When rules conflict: **Safety** > **Behavioral Constraints** > **Domain Defaults
 **Never close, merge, or force-push shared PRs without explicit approval.** Fix in-place — preserves PR number, review threads, and CI history. If you think a PR should be closed, present the reasoning and ask.
 
 ### Stateful External Operations
+
+_Scope: universal._
 
 Applies to IAM, identity providers, databases, DNS, Kubernetes, or any API that mutates permissions or data:
 
@@ -81,6 +98,8 @@ The exact format is up to you; the principle is **lead with live state**. Buryin
 
 ### Before Creating a PR
 
+_Scope: universal._
+
 1. Diff `origin/main...HEAD` — confirm it contains exactly what was intended, no accidental inclusions or omissions.
 2. Verify all commits are pushed and no uncommitted changes are missing.
 3. PR body describes the final state, not just the latest commit.
@@ -88,6 +107,8 @@ The exact format is up to you; the principle is **lead with live state**. Buryin
 **Before closing a PR:** Verify no unique unmerged commits. State the reason explicitly. Prefer fixing in-place.
 
 ## Testing & Validation
+
+_Scope: universal._
 
 - **Every unexpected diff is a finding** — investigate it; never dismiss as pre-existing or "not our change."
 - **"Test" means end-to-end** — verify the deployed result; unit tests are a prerequisite, not the test itself.
@@ -97,10 +118,14 @@ The exact format is up to you; the principle is **lead with live state**. Buryin
 
 ## Correctness & Least Privilege
 
+_Scope: universal._
+
 - **Every permission, secret, and env var must be justified** — "harmless" is not acceptable; trace the runtime code path that consumes it.
 - **Trace all consumers before unifying config** — different services may parse the same env var with different expectations; a grep for the name is not enough, trace the full code path.
 
 ## Version Control
+
+_Scope: mixed. The "no AI attribution" and "conventional commits" rules are universal. The worktree convention is opinionated — adapt if your team uses branch-switching._
 
 - **No AI attribution** — never include AI hints in commits, code, docs, or PRs.
 - Conventional commits: `type(scope): description`
@@ -108,6 +133,8 @@ The exact format is up to you; the principle is **lead with live state**. Buryin
 - **`EnterWorktree` creates from HEAD** — if you use the worktree convention: fetch and confirm root is on `main` first, or the worktree inherits stale or feature-branch state.
 
 ## Task-Local Context (optional pattern)
+
+_Scope: opinionated. A specific scratch-space convention; useful if you frequently resume multi-session work; skip if your sessions are short-lived or single-task._
 
 A scratch-space convention for multi-session tasks. Useful if you frequently resume work across multiple Claude Code sessions on the same ticket; skip if your sessions are short-lived or single-task.
 
@@ -134,6 +161,8 @@ This space is ephemeral, not backed up, and not shared. Don't put anything in it
 
 ## Bash & CLI Patterns
 
+_Scope: universal._
+
 - **Never start Bash commands with `#` comments** — use the tool's `description` field instead.
 - **Heredocs with `#` comments and quotes: write to a file first**, then run separately.
 - **`gh api` becomes POST when any `-f`/`-F` flag is present** — add `--method GET` explicitly for parameterized GET requests.
@@ -144,11 +173,15 @@ This space is ephemeral, not backed up, and not shared. Don't put anything in it
 
 ## Hook Authoring
 
+_Scope: universal._
+
 - **POSIX ERE only** — macOS `grep -E` rejects `\s`, `\d`, `\b`; use `[[:space:]]`, `[0-9]`, literal characters.
 - **Test hooks before registering**: `echo '{"tool_input":{"command":"test"}}' | ~/.claude/hooks/hook-name.sh`
 - **Always close the closing quote on `source` lines** — `source "${HOME}/.claude/hooks/foo.sh<newline>` is treated as a multi-line string by bash; the next line gets eaten as part of a malformed source argument and the function silently fails to load. `bash -n` does not catch this. Prefer `source "$(dirname "$0")/../_lib/foo.sh"` for portability across install locations.
 
 ## Privacy & External Content
+
+_Scope: universal._
 
 - **Never include personal paths or internal names in shared content** — tickets, PRs, public repos, team docs; use generic references or repo-hosted links.
 - **Scan diffs for PII before committing to public repos** — company names, usernames, account IDs, email addresses, token prefixes.
@@ -156,6 +189,8 @@ This space is ephemeral, not backed up, and not shared. Don't put anything in it
 - **Secret manager CLI: read each secret once per session** — interactive auth prompts on every new shell invocation; re-export the value instead of re-invoking the CLI.
 
 ## Review Quality
+
+_Scope: universal._
 
 - **Adversarial pass on every review** — challenge your findings ("would I stake credibility on this?") and their absence ("what did I miss?"). Verify author rebuttals.
 - **Self-verify every finding before presenting** — wrong findings destroy credibility; when in doubt, downgrade or drop.
@@ -171,6 +206,8 @@ This space is ephemeral, not backed up, and not shared. Don't put anything in it
 
 ## Rule Authoring
 
+_Scope: universal._
+
 - **Scope to the narrowest directory** — `.claude/rules/` at the repo root loads on every conversation; domain rules belong under `{directory}/.claude/rules/`.
 - **Consolidate over proliferating** — one file per domain, not one per incident; group by domain (terraform, k8s, CI) not by event.
 - **Rule titles lead with the non-obvious insight** — surface the gotcha, not the tool name.
@@ -181,12 +218,16 @@ This space is ephemeral, not backed up, and not shared. Don't put anything in it
 
 ## CI/CD
 
+_Scope: universal._
+
 - **Update all sparse-checkout lists when adding action dependencies** — Trace the full dependency chain and update `sparse-checkout` in every consuming workflow. A composite action that adds a new internal `uses:` reference must have every caller's sparse-checkout updated, or the new file silently isn't there.
 - **Add `always()` to GHA steps that must run after a potentially-failing step** — GitHub Actions adds implicit `&& success()` to any step with a custom `if` that doesn't include `always()`, `failure()`, or `cancelled()`. A cleanup or notification step gated only on `if: needs.foo.outputs.bar` will silently skip when an upstream step fails.
 - **`helm rollback` after `uninstall --keep-history` is broken** — Known Helm bug leaves the release stuck in `pending-rollback`. Don't use `--keep-history` + rollback as a safety net; pick one or the other.
 - **New `workflow_call` reusable workflows require a branch dry-run before the PR merges** — Trigger the caller workflow with `dry_run=true` (or equivalent plan-only flag) pointing at the feature branch ref before opening the PR. This catches runtime failures — env var encoding bugs, sparse-checkout gaps, missing relative-path files — that no static reviewer can detect.
 
 ## Domain Configuration
+
+_Scope: universal (this is meta-guidance about where domain rules belong, not domain content itself)._
 
 Stack-specific rules — AWS authentication, Kubernetes contexts, Terraform discipline, Helm operations, CI/CD pipeline specifics — belong in your project's `.claude/CLAUDE.md` or lazily-loaded `.claude/rules/` files. Placing them here loads them on every session regardless of context, wasting tokens on irrelevant rules.
 

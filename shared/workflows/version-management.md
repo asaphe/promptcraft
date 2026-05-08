@@ -1,5 +1,7 @@
 # Version Management
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 Single source of truth for package and tool versions across CI, containers, and deployment configs.
 
 ## Core Principle

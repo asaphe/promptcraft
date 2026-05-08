@@ -1,5 +1,7 @@
 # CLI Tool Design
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 Conventions for any CLI tool you build — favor predictable defaults and consistent flags across tools so users can transfer knowledge without re-reading `--help`.
 
 ## Error Display and Output

@@ -1,5 +1,7 @@
 # Tool Safety & Investigation Protocol
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 ## Investigation Requirements
 
 ### Before Any Solution Implementation

@@ -1,5 +1,7 @@
 # Python Development Standards
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 ## Code Quality
 
 - Write Pythonic code that adheres to PEP 8 standards

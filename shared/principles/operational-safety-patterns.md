@@ -1,5 +1,7 @@
 # Operational Safety Patterns
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 Generalized safety patterns for AI-assisted coding sessions, distilled from real-world incidents. These patterns apply regardless of tech stack or project type.
 
 ## Session Continuity

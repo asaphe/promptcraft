@@ -1,5 +1,7 @@
 # Ansible Guidelines
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 ## Design Principles
 
 - Follow idempotent design principles for all playbooks

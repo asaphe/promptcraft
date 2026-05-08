@@ -4,9 +4,9 @@
 
   | Changed files | Reviewer |
   | --- | --- |
-  | `devops/`, `.github/`, `**/Dockerfile*`, `**/*.sh` | Spawn `devops-reviewer` agent |
-  | `.claude/` | Spawn `config-reviewer` agent |
-  | Application code (Python, TypeScript, Go, Java) | Application code reviewer |
+  | `devops/`, `.github/`, `**/Dockerfile*`, `**/*.sh` | Spawn `devops-reviewer` agent (ships with this scaffold) |
+  | `.claude/` | `<TODO>` Spawn `config-reviewer` agent (not in scaffold; add when you author one for `.claude/` PR reviews) |
+  | Application code (Python, TypeScript, Go, Java) | `<TODO>` Application code reviewer (not in scaffold; add for your stack) |
   | Mixed | Spawn all applicable reviewers in parallel |
 
 - **Present findings before posting** — After the review agent returns findings, present them to the user for approval. Do not let agents post directly to the PR without review.
