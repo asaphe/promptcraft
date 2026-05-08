@@ -4,6 +4,87 @@ How to start using promptcraft content in your own AI assistant setup. Three too
 
 Nothing here is installed — you copy, paste, edit, commit. The repo is source material, not a dependency.
 
+## Quickstart by persona
+
+Pick the closest match and start there. Each starter set is a minimal viable adoption — copy these and you have something useful in <15 minutes; expand later.
+
+### Just give me safety guardrails (any tool with hooks)
+
+You already have a Claude Code setup; you want the destructive-operation guards without changing your CLAUDE.md.
+
+```bash
+# Copy the three core safety hooks to your global Claude Code config
+cp -r tools/claude/examples/hooks/destructive-guard ~/.claude/hooks/
+cp -r tools/claude/examples/hooks/stateful-op-reminder ~/.claude/hooks/
+cp -r tools/claude/examples/hooks/pr-create-guard ~/.claude/hooks/
+
+# Bring along the shared lib the destructive-guard sources
+mkdir -p ~/.claude/_lib
+cp tools/claude/examples/hooks/_lib/*.sh ~/.claude/_lib/
+```
+
+Then register each hook in `~/.claude/settings.json` per its README. You're done.
+
+### Bootstrap a Claude Code DevOps setup from scratch
+
+You have no `~/.claude/CLAUDE.md` and want a complete DevOps-flavored setup.
+
+```bash
+# 1. Global config
+cp tools/claude/examples/config/global-CLAUDE.md ~/.claude/CLAUDE.md
+# Edit it — every section has <TODO> markers. Replace company-specific paths.
+
+# 2. Safety hooks (see "Just give me safety guardrails" above)
+
+# 3. Project-level scaffolding for a specific repo
+cp -r tools/claude/scaffolding/.claude/ /path/to/your-project/.claude/
+# Edit /path/to/your-project/.claude/CLAUDE.md — replace <TODO> markers.
+```
+
+Then read [`tools/claude/guides/claude-best-practices.md`](tools/claude/guides/claude-best-practices.md) for the why behind the patterns.
+
+### Bootstrap a Claude Code setup (general developer, not DevOps)
+
+The DevOps-flavored `global-CLAUDE.md` is heavy on AWS, Terraform, EKS. For a general dev setup, do the same as DevOps but treat `global-CLAUDE.md` as a starting frame: keep the universal sections (working style, communication, scope discipline) and prune the AWS / TF / K8s / Datadog blocks.
+
+The principles under [`shared/principles/`](shared/principles/) are language- and stack-agnostic — pull from `tone-and-style.md`, `tool-safety.md`, `operational-safety-patterns.md`, `modular-composition.md` to assemble a personal CLAUDE.md without DevOps clutter.
+
+### Cursor starter pack
+
+You use Cursor and want the smallest viable rule set.
+
+```bash
+# 1. Open Cursor Settings → Rules → User Rules.
+# 2. Paste these three files (concatenated) into the User Rules text area:
+cat tools/cursor/rules/user/core-principles.md \
+    tools/cursor/rules/user/code-quality.md \
+    tools/cursor/rules/user/general-principles.md \
+  | pbcopy   # macOS; on Linux use xclip / xsel
+
+# 3. For a specific project, add the one ready-to-use Project Rule:
+mkdir -p /path/to/your-project/.cursor/rules/
+cp tools/cursor/rules/mdc/kubernetes/kubernetes-helm.mdc /path/to/your-project/.cursor/rules/
+```
+
+Add language-specific files from `tools/cursor/rules/user/` as relevant.
+
+### ChatGPT-only minimum
+
+You only use ChatGPT (no Claude Code, no Cursor) and want sensible defaults.
+
+```bash
+# Open ChatGPT → Settings → Personalization → Custom Instructions.
+# Paste the two code blocks from one of:
+cat tools/chatgpt/global/general-instructions.md       # multi-stack default
+cat tools/chatgpt/global/professional-instructions.md  # DevOps-leaning
+```
+
+Each file has two code blocks for the two text fields. **Budget: 1500 chars per field** — don't extend without counting.
+
+---
+
+The full per-tool sections below cover the same paths plus the rest of the optional content.
+
 ## Claude Code
 
 ### 1. Fastest path: grab the global CLAUDE.md template

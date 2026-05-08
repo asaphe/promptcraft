@@ -20,6 +20,18 @@ The universal content — principles, language standards, infra patterns, CI/CD,
 - **Developers** tuning Cursor or ChatGPT to match their team's code style — `shared/languages/` + `tools/<tool>/` gets you 80% of the way.
 - **AI tooling tinkerers** wanting hook / agent / skill patterns to fork — `tools/claude/examples/hooks/` and `tools/claude/examples/agents/`.
 
+## Distinguishing patterns
+
+The strongest ideas in this repo are concentrated in a handful of files. If you only read seven things:
+
+- **Modular composition (the Lego principle)** — module boundaries are agent task boundaries; one agent owns one module via a typed contract. [`shared/principles/modular-composition.md`](shared/principles/modular-composition.md).
+- **Specialist agent roster** — split work across bounded specialists with sibling deferral tables, instead of one general-purpose agent. [`shared/principles/agent-design-patterns.md`](shared/principles/agent-design-patterns.md).
+- **Failure triage tables** — `Symptom → Root Cause → Fix` tables are the highest-value-per-token section any specialist agent can carry. Same file: [`agent-design-patterns.md`](shared/principles/agent-design-patterns.md).
+- **Stateful operations protocol** — query-state → backup-full-object → mutate → verify-against-backup, for any change to external systems (cloud, DB, K8s, secrets, identity). [`shared/principles/operational-safety-patterns.md`](shared/principles/operational-safety-patterns.md).
+- **Approval interpretation** — "looks good" ≠ "execute everything"; "show me X" ≠ "run X". Explicit phrases gate destructive operations. Same file: [`operational-safety-patterns.md`](shared/principles/operational-safety-patterns.md).
+- **Hooks as deterministic guardrails** — enforce rules at the tool layer (PreToolUse hooks) rather than relying on the agent to remember. Safer and cheaper than instruction-only enforcement. [`tools/claude/examples/hooks/`](tools/claude/examples/hooks/).
+- **Context management is the #1 success factor** — most agent failures trace to bloated or stale context, not weak reasoning. Manage the window obsessively. [`tools/claude/guides/claude-best-practices.md`](tools/claude/guides/claude-best-practices.md).
+
 ## Repo layout
 
 ```text
