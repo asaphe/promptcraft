@@ -53,14 +53,18 @@ Recommended minimum:
 
 ### Project rules (`.cursor/rules/*.mdc`)
 
-Cursor's project rules live in `.cursor/rules/` inside your repo and auto-load based on globs. Copy the relevant `.mdc` file:
+Cursor's project rules live in `.cursor/rules/` inside your repo and auto-load based on globs.
+
+**Ready-to-use rules** are in [`tools/cursor/rules/mdc/`](tools/cursor/rules/mdc/) (currently `kubernetes/kubernetes-helm.mdc`). Copy directly:
 
 ```bash
 mkdir -p /path/to/your-project/.cursor/rules/
-cp tools/cursor/rules/mdc/<rule>.mdc /path/to/your-project/.cursor/rules/
+cp tools/cursor/rules/mdc/kubernetes/kubernetes-helm.mdc /path/to/your-project/.cursor/rules/
 ```
 
-The frontmatter controls activation — see Cursor's [Rules for AI](https://docs.cursor.com/context/rules) docs.
+**JSON templates** that need conversion to `.mdc` first are in [`tools/cursor/rules/mdc-templates/`](tools/cursor/rules/mdc-templates/) — see that directory's README for the conversion recipe (it's mechanical for simple rules, judgment-heavy for complex ones).
+
+The `.mdc` frontmatter controls activation — see Cursor's [Project Rules docs](https://cursor.com/docs/context/rules).
 
 ### MCP servers
 

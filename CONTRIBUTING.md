@@ -21,7 +21,7 @@ Thank you for considering a contribution. This repository is a living collection
 
 - **Battle-tested patterns** — Rules and patterns that come from real production experience, not theoretical best practices
 - **Concrete examples** — Show input/output pairs, before/after comparisons, or working configurations
-- **Tool-agnostic core, tool-specific extensions** — Core principles go in `core/`, tool-specific guidance goes in `claude/`, `cursor/`, `chatgpt/`, etc.
+- **Tool-agnostic core, tool-specific extensions** — Universal principles, language standards, and infrastructure patterns go under `shared/` (e.g., `shared/principles/`, `shared/languages/`, `shared/infrastructure/`); tool-specific adaptations go under `tools/<tool>/` (`tools/claude/`, `tools/cursor/`, `tools/chatgpt/`).
 - **Concise and actionable** — Every sentence should help the reader do something. Cut preamble and filler.
 
 ### What to Avoid

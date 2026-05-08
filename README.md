@@ -68,4 +68,4 @@ Edits welcome. See [`AGENTS.md`](AGENTS.md) for contribution guidelines and [`CO
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+CC BY 4.0 — see [`LICENSE`](LICENSE).

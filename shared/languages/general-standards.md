@@ -12,7 +12,7 @@
 
 - **camelCase**: for variables, functions, and method names
 - **PascalCase**: for class names
-- **snake_case**: for file names and directory structures
+- **kebab-case**: for file names and directory structures (matches `CONVENTIONS.md`)
 - **UPPER_CASE**: for environment variables
 
 ## Environment Awareness

@@ -1,8 +1,7 @@
 # CLAUDE CODE SPECIFICATION (RFC-STYLE)
 
-**Version:** 1.1
-**Last Updated:** 2025-12-10
 **Document Type:** Canonical AI Enforcement Specification
+
 **Purpose:** Define deterministic, exhaustive, machine-enforceable rules governing workflow development, testing, validation, naming, execution, and behavioral constraints for AI systems modifying GitHub Actions, Dockerfiles, Terraform, and supporting infrastructure.
 
 ---

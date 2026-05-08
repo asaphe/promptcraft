@@ -270,8 +270,8 @@ When rules conflict, apply this priority order:
 
 **Universal vs Project-Specific Rules:**
 
-- Apply universal rules (core/, quality/) in all contexts
-- Apply project-specific rules (project/) only when explicitly indicated by user context
+- Apply universal rules (`shared/principles/`, `shared/quality/`) in all contexts
+- Apply tool-specific rules (under `tools/<tool>/`) only when working in that tool's ecosystem
 - If uncertain about context, ask for clarification rather than assume
 
 **Capability Limitations:**

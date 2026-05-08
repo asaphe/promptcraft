@@ -1,6 +1,6 @@
 # Claude Code Best Practices
 
-A practical guide to getting the most out of Claude Code, synthesized from community patterns, production experience with a 40+ service monorepo, and the configuration patterns documented throughout this repository.
+A practical guide to getting the most out of Claude Code, synthesized from community patterns, production experience on a multi-service codebase, and the configuration patterns documented throughout this repository.
 
 ## Three Core Principles
 
@@ -483,5 +483,5 @@ Audit with `claude mcp list`. If you see servers you never use, remove them or d
 
 This guide synthesizes:
 - Community best practices from [rosmur.github.io/claudecode-best-practices](https://rosmur.github.io/claudecode-best-practices/) (12-source synthesis)
-- Production experience from a 40+ service monorepo with 11 specialized agents, automated learning hooks, and conditional rule loading
+- Production experience on a multi-service codebase with specialized agents, automated learning hooks, and conditional rule loading
 - Patterns documented throughout this repository

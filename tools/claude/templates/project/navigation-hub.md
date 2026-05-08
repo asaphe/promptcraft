@@ -57,8 +57,3 @@ Branch naming: `dev-###-short-description`
 - Test ALL workflow changes with `act` before implementation
 - Validate ALL paths before use — never assume directory structure
 - Run appropriate linters and fix all issues before completion
-
----
-
-**Template Version**: 2.0
-**Last Updated**: 2026-02-18

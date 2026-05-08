@@ -1,145 +1,87 @@
-# Cursor Integration Guide
+# Cursor Integration
 
-## Overview
+Cursor-specific adaptations of promptcraft content. Universal rules live under `../../shared/`; this directory holds Cursor-specific adaptations and starter rules in Cursor's two native formats (User Rules and Project Rules).
 
-This directory contains Cursor-optimized versions of our AI assistant rules, formatted for easy integration with Cursor IDE.
-
-## Directory Structure
+## Layout
 
 ```text
-cursor/
-├── user-rules/           # Copy-paste into Cursor Settings → Rules
-│   ├── core-principles.md        # Core development approach and protocols
-│   ├── code-quality.md          # Quality standards and linting requirements
-│   ├── language-standards.md    # Multi-language coding conventions
-│   ├── terraform-infrastructure.md  # Terraform IaC, state management, modules
-│   ├── infrastructure-tools.md  # Kubernetes, Docker, AWS, container orchestration
-│   ├── workflow-patterns.md     # GitHub Actions, CI/CD, automation
-│   ├── general-principles.md    # Universal standards and environment management
-│   └── ansible-automation.md    # Ansible configuration management and automation
-├── multi-tool-coexistence.md  # AGENTS.md + CLAUDE.md + Cursor rules coexistence guide
-├── mdc-rules/           # MDC (JSON) rules for project-level enforcement
-│   ├── naming/                  # Naming convention rules
-│   ├── formatting/              # Code formatting rules
-│   ├── structure/               # Code structure rules
-│   ├── documentation/            # Documentation requirements
-│   ├── language-specific/        # Language-specific standards
-│   ├── terraform/               # Terraform-specific rules
-│   └── README.md                # MDC rules documentation
-└── README.md            # This guide
+tools/cursor/
+├── README.md                          # This file
+├── multi-tool-coexistence.md          # Coexistence guide: AGENTS.md + CLAUDE.md + Cursor rules
+├── rules/
+│   ├── README.md
+│   ├── user/                          # Markdown for Cursor's User Rules UI (Settings → Rules)
+│   │   ├── core-principles.md
+│   │   ├── code-quality.md
+│   │   ├── language-standards.md
+│   │   ├── general-principles.md
+│   │   ├── infrastructure-tools.md
+│   │   ├── terraform-infrastructure.md
+│   │   ├── workflow-patterns.md
+│   │   └── ansible-automation.md
+│   ├── mdc/                           # Ready-to-use Cursor Project Rules (.mdc files)
+│   │   ├── README.md
+│   │   └── kubernetes/
+│   │       └── kubernetes-helm.mdc
+│   └── mdc-templates/                 # JSON templates that need conversion to .mdc
+│       ├── README.md
+│       ├── naming/
+│       ├── formatting/
+│       ├── structure/
+│       ├── documentation/
+│       ├── language-specific/
+│       └── terraform/
+├── mcp/                               # MCP server configuration for Cursor
+└── recovery/                          # Conversation history recovery utility
 ```
 
-## User Rules Setup (Recommended for Shared Repositories)
+## Cursor's two rule formats — choose by destination
 
-User Rules are perfect for shared repositories where you can't add project-level rules. They apply globally but don't interfere with existing Project Rules.
+| Format | Lives in | Loaded by | Use for |
+|--------|----------|-----------|---------|
+| **User Rules** | Cursor Settings → Rules → User Rules | Cursor Agent (chat), globally | Personal preferences applied across every project |
+| **Project Rules** | `.cursor/rules/*.mdc` inside a project | Cursor Agent, scoped + glob-matched | Project-specific standards, version-controlled |
 
-### Setup Steps
+Per [Cursor's rule precedence](https://cursor.com/docs/context/rules): Team Rules → Project Rules → User Rules. User Rules fill gaps; Project Rules win for project-specific guidance.
 
-1. **Open Cursor Settings**: `Cmd/Ctrl + ,`
-2. **Navigate to Rules**: Settings → Rules → User Rules
-3. **Copy content** from desired `.md` files in `user-rules/`
-4. **Paste into User Rules** text area
-5. **Save settings**
+## User Rules setup (`rules/user/`)
 
-### How User Rules Work with Project Rules
+User Rules are the easiest way to add personal preferences without touching project repos. They apply globally across all projects.
 
-- **User Rules apply globally** across all your projects
-- **Project Rules take precedence** when both exist (per Cursor's precedence order)
-- **User Rules fill gaps** where Project Rules don't provide guidance
-- **No conflicts**: User Rules are your personal preferences, Project Rules are project standards
+1. Open Cursor Settings (`Cmd/Ctrl + ,`).
+2. Navigate to **Rules → User Rules**.
+3. Pick one or more files from `rules/user/` and paste their contents into the User Rules text area. Concatenate multiple files if needed.
+4. Save.
 
-**Example**: If a project has a Project Rule about using TypeScript, and your User Rule says "prefer Python", the Project Rule wins for that project. But in projects without TypeScript rules, your User Rule preference applies.
+Recommended starter set:
 
-## Rule Selection
+- `core-principles.md` — communication discipline, verification, scope.
+- `code-quality.md` — linting, formatting, review gates.
+- `general-principles.md` — universal naming and environment conventions.
 
-### Essential Core (Start Here)
+Add language- or infra-specific files as relevant to your work.
 
-- `core-principles.md` - Development approach, implementation strategy
-- `code-quality.md` - Linting, testing, quality requirements
-- `general-principles.md` - Universal standards, environment management
+## Project Rules setup (`rules/mdc/` + `rules/mdc-templates/`)
 
-### Language-Specific
+Project Rules version-control rule logic alongside the codebase. Cursor loads `.mdc` files from `.cursor/rules/` based on each rule's globs.
 
-- `language-standards.md` - TypeScript, Python, Bash, Java, Go standards
+**Ready-to-use** (copy directly):
 
-### Infrastructure Focus
+```bash
+mkdir -p /path/to/your-project/.cursor/rules/
+cp tools/cursor/rules/mdc/kubernetes/kubernetes-helm.mdc /path/to/your-project/.cursor/rules/
+```
 
-- `terraform-infrastructure.md` - Infrastructure as Code, state management, modules
-- `infrastructure-tools.md` - Kubernetes, Docker, AWS, container orchestration
-- `workflow-patterns.md` - GitHub Actions, CI/CD automation
-- `ansible-automation.md` - Configuration management, idempotent design
+**JSON templates** (convert first — see [`rules/mdc-templates/README.md`](rules/mdc-templates/README.md)):
 
-## Best Practices
+The templates directory holds rule logic encoded as structured JSON. Conversion to `.mdc` is mechanical for simple naming/formatting rules, judgment-heavy for complex ones. The README walks through the conversion shape with one worked example.
 
-### File Size Management
+## Coexistence with other AI assistants
 
-- Each rule file is under 500 lines (Cursor recommendation)
-- Focused, composable rules that can be combined as needed
-- Split by logical domain for easier maintenance
+If you use Cursor alongside Claude Code, GitHub Copilot, or Aider, see [`multi-tool-coexistence.md`](multi-tool-coexistence.md). It covers `AGENTS.md` + `CLAUDE.md` + Cursor rules in one repo without conflicts.
 
-### Content Style
+## See also
 
-- Comprehensive explanations with context (Unity-style approach)
-- Structured sections: Context, Requirements, Examples
-- Actionable instructions with reasoning
-- Concrete examples and code snippets
-
-### Usage Patterns
-
-**For Personal Projects:**
-
-- Copy multiple rule files as needed
-- Combine related rules in single User Rules entry
-
-**For Work Projects:**
-
-- Use conservative core rules only
-- Focus on code quality and development principles
-- Avoid company-specific infrastructure rules
-
-## User Rules vs Project Rules
-
-According to [Cursor's official documentation](https://cursor.com/docs/context/rules), there are distinct rule types:
-
-### User Rules (Global, Personal)
-
-- **Location**: Cursor Settings → Rules → User Rules
-- **Format**: Plain markdown text
-- **Scope**: Global across all projects
-- **Applied to**: Agent (Chat) only (not Inline Edit)
-- **Use for**: Personal coding preferences, communication style, universal standards
-- **Precedence**: Applied after Team Rules and Project Rules (lowest priority)
-
-### Project Rules (Version-Controlled)
-
-- **Location**: `.cursor/rules/` directory in your project
-- **Format**: `.mdc` files (Markdown with frontmatter metadata)
-- **Scope**: Project-specific, version-controlled
-- **Applied to**: Agent (Chat) based on rule type and file patterns
-- **Use for**: Domain-specific knowledge, project workflows, architecture decisions
-- **Precedence**: Applied after Team Rules, before User Rules
-
-### Rule Precedence Order
-
-1. **Team Rules** (highest priority, if on Team/Enterprise plan)
-2. **Project Rules** (`.cursor/rules/*.mdc` files)
-3. **User Rules** (lowest priority, personal preferences)
-
-**Key Insight**: User Rules complement Project Rules without conflicting. User Rules provide your personal preferences globally, while Project Rules provide project-specific standards. When both exist, Project Rules take precedence for project-specific guidance, while User Rules fill in gaps for personal preferences.
-
-## Project Rules (`.mdc` Format)
-
-Project Rules use `.mdc` format (Markdown with frontmatter) and are stored in `.cursor/rules/` directories. The `mdc-rules/` directory contains templates that can be converted to `.mdc` format for use in projects.
-
-**Note**: The JSON files in `mdc-rules/` are templates/references. To use them as Cursor Project Rules, they should be converted to `.mdc` format. See `mdc-rules/README.md` for conversion guidance.
-
-## Updating Rules
-
-When the main rules are updated:
-
-1. Regenerate Cursor-optimized versions
-2. Copy new content to Cursor User Rules
-3. Update MDC rules if patterns have changed
-4. Restart Cursor to ensure rules are loaded
-
-This setup provides maximum flexibility for both personal and professional development work!
+- [`../../shared/principles/`](../../shared/principles/) — tool-agnostic principles that underlie these rules.
+- [`../claude/`](../claude/) — equivalent setup for Claude Code.
+- [`../chatgpt/`](../chatgpt/) — equivalent setup for ChatGPT.
