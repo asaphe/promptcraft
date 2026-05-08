@@ -2,6 +2,14 @@
 
 General principles for designing, structuring, and evolving AI coding agent systems. These patterns apply regardless of the specific tool (Claude Code, Cursor, Copilot Agents, custom agents).
 
+## Foundation: Modular Composition
+
+The patterns below are the agent-layer expression of a broader architectural principle: **module boundaries are agent task boundaries**. A well-bounded module — sharp scope, public API contract, dedicated tests, README in the imperative voice — is what makes it possible to delegate work to one agent without supervisory overhead. The contract is the agent's input/output spec; the test suite is the agent's verification harness; the README is the agent's instruction set.
+
+This means the rules for designing good code modules and the rules for designing good agents are the same rules. If a domain doesn't have a clean module shape, no amount of agent-prompt engineering will give you a clean agent shape — the boundary problem has to be solved at the system-design level first.
+
+See [`modular-composition.md`](modular-composition.md) for the full principle and how it applies across stacks (Terraform, Python, agent orchestration).
+
 ## Core Concept: Specialist Agent Roster
 
 Instead of one general-purpose agent handling all tasks, split work across specialist agents that each own a bounded domain. Benefits:

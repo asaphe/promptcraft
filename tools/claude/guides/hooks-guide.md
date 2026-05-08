@@ -212,7 +212,7 @@ See `../examples/hooks/post-compact-reinject/` for a production implementation.
 
 The naive pattern `<cmd> +<verb>` (e.g., `kubectl +delete`, `gh +pr +create`) silently misses real-world commands because users interpose flags between the binary and the verb. Examples that bypass naive matchers:
 
-```
+```bash
 kubectl --context my-cluster delete pod foo     # → does NOT match `kubectl +delete`
 gh --repo owner/repo pr create --title "..."    # → does NOT match `gh +pr +create`
 git -C /path push origin main                   # → does NOT match `git +push`
@@ -221,7 +221,7 @@ aws --profile prod s3 rm s3://bucket/key        # → does NOT match `aws +s3 +r
 
 The fix is a regex shape that allows arbitrary tokens between the command and the verb while excluding command separators that would let a downstream pipe smuggle a false positive:
 
-```
+```text
 <cmd>[[:space:]]([^|;&]* )?<verb>([[:space:]]|$)
 ```
 

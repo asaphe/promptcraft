@@ -16,7 +16,7 @@ A reference library meant for humans and AI assistants to browse, copy, and adap
 
 Tool-agnostic — applies to any AI coding assistant.
 
-- [shared/principles/](shared/principles/): communication style, tool safety, agent design, prompting examples, CLI tool design, personal conventions.
+- [shared/principles/](shared/principles/): development principles, modular composition (the Lego principle), tone & style, tool safety, operational safety, agent design, prompting examples, CLI design, personal conventions.
 - [shared/languages/](shared/languages/): TypeScript, Python, Bash, Java, Go, general cross-language standards.
 - [shared/infrastructure/](shared/infrastructure/): Terraform, Kubernetes/Helm, Docker, AWS, Ansible, cost optimization.
 - [shared/workflows/](shared/workflows/): CI/CD patterns, GitHub Actions, version management.

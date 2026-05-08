@@ -25,7 +25,7 @@ The universal content — principles, language standards, infra patterns, CI/CD,
 ```text
 .
 ├── shared/               # Tool-agnostic content (universal rules)
-│   ├── principles/       # Communication, tool safety, agent design
+│   ├── principles/       # Process, architecture, style, safety, agents, prompting, CLI
 │   ├── languages/        # TS, Python, Bash, Java, Go conventions
 │   ├── infrastructure/   # Terraform, K8s, Docker, AWS, cost
 │   ├── workflows/        # CI/CD, GitHub Actions, version mgmt
