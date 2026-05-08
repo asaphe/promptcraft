@@ -18,9 +18,11 @@ cp -r tools/claude/examples/hooks/destructive-guard ~/.claude/hooks/
 cp -r tools/claude/examples/hooks/stateful-op-reminder ~/.claude/hooks/
 cp -r tools/claude/examples/hooks/pr-create-guard ~/.claude/hooks/
 
-# Bring along the shared lib the destructive-guard sources
-mkdir -p ~/.claude/_lib
-cp tools/claude/examples/hooks/_lib/*.sh ~/.claude/_lib/
+# Bring along the shared lib the destructive-guard sources.
+# (Each hook sources `../_lib/<lib>.sh` from its own directory,
+# so the lib needs to live as a sibling to the hook subdirs.)
+mkdir -p ~/.claude/hooks/_lib
+cp tools/claude/examples/hooks/_lib/*.sh ~/.claude/hooks/_lib/
 ```
 
 Then register each hook in `~/.claude/settings.json` per its README. You're done.
