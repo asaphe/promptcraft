@@ -1,5 +1,7 @@
 # Docker Standards
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 ## Dockerfile Guidelines
 
 - Use multi-stage builds to reduce image size and separate build/runtime concerns

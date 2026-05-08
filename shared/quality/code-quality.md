@@ -1,93 +1,78 @@
-# Code Quality & Linting Standards
+# Code Quality & Linting
 
-## Mandatory Quality Requirements
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
 
-### 1. All Code Must Pass Linting
+Code is presented only after it passes its language's lint+format gate. "Works on my machine" is not a quality bar — the lint pass is.
 
-Every piece of code output must pass appropriate linters:
+## Lint gates by language
 
-- **Shell Scripts**: Must pass `shellcheck` with no errors
-- **Dockerfiles**: Must pass `hadolint` with no errors
-- **Python**: Must pass `ruff` linting and formatting standards
-- **Markdown**: Must pass markdown linting rules
-- **YAML**: Must be valid and well-formed
-- **TypeScript/JavaScript**: Must pass eslint standards
-- **Terraform**: Must pass `terraform fmt` and `tflint`
+| Language | Required gate |
+|----------|---------------|
+| Shell | `shellcheck` (zero errors) |
+| Dockerfile | `hadolint` (zero errors) |
+| Python | `ruff` lint + format |
+| Markdown | `markdownlint` against the project's config |
+| YAML | parses cleanly; `yamllint` if the project uses it |
+| TypeScript / JavaScript | project's ESLint config |
+| Terraform | `terraform fmt -check` + `tflint` |
 
-### 2. Best Practices Adherence
+When a project pins different tools or extra steps (e.g., `mypy`, `prettier`, `checkov`), discover them via the project's `package.json` / `pyproject.toml` / CI config and run them too. The lint gate is whatever CI enforces, not a generic default.
 
-Code should follow established best practices unless there's a compelling reason not to:
+## Workflow
 
-- Use official recommended patterns and idioms
-- Follow security best practices (principle of least privilege, no hardcoded secrets, etc.)
-- Apply performance and maintainability guidelines
-- Use appropriate error handling and validation
+1. Write the code.
+2. Run the relevant linter(s).
+3. Fix every reported issue.
+4. Present the final, lint-passing version — show the command output, not a claim.
 
-### 3. Innovation Permission
+If you can't run the linter (sandbox limitation, missing tooling), say so explicitly and provide the exact command for the user to run.
 
-Quality standards should not prevent innovative solutions:
+## Lint-disable / suppress comments
 
-- **Allowed**: New approaches, creative solutions, modern techniques
-- **Encouraged**: Explaining why non-standard approaches were chosen
-- **Required**: Ensuring innovative code still passes linting and security standards
-- **Balance**: Innovation in logic/approach, standards in syntax/formatting
+Treat `// eslint-disable`, `# noqa`, `# type: ignore`, `// @ts-ignore`, `tflint-ignore` as code smells:
 
-## Implementation Protocol
+- **Default: don't.** A lint warning usually points at a real problem; suppressing is rarely the right fix.
+- **Justify in writing.** If suppression is correct (e.g., generated code, intentional pattern), the comment must include the *reason* — not just "ignore this".
+- **Scope tightly.** Suppress one rule, one line. Never blanket-disable a file.
 
-### 1. Iterative Improvement
+When the suppressed pattern appears repeatedly, that's a signal to update the lint config (or the rule) — not to scatter more suppressions.
 
-Linting failures are opportunities to improve, not roadblocks:
+## Style vs correctness
 
-- Present initial solution
-- Run appropriate linters
-- Fix any issues found
-- Present final, lint-passing version
+A linter enforces style; correctness is a separate gate. Even with a clean lint pass, ask:
 
-### 2. Explicit Linting Validation
+- Does it handle the failure modes (network errors, empty inputs, oversized inputs, concurrent access)?
+- Does it match project conventions visible in surrounding code?
+- Does it preserve the invariants the calling code depends on?
 
-When presenting code, show that it passes linting:
+Lint passing is necessary, not sufficient.
 
-- Run relevant linters during development (or provide commands for user to execute)
-- Fix issues before presenting final solution
-- Document any linter exceptions and justifications
-- If unable to run linters directly, explain validation steps and provide specific linting commands
+## Deviating from defaults
 
-### 3. Best Practice Documentation
+Sometimes the right code violates a default lint rule. When deviating:
 
-When deviating from common patterns, explain why:
+1. State the standard approach.
+2. State why this case is different.
+3. Show how the alternative still meets the quality bar.
+4. Suppress with a tight `// eslint-disable-next-line <rule>` (or equivalent) and a one-line reason.
 
-- State the standard approach
-- Explain the specific reason for deviation
-- Show how the alternative still meets quality standards
+Innovation in logic or design is fine; ignoring lint errors is not the right venue for it.
 
-## Quality Without Innovation Limits
+## Security floor
 
-### DO
+Independent of any other rule, every contribution must:
 
-- ✅ Use cutting-edge tools and techniques that pass linting
-- ✅ Propose creative solutions that follow syntax standards
-- ✅ Challenge conventional approaches with well-linted alternatives
+- **Never hardcode secrets** — no API keys, tokens, passwords, account IDs in code, configs, or container images. Use the project's secret-injection mechanism.
+- **Use least privilege** — IAM policies, K8s RBAC, file permissions, env-var scope all default to the minimum required.
+- **Validate at trust boundaries** — user input, external API responses, untrusted config. Don't validate at internal boundaries that already have typed contracts.
+- **Mask sensitive values in logs** — secrets, PII, tokens. CI output is shared state; treat it as semi-public.
+- **Pin dependencies** — base images, package versions, action SHAs. `latest` is a supply-chain liability.
 
-### DON'T
+These are non-negotiable; lint gates won't catch them but they fail the same gate (don't ship).
 
-- ❌ Sacrifice code quality for speed
-- ❌ Ignore linting errors "because it works"
-- ❌ Use "it's innovative" as excuse for poor practices
+## See also
 
-## Security Standards
-
-### Compliance Scanning
-
-- Run daily secret scans for secret detection
-- Implement container vulnerability scanning
-- Apply security linting for infrastructure code
-- Use security-focused base images and dependency scanning
-
-### Access Control
-
-- Never hardcode secrets in configuration files or containers
-- Rotate secrets regularly and use automated secret injection
-- Apply workload identity patterns for secure service communication
-- Mask sensitive values in CI/CD logs and outputs
-
-**Principle**: "Innovation in thinking, excellence in execution" - be creative with solutions but rigorous with implementation quality.
+- [`documentation.md`](documentation.md) — documentation quality standards.
+- [`research-standards.md`](research-standards.md) — when to research vs. when to act.
+- [`../principles/development-principles.md`](../principles/development-principles.md) — verification and impact analysis.
+- [`../principles/tool-safety.md`](../principles/tool-safety.md) — destructive commands, approval gates.

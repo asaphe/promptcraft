@@ -1,5 +1,7 @@
 # Modular Composition (the Lego principle)
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 **Core thesis:** Build software as **separate parts that snap together cleanly** — never as one large blob with implicit couplings. Each part has a sharp, named boundary; what crosses the boundary is a typed contract; what stays inside is private. The system emerges from composition, not from sprawl.
 
 This principle is stack-agnostic. It applies to Python services, internal libraries, agent personas, orchestrators, Terraform infrastructure, and any system humans and AI agents iterate on together.

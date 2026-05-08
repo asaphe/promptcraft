@@ -1,5 +1,7 @@
 # Bash Scripting Standards
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 ## Quality Standards
 
 - Scripts should pass shellcheck linting

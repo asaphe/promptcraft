@@ -1,5 +1,7 @@
 # AWS Guidelines
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 ## Access Control
 
 - Prefer IAM roles over users for programmatic access

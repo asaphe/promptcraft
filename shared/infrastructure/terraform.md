@@ -1,5 +1,7 @@
 # Terraform Standards
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 ## Structure & Organization
 
 - Use numbered prefixes for infrastructure layers (00-core, 01-network, 02-dns, etc.)

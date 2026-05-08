@@ -1,5 +1,7 @@
 # Research & Verification Standards
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 ## Information Validation
 
 - **ALWAYS check online before answering** - verify information against current sources

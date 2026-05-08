@@ -1,5 +1,7 @@
 # Communication Style & Tone
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 ## Core Communication Principles
 
 - Be concise, direct, and to the point

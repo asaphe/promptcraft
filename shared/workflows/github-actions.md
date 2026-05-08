@@ -1,5 +1,7 @@
 # GitHub Actions Workflow Development Protocol
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 ## MANDATORY for ALL workflow changes - no exceptions
 
 ### Core Requirements

@@ -1,5 +1,7 @@
 # Cost Optimization
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 Guidance for making cost-aware infrastructure and architecture decisions.
 
 ## Framing

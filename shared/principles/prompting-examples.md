@@ -1,5 +1,7 @@
 # Prompting Examples
 
+> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+
 Concrete input/output examples demonstrating effective prompting patterns. These are "multishot" examples — showing Claude what good looks like is more effective than describing it.
 
 ## Why Examples Matter
