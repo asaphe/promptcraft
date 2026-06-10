@@ -1,29 +1,30 @@
 #!/usr/bin/env bash
-# Claude Code statusline — dir | branch | pr | k8s | tf | aws | py | wt | model | ctx | rl | cost
-#
-# Segments (all conditional except dir):
-#   [label] ~/path     — repo label badge; falls back to git remote name for worktrees
-#   branch*            — git branch with dirty indicator
-#   PR#123             — open PR for current branch (requires pr-context-inject cache)
-#   k8s-context        — kubectl context (red=prod, yellow=stg)
-#   tf:workspace       — Terraform workspace (only when .terraform/environment found)
-#   aws:profile        — AWS_PROFILE env var, if set
-#   py:3.12            — pyenv version (major.minor, only when .python-version found)
-#   wt:name            — active worktree name (only when in a worktree)
-#   model-name         — active Claude model (dim)
-#   ctx:42%            — context window usage (green <50%, yellow <80%, red ≥80%)
-#   rl:62%             — 5-hour rate limit (only shown ≥50%; yellow, red ≥80%)
-#   $0.12              — session cost (dim <$1, yellow $1-$5, red ≥$5)
+# Claude Code statusline — segments and conditions documented in README.md alongside this script.
 
 input=$(cat)
 
-IFS=$(printf '\t') read -r model used cost rate5h worktree_name < <(echo "$input" | jq -r '[
-  (.model.display_name // ""),
-  (.context_window.used_percentage // ""),
-  (.cost.total_cost_usd // ""),
-  (.rate_limits.five_hour.used_percentage // ""),
-  (.worktree.name // "")
-] | @tsv')
+# \x1f join: tab is IFS-whitespace, so empty TSV fields collapse and shift later values left
+IFS=$'\x1f' read -r model used rate5h worktree_name effort_level thinking_enabled \
+  repo_name git_worktree pr_number pr_review_state \
+  lines_added lines_removed session_name added_dirs_count rl_resets_at < <(
+  echo "$input" | jq -r '[
+    (.model.display_name // ""),
+    (.context_window.used_percentage // ""),
+    (.rate_limits.five_hour.used_percentage // ""),
+    (.worktree.name // ""),
+    (.effort.level // ""),
+    (if .thinking.enabled == true then "true" else "" end),
+    (.workspace.repo.name // ""),
+    (.workspace.git_worktree // ""),
+    (if .pr.number != null then (.pr.number | tostring) else "" end),
+    (.pr.review_state // ""),
+    (if ((.cost.total_lines_added // 0) > 0) then (.cost.total_lines_added | tostring) else "" end),
+    (if ((.cost.total_lines_removed // 0) > 0) then (.cost.total_lines_removed | tostring) else "" end),
+    (.session_name // ""),
+    ((.workspace.added_dirs // []) | length | if . > 0 then tostring else "" end),
+    (if .rate_limits.five_hour.resets_at != null then (.rate_limits.five_hour.resets_at | tostring) else "" end)
+  ] | join("\u001f")'
+)
 
 cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // ""')
 aws_profile="${AWS_PROFILE:-${AWS_DEFAULT_PROFILE:-}}"
@@ -72,35 +73,49 @@ while [ "$dir" != "/" ] && [ -n "$dir" ]; do
   dir=$(dirname "$dir")
 done
 
-# Repo identity label — fixed badge for known repos, git remote name for everything else.
-# Customize the case arms for your own layout; the fallback handles worktrees in /tmp
-# and unknown repos automatically.
+# Repo identity label — customize the case arms; fallback uses the repo name from the harness JSON (no `git remote get-url` subprocess). See README § Repo label badge.
 clone_label=""
 clone_color='\033[36m'
 case "$cwd" in
-  # Uncomment and adapt:
-  # */myorg/services*)       clone_label="svc";   clone_color='\033[36m' ;;
-  # */myorg/infrastructure*) clone_label="infra"; clone_color='\033[93m' ;;
-  # */.dotfiles*)            clone_label="dots";  clone_color='\033[97m' ;;
+  # */myorg/services*) clone_label="svc"; clone_color='\033[36m' ;;
   *) ;;
 esac
-if [ -z "$clone_label" ]; then
-  _remote=$(git -C "$cwd" remote get-url origin 2>/dev/null | sed 's|.*/||; s|\.git$||')
-  [ -n "$_remote" ] && clone_label="$_remote"
+if [ -z "$clone_label" ] && [ -n "$repo_name" ]; then
+  clone_label="$repo_name"
 fi
 
-# PR badge — reads from a repo+branch-scoped cache file written by a pr-context-inject
-# hook. No cache file = no badge (no API call on every tick).
-_pr_badge() {
+# Build parts
+parts=()
+
+if [ -n "$clone_label" ]; then
+  parts+=("$(printf "${clone_color}[%s]\033[0m \033[2m%s\033[0m" "$clone_label" "$short_cwd")")
+else
+  parts+=("$(printf '\033[36m%s\033[0m' "$short_cwd")")
+fi
+
+[ -n "$git_branch" ] && parts+=("$(printf '\033[35m%s%s\033[0m' "$git_branch" "$git_dirty")")
+
+# PR badge — native JSON fields for the CWD repo (no subprocess; colored by review state)
+if [ -n "$pr_number" ]; then
+  case "$pr_review_state" in
+    approved)          pr_color='\033[32m' ;;
+    changes_requested) pr_color='\033[31m' ;;
+    draft)             pr_color='\033[33m' ;;
+    *)                 pr_color='\033[32m' ;;   # open / pending review
+  esac
+  parts+=("$(printf "${pr_color}PR#%s\033[0m" "$pr_number")")
+fi
+
+# Secondary-repo PR badges read /tmp/claude-pr-cache-<repo>-<branch> (native JSON only covers the CWD repo's PR). See README § PR badge.
+_pr_badge_cache() {
   local repo="$1" dir="$2"
   local branch
   branch=$(git -C "$dir" --no-optional-locks branch --show-current 2>/dev/null)
   [ -z "$branch" ] || [ "$branch" = "main" ] || [ "$branch" = "master" ] && return
-  local safe
+  local safe cache pr_line pr_num pr_state
   safe=$(printf '%s' "$branch" | tr '/' '_' | tr ' ' '-')
-  local cache="/tmp/claude-pr-cache-${repo}-${safe}"
+  cache="/tmp/claude-pr-cache-${repo}-${safe}"
   [ -f "$cache" ] || return
-  local pr_line pr_num pr_state
   pr_line=$(cat "$cache")
   pr_num=$(printf '%s\n' "$pr_line" | awk '{print $1}')
   pr_state=$(printf '%s\n' "$pr_line" | awk '{print $2}')
@@ -114,38 +129,16 @@ _pr_badge() {
   printf "${color}%s:PR#%s\033[0m" "$repo" "$pr_num"
 }
 
-# Build parts
-parts=()
-
-if [ -n "$clone_label" ]; then
-  parts+=("$(printf "${clone_color}[%s]\033[0m \033[2m%s\033[0m" "$clone_label" "$short_cwd")")
-else
-  parts+=("$(printf '\033[36m%s\033[0m' "$short_cwd")")
-fi
-
-[ -n "$git_branch" ] && parts+=("$(printf '\033[35m%s%s\033[0m' "$git_branch" "$git_dirty")")
-
-# PR badge for CWD repo (no repo prefix — implied by label)
-if [ -n "$git_branch" ] && [ "$git_branch" != "main" ] && [ "$git_branch" != "master" ]; then
-  _cwd_repo=$(git remote get-url origin 2>/dev/null | sed 's|.*/||' | sed 's|\.git$||')
-  if [ -n "$_cwd_repo" ]; then
-    _safe=$(printf '%s' "$git_branch" | tr '/' '_' | tr ' ' '-')
-    _cache="/tmp/claude-pr-cache-${_cwd_repo}-${_safe}"
-    if [ -f "$_cache" ]; then
-      _pr_line=$(cat "$_cache")
-      _pr_num=$(printf '%s\n' "$_pr_line" | awk '{print $1}')
-      _pr_state=$(printf '%s\n' "$_pr_line" | awk '{print $2}')
-      if [ -n "$_pr_num" ]; then
-        case "$_pr_state" in
-          DRAFT)         _pr_color='\033[33m' ;;
-          MERGED|CLOSED) _pr_color='\033[2m'  ;;
-          *)             _pr_color='\033[32m' ;;
-        esac
-        parts+=("$(printf "${_pr_color}PR#%s\033[0m" "$_pr_num")")
-      fi
-    fi
-  fi
-fi
+# Sibling repos to show PR badges for even when they're not the cwd:
+secondary_repos=()
+# secondary_repos=("$HOME/code/infrastructure" "$HOME/code/workflows")
+for _rdir in "${secondary_repos[@]}"; do
+  [ -d "$_rdir" ] || continue
+  _repo=$(basename "$_rdir")
+  [ "$_repo" = "$repo_name" ] && continue   # skip if this is the CWD repo
+  _badge=$(_pr_badge_cache "$_repo" "$_rdir")
+  [ -n "$_badge" ] && parts+=("$_badge")
+done
 
 # K8s context — red for prod, yellow for stg, dim for others
 if [ -n "$k8s_context" ]; then
@@ -169,9 +162,37 @@ fi
 
 [ -n "$aws_profile" ] && parts+=("$(printf '\033[33m%s\033[0m' "aws:$aws_profile")")
 [ -n "$py_version" ]  && parts+=("$(printf '\033[2mpy:%s\033[0m' "$py_version")")
-[ -n "$worktree_name" ] && parts+=("$(printf '\033[2mwt:%s\033[0m' "$worktree_name")")
-[ -n "$model" ]       && parts+=("$(printf '\033[2m%s\033[0m' "$model")")
 
+# Worktree: prefer --worktree session name, fall back to git worktree name
+wt_display="${worktree_name:-$git_worktree}"
+[ -n "$wt_display" ] && parts+=("$(printf '\033[2mwt:%s\033[0m' "$wt_display")")
+
+# Session name — only when set via /rename
+[ -n "$session_name" ] && parts+=("$(printf '\033[2m[%s]\033[0m' "$session_name")")
+
+# Multi-root session signal — when --add-dir / /add-dir is active
+[ -n "$added_dirs_count" ] && parts+=("$(printf '\033[2m+%sdirs\033[0m' "$added_dirs_count")")
+
+[ -n "$model" ] && parts+=("$(printf '\033[2m%s\033[0m' "$model")")
+
+# Effort level — only show non-default levels (high is treated as the default)
+case "$effort_level" in
+  max)    parts+=("$(printf '\033[31mmax\033[0m')")  ;;
+  xhigh)  parts+=("$(printf '\033[31mxhg\033[0m')")  ;;
+  low)    parts+=("$(printf '\033[2mlow\033[0m')")   ;;
+  medium) parts+=("$(printf '\033[2mmed\033[0m')")   ;;
+esac
+
+# Extended thinking indicator
+[ "$thinking_enabled" = "true" ] && parts+=("$(printf '\033[33mthink\033[0m')")
+
+# Lines changed this session (zero-cost — from JSON, no subprocess)
+if [ -n "$lines_added" ] || [ -n "$lines_removed" ]; then
+  la="${lines_added:-0}"; lr="${lines_removed:-0}"
+  parts+=("$(printf '\033[2m+%s/-%s\033[0m' "$la" "$lr")")
+fi
+
+# Context window usage
 if [ -n "$used" ]; then
   used_int=$(echo "$used" | awk '{printf "%d", $1}')
   if   [ "$used_int" -ge 80 ]; then color='\033[31m'
@@ -181,24 +202,25 @@ if [ -n "$used" ]; then
   parts+=("$(printf "${color}ctx:%d%%\033[0m" "$used_int")")
 fi
 
-# Rate limit (5-hour window) — only shown when approaching the limit
+# Rate limit (5-hour window) with reset countdown — only shown when approaching the limit
 if [ -n "$rate5h" ]; then
   rl_int=$(echo "$rate5h" | awk '{printf "%d", $1}')
-  if   [ "$rl_int" -ge 80 ]; then
-    parts+=("$(printf '\033[31mrl:%d%%\033[0m' "$rl_int")")
-  elif [ "$rl_int" -ge 50 ]; then
-    parts+=("$(printf '\033[33mrl:%d%%\033[0m' "$rl_int")")
+  if [ "$rl_int" -ge 50 ]; then
+    rl_suffix=""
+    if [ -n "$rl_resets_at" ]; then
+      now=$(date '+%s')
+      remaining_secs=$(( rl_resets_at - now ))
+      if [ "$remaining_secs" -gt 0 ]; then
+        remaining_min=$(( remaining_secs / 60 ))
+        rl_suffix=" ${remaining_min}m"
+      fi
+    fi
+    if [ "$rl_int" -ge 80 ]; then
+      parts+=("$(printf '\033[31mrl:%d%%%s\033[0m' "$rl_int" "$rl_suffix")")
+    else
+      parts+=("$(printf '\033[33mrl:%d%%%s\033[0m' "$rl_int" "$rl_suffix")")
+    fi
   fi
-fi
-
-# Session cost — dim below $1, yellow $1-$5, red ≥$5
-if [ -n "$cost" ] && [ "$cost" != "0" ]; then
-  cost_cents=$(echo "$cost" | awk '{printf "%d", $1 * 100}')
-  if   [ "$cost_cents" -ge 500 ]; then ccolor='\033[31m'
-  elif [ "$cost_cents" -ge 100 ]; then ccolor='\033[33m'
-  else                                  ccolor='\033[2m'
-  fi
-  parts+=("$(printf "${ccolor}\$%.2f\033[0m" "$cost")")
 fi
 
 printf '%s' "${parts[0]}"

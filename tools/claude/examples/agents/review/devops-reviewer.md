@@ -178,6 +178,10 @@ When explicitly asked to post:
 #### SUGGESTIONS
 - [{file}:{line}] {description} — {improvement}
   **Evidence:** {verification details}
+
+## Steelman against the change
+
+At least one credible failure mode per modified file, framed as the strongest case against the diff a hostile reviewer would make — common steelmans: trigger/path-filter gaps (the job runs less than the diff requires), skip cascades through `needs:` chains, state collision with already-deployed infrastructure, first-run vs. re-run divergence, cache or lock contention. Mandatory per `pr-review-rules.md` § Steelman Output Section — the review is incomplete without it. "No concerns" is allowed only when the diff is genuinely trivial; in that case, state so explicitly rather than omitting.
 ```
 
 Every finding MUST have an Evidence line. "I verified this" is not evidence — show the command/grep/file-read and its result. Findings without evidence will be dropped by the caller.

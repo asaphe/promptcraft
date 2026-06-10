@@ -45,6 +45,33 @@ Must show a concrete attack vector or reference a specific CVE/OWASP category.
 - Trace the data flow: where does user input enter? Does it reach the dangerous sink unsanitized?
 - For dependency vulnerabilities: verify the version is actually affected (check advisory, not just "old version")
 
+### "IAM policy condition claim" (wildcard semantics, prefix coverage, condition-key behavior)
+
+Disputes about what an IAM condition actually allows or denies — whether `StringLike prefix/*` matches `prefix/` alone, whether a condition key applies to an action, whether a resource ARN scopes a bucket-level action — are settled empirically with the policy simulator, not by reasoning about wildcard semantics.
+
+```bash
+aws iam simulate-principal-policy \
+  --policy-source-arn <role-or-user-arn> \
+  --action-names <action> \
+  --resource-arns <resource-arn> \
+  --context-entries "ContextKeyName=<condition-key>,ContextKeyValues=<value>,ContextKeyType=string"
+# EvalDecision: allowed | implicitDeny | explicitDeny
+```
+
+**Why**: IAM wildcard and condition-key semantics are subtle (`StringLike *` matches zero-or-more characters; `s3:ListBucket` is bucket-level so the resource ARN cannot scope keys — only `s3:prefix` can), and both reviewers and bots routinely assert them wrong in either direction. One simulator call per disputed (action, resource, context) tuple produces a definitive allow/deny against the live policy. Run it for the disputed case AND a control case (a value that must be denied) — an `allowed` on the control means the policy is broader than claimed, not that the finding is wrong.
+
+Scope caveat: the simulator evaluates the **identity-attached policies** of `--policy-source-arn` only. Resource policies (bucket policy), SCPs, and permission boundaries are NOT included unless supplied explicitly (`--resource-policy`, `--permissions-boundary-policy-input-list`). When the dispute involves those layers, supply them — an identity-only `allowed` can be overridden by a resource-layer Deny.
+
+Evidence format:
+
+```text
+Checked: aws iam simulate-principal-policy --policy-source-arn <arn> --action-names s3:ListBucket \
+           --resource-arns arn:aws:s3:::bucket --context-entries "ContextKeyName=s3:prefix,ContextKeyValues=scope/,ContextKeyType=string"
+Disputed case (scope/): allowed
+Control case (other/): implicitDeny
+Conclusion: condition covers the trailing-slash prefix; scoping intact. Finding refuted.
+```
+
 ### "Doesn't match config/spec" (mismatch between code and config)
 
 Read BOTH sides and show the comparison.
@@ -161,6 +188,28 @@ Merge-base: not found
 origin/main: found
 Conclusion: Stale-branch artifact. Merge will preserve it. Drop the finding.
 ```
+
+### "Bot finding on changed code" (stale-against-HEAD false positive)
+
+Before treating a bot review finding as live — or accepting the author's rebuttal of it — verify both against the **PR HEAD**, independently.
+
+**Why**: Bot reviews pin to the commit they ran on (`commit_id` on the review). Pushes after that review can fix the finding, making it stale even though the thread is open; conversely, the author's rebuttal can be false while the finding is *still* fixed at HEAD by a different mechanism than the rebuttal claims. The two failure modes co-occur: rebuttal wrong AND finding stale, for different reasons. Verifying only one side produces a wrong verdict either way.
+
+```bash
+# Which commit was THIS finding raised on? Pin the thread's own comment, not the
+# PR's latest review — with multiple bot runs they routinely differ.
+gh api repos/{owner}/{repo}/pulls/comments/{comment_id} --jq '{commit_id, original_commit_id, path, line}'
+
+# Is the finding still present at PR HEAD? Locate the cited code by CONTENT — the
+# comment's line numbers refer to the bot's commit and shift with later pushes.
+# HEAD == PR HEAD in all reviewer contexts (see the stale-branch entry above for why).
+git show HEAD:<file> | grep -nF '<distinctive snippet the bot quoted>'
+git show HEAD:<file> | sed -n '<matched_line-3>,<matched_line+5>p'   # read around the content match, not the cited range
+```
+
+- Finding present at HEAD → live finding; evaluate the rebuttal against the HEAD code, not the author's narrative.
+- Finding absent at HEAD → stale; resolve the thread citing the fixing commit — even if the author's stated reason for dismissing it was wrong (say so explicitly).
+- This recipe covers line-localizable findings. For cross-file invariants or runtime behavior, reading the cited lines proves nothing — re-verify the actual claim at HEAD (run the command, trace the consumers).
 
 ### "Wildcard removed, explicit list added" (coverage completeness)
 

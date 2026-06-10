@@ -66,6 +66,19 @@ if [ -z "$REMINDER" ] && echo "$CMD" | grep -qE 'curl [^|;&]*-X +(POST|PUT|PATCH
   REMINDER="STATEFUL OP: HTTP mutation to a production API detected. Follow the Stateful Operations Protocol: (1) Query current state via GET first, (2) Capture baseline, (3) Execute, (4) Verify via GET, (5) Check consumer perspective."
 fi
 
+# --- Team heads-up — any detected mutation can disrupt teammates, who need a heads-up + ETA before it lands ---
+if [ -n "$REMINDER" ]; then
+  REMINDER="$REMINDER
+
+TEAM HEADS-UP: This change can disrupt the team. Draft a team-chat message now and present it for the user's approval — never auto-send. The command may already be executing: announce it as in-progress, and get the draft approved before any further mutations in this change window. Template:
+  :warning: *<system> change in progress* — starting ~<HH:MM local>
+  *What:* <one-line description + the action being taken>
+  *Impact:* <who/what is affected; expected degradation or downtime, or 'no expected impact'>
+  *Window / ETA:* <start> → est. <duration>; expect normal by ~<ETA>
+  *Status:* in progress — will update on completion
+After the user approves, offer to post via your team-chat MCP (e.g. Slack); post only on explicit OK. Send a follow-up 'resolved / completed' message once the change is verified."
+fi
+
 if [ -n "$REMINDER" ]; then
   echo "$REMINDER" >&2
 fi

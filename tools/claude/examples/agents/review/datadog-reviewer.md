@@ -106,6 +106,10 @@ Before reviewing, read:
 
 #### SUGGESTIONS
 - [{file}:{line}] {description} — {evidence}
+
+## Steelman against the change
+
+At least one credible failure mode per modified config, framed as the strongest case against the diff a hostile reviewer would make — common steelmans: query that silently returns no data (wrong facet prefix, `.as_count()` on a gauge), perpetual drift from read-only fields left in config, alert that never fires or routes to nobody, custom rotation layer applying 24/7 without restrictions. Mandatory per `pr-review-rules.md` § Steelman Output Section — the review is incomplete without it. "No concerns" is allowed only when the diff is genuinely trivial; in that case, state so explicitly rather than omitting.
 ```
 
 Omit empty severity sections. Every finding must include evidence (what you checked, what you found).

@@ -47,5 +47,23 @@
     "label": "safe command → silent",
     "command": "git status",
     "expected_exit": 0
+  },
+  {
+    "label": "terraform apply → team heads-up appended to reminder",
+    "command": "terraform apply -auto-approve",
+    "expected_exit": 0,
+    "expected_output": "TEAM HEADS-UP"
+  },
+  {
+    "label": "kubectl apply → team heads-up appended to reminder",
+    "command": "kubectl apply -f deployment.yaml",
+    "expected_exit": 0,
+    "expected_output": "TEAM HEADS-UP"
+  },
+  {
+    "label": "helm upgrade → heads-up includes approval-gating instruction",
+    "command": "helm upgrade my-release ./chart",
+    "expected_exit": 0,
+    "expected_output": "approved before any further mutations"
   }
 ]

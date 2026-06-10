@@ -50,6 +50,20 @@ Don't wait for automatic compaction — it's opaque and loses precision.
 
 **Why not `/compact`?** Automatic compaction is lossy — it discards details Claude might need. Explicit clearing with documented state gives you control over what's preserved.
 
+### Session Handoff Discipline
+
+The Document & Clear pattern fails in a specific, recurring way: the *suggestion* to clear arrives first, and the handoff document is promised "next". Anything not written down before the clear is gone — the new session can't recover what only existed in the old one's context.
+
+The fix is an ordering rule: **whoever suggests ending the session must produce the complete handoff prompt in the same response.** A usable handoff is self-contained:
+
+- The task and its acceptance criteria
+- Decisions already made (with the reasoning, not just the outcome)
+- Live-state snapshots (branch, open PR numbers, what's deployed, what's running)
+- Specific next steps and the file paths they touch
+- Zero references to "as discussed" or "see above" — the new session has no above
+
+Two preconditions before any clear: the handoff prompt is already written out, and **no open questions are pending**. Suggesting a clear while a clarification is unanswered strands the decision — the answer's context dies with the cleared session. Resolve the question first, then hand off.
+
 ### Token Budget Awareness
 
 Your total context has a budget. Monitor where tokens go:
@@ -62,6 +76,14 @@ Your total context has a budget. Monitor where tokens go:
 | Conversation history | Clear before saturation | Quality degrades as context fills |
 
 Use `paths:` frontmatter on rules files to conditionally load only what's relevant to the current task. See: [learning-system-guide.md](learning-system-guide.md#rules-organization) for the subdirectory pattern.
+
+### Cache-Read Economics
+
+Token budget explains context *quality*; cache reads explain context *cost*. On cached-prompt pricing, every API call re-reads the entire accumulated context — so spend scales with **context length × call count**, and cache reads end up dominating the bill on long sessions. Three consequences:
+
+- **Marathon sessions are the cost driver.** A session that rolls from task to task carries every prior task's context into every subsequent call. Prefer a fresh session (or `/clear` with a handoff) at task boundaries — it resets the multiplier, not just the clutter.
+- **Subagents inherit the session model unless pinned.** An agent definition without an explicit `model:` runs on whatever the session runs on. Fanning out five subagents while on an expensive tier multiplies cost five ways — verify the tier before fan-out.
+- **Polling past the prompt-cache TTL pays full price.** Prompt caches expire after a few minutes of inactivity. A wakeup or status check that fires after the TTL pays a complete *uncached* re-read of the context. Batch checks and prefer longer intervals over frequent short ones.
 
 ### Instruction Design Principles
 
@@ -333,6 +355,27 @@ These patterns prevent the most common production mistakes:
 - **Enumerate before destroying** — Produce an explicit list of what will be affected; get per-item confirmation
 - **Fix diagnostics immediately** — Every warning is a finding; don't classify them as "minor" to avoid fixing them
 - **Never dismiss unexpected diffs** — An unexpected diff means something WILL change on the next apply
+
+### Event-Driven Waiting Over Polling Loops
+
+A background `while true; do check; sleep 30; done` looks free — it isn't. Each iteration is a fresh API call that re-sends the **entire conversation context**, so a polling loop's cost is context size × iteration count. On a large session, waiting 20 minutes for CI this way can cost more than the work itself.
+
+Prefer, in order:
+
+1. **Event-driven waiting** — monitor/log-tail style tools that block on process output, log lines, or CI event streams and wake only when the condition fires.
+2. **Scheduled wakeups** — a single timed re-entry instead of N checks.
+3. If you must poll, batch the checks and stretch the interval.
+
+One enforcement gotcha: a hook or regex guard that blocks `sleep` in loops misses sleepless `until`/`while` loops — they spin even faster and re-send context just as often. The discipline has to live in the rule ("never poll via background shell loops"), not only in the pattern-matcher.
+
+### Right Container Before Line-Level Polish
+
+When reviewing a change that *adds a rule, agent definition, or config file*, two questions apply — in strict order:
+
+1. **Is this the right artifact type?** Decompose what the addition actually instructs the agent to do differently. If that agent-actionable core is thin, or duplicates rules that are already always-loaded, the verdict is **wrong container** — the content is a doc (on-demand reference), not a rule (always-on instruction).
+2. Only then: **is it well-written?**
+
+The ordering matters because the failure mode is real: a reviewer lists line-level findings ("tighten this title", "drop the date"), the author fixes them, and both now believe the artifact is merge-worthy — when the actual problem was that it should never have been a rule at all. "Fix these issues first" implies polish leads to merge; lead with the container verdict so it can't.
 
 ### List Completeness Audit
 
