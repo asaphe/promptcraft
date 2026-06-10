@@ -35,19 +35,19 @@
     "label": "git push --force origin main → hard block",
     "command": "git push --force origin main",
     "expected_exit": 2,
-    "expected_output": "force"
+    "expected_output": "git push --force to main"
   },
   {
     "label": "git push --force-with-lease origin main → hard block",
     "command": "git push --force-with-lease origin main",
     "expected_exit": 2,
-    "expected_output": "force"
+    "expected_output": "git push --force to main"
   },
   {
     "label": "git push --force origin feature → soft block (force but not main)",
     "command": "git push --force origin feature-branch",
     "expected_exit": 0,
-    "expected_output": "force"
+    "expected_output": "rewrites remote history"
   },
   {
     "label": "cd worktree + push with refspec → allow",
@@ -55,58 +55,58 @@
     "expected_exit": 0
   },
   {
-    "label": "git reset --hard → hard block",
+    "label": "git reset --hard → soft block (recoverable via reflog)",
     "command": "git reset --hard HEAD~1",
-    "expected_exit": 2,
-    "expected_output": "reset --hard"
+    "expected_exit": 0,
+    "expected_output": "recoverable via reflog"
   },
   {
     "label": "aws s3 rm → hard block",
     "command": "aws s3 rm s3://bucket/key",
     "expected_exit": 2,
-    "expected_output": "AWS"
+    "expected_output": "aws s3 rm/rb"
   },
   {
     "label": "aws iam delete-role → hard block",
     "command": "aws iam delete-role --role-name test",
     "expected_exit": 2,
-    "expected_output": "AWS"
+    "expected_output": "aws iam delete"
   },
   {
     "label": "gh pr create → soft block",
     "command": "gh pr create --title test --body test",
     "expected_exit": 0,
-    "expected_output": "pr create"
+    "expected_output": "creating a PR is a visible shared action"
   },
   {
-    "label": "gh pr close → soft block with verification checklist",
+    "label": "gh pr close → hard block with verification checklist",
     "command": "gh pr close 123",
-    "expected_exit": 0,
-    "expected_output": "verify before closing"
+    "expected_exit": 2,
+    "expected_output": "Cannot close PRs without explicit user instruction"
   },
   {
-    "label": "gh pr merge → soft block",
+    "label": "gh pr merge → hard block",
     "command": "gh pr merge 123",
-    "expected_exit": 0,
-    "expected_output": "pr merge"
+    "expected_exit": 2,
+    "expected_output": "Never merge a PR without explicit user instruction"
   },
   {
     "label": "terraform destroy → soft block",
     "command": "terraform destroy -auto-approve",
     "expected_exit": 0,
-    "expected_output": "terraform"
+    "expected_output": "terraform destroy — destroys all resources"
   },
   {
     "label": "kubectl delete → soft block",
     "command": "kubectl delete pod my-pod -n default",
     "expected_exit": 0,
-    "expected_output": "kubectl"
+    "expected_output": "kubectl delete — permanently removes Kubernetes resources"
   },
   {
     "label": "helm uninstall → soft block",
     "command": "helm uninstall my-release",
     "expected_exit": 0,
-    "expected_output": "helm"
+    "expected_output": "helm uninstall — removes a Helm release"
   },
   {
     "label": "safe command → allow silently",
@@ -129,7 +129,7 @@
     "label": "git push --force origin HEAD:refs/heads/main → hard block",
     "command": "git push --force origin HEAD:refs/heads/main",
     "expected_exit": 2,
-    "expected_output": "force"
+    "expected_output": "git push --force to main"
   },
   {
     "label": "git push --set-upstream origin feature-branch → allow",

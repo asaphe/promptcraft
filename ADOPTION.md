@@ -101,7 +101,7 @@ Edit it — every section has `<TODO>` markers and inline comments. Replace comp
 
 ### 2. Extend with hooks
 
-The `tools/claude/examples/hooks/` directory has ~20 production-tested hooks. Each is a standalone directory with a README and shell script.
+The `tools/claude/examples/hooks/` directory has 30 production-tested hooks. Each is a standalone directory with a README and shell script.
 
 ```bash
 # Copy a hook:
@@ -110,7 +110,7 @@ cp -r tools/claude/examples/hooks/destructive-guard ~/.claude/hooks/
 # Register it in ~/.claude/settings.json (see the hook's README for exact JSON).
 ```
 
-Start with `destructive-guard` (blocks `rm -rf`, `git push --force` to main), `stateful-op-reminder` (nudges before AWS/K8s/DB mutations), and `kubectl-context-inject` (auto-injects `--context` on every kubectl command).
+Start with `destructive-guard` (hard-blocks pushes to main — force included — and destructive AWS commands), `stateful-op-reminder` (nudges before AWS/K8s/DB mutations), and `kubectl-context-inject` (auto-injects `--context` on every kubectl command).
 
 ### 3. Project-level `.claude/`
 

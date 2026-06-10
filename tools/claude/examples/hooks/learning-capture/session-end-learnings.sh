@@ -6,20 +6,21 @@ set -euo pipefail
 #
 # Runs async — does not block session termination.
 # Input: JSON on stdin with transcript_path, session_id, cwd, reason.
+# Stdin is small hook metadata JSON (not the full transcript) — safe to buffer.
+
+command -v jq &>/dev/null || exit 0
 
 INPUT=$(cat)
-TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
-SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
-CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+TRANSCRIPT_PATH=$(printf '%s\n' "$INPUT" | jq -r '.transcript_path // empty')
+SESSION_ID=$(printf '%s\n' "$INPUT" | jq -r '.session_id // empty')
+CWD=$(printf '%s\n' "$INPUT" | jq -r '.cwd // empty')
 
 if [[ -z "$TRANSCRIPT_PATH" || ! -f "$TRANSCRIPT_PATH" ]]; then
   exit 0
 fi
 
 PROJECT_DIR=$(dirname "$TRANSCRIPT_PATH")
-if [[ "$PROJECT_DIR" != *".claude/projects"* ]]; then
-  exit 0
-fi
+# Handle nested subagent transcripts — walk up to find memory/
 while [[ ! -d "$PROJECT_DIR/memory" && "$PROJECT_DIR" == *".claude/projects"* ]]; do
   PROJECT_DIR=$(dirname "$PROJECT_DIR")
 done
@@ -30,8 +31,9 @@ PENDING_FILE="$MEMORY_DIR/pending-learnings.md"
 
 # --- Signal detection ---
 
-# 1. User corrections: "no", "wrong", "not that", "I said", "actually,"
-# Minimum 30 chars to avoid false positives from short denials.
+# 1. User corrections: "no", "wrong", "not that", "that's not right", "I said", "actually,"
+# Minimum 30 chars required to avoid false positives from short denials or
+# rule text pasted in user messages that happens to match keywords.
 CORRECTIONS=$(jq -r '
   select(.type == "user") |
   .message.content // [] |
@@ -42,7 +44,7 @@ CORRECTIONS=$(jq -r '
   grep -vE '^.{0,29}$' | \
   head -10 || true)
 
-# 2. Retry patterns: same tool name appearing consecutively
+# 2. Error-retry patterns: same tool name appearing consecutively (heuristic for retries)
 RETRIES=$(jq -r '
   select(.type == "assistant") |
   .message.content // [] | .[] |
@@ -66,7 +68,7 @@ CORRECTION_COUNT=$(echo "$CORRECTIONS" | grep -c '.' 2>/dev/null || true)
 RETRY_COUNT=$(echo "$RETRIES" | grep -c '.' 2>/dev/null || true)
 TOTAL_SIGNALS=$((CORRECTION_COUNT + RETRY_COUNT))
 
-# Only write if meaningful signals found
+# Only write if meaningful signals found (corrections, retries, or very long session)
 if [[ "$TOTAL_SIGNALS" -lt 2 && "$TOOL_COUNT" -lt 50 ]]; then
   exit 0
 fi

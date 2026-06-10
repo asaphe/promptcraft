@@ -13,6 +13,7 @@ Two scripts that keep `.claude/` config healthy across that multi-`.claude/` lay
 
 ```bash
 .claude/scripts/generate-inventory.sh                 # write outputs
+# install both scripts side-by-side under .claude/scripts/ — REPO_ROOT resolves two levels up from the script
 .claude/scripts/generate-inventory.sh --dry-run       # print to stdout instead of writing
 ROSTER_OUT=/tmp/r INVENTORY_OUT=/tmp/i \
   .claude/scripts/generate-inventory.sh               # override output paths

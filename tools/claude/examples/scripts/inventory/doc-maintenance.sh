@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# doc-maintenance.sh — Validate .claude/ doc health across the services repo.
+# doc-maintenance.sh — Validate .claude/ doc health across the repo.
 #
 # Phase 1: three checks:
 #   1. Path validation    — backtick-quoted .claude/ paths in docs resolve to real files
@@ -175,7 +175,7 @@ fi
 
 # 2b. Content equality — regenerate to temp files and diff against committed.
 _section "2b. Inventory content equality"
-GEN_SCRIPT="$CLAUDE_DIR/scripts/generate-inventory.sh"
+GEN_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/generate-inventory.sh"
 if [[ -x "$GEN_SCRIPT" || -f "$GEN_SCRIPT" ]]; then
   GEN_TMPDIR=$(mktemp -d)
   trap 'rm -rf "$GEN_TMPDIR"' EXIT

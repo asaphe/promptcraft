@@ -133,7 +133,7 @@ op item create \
   --url="https://github.com/settings/tokens" \
   --tags="mcp,github,development" \
   username="your-github-username" \
-  password="ghp_your_token_here" \
+  password="<your-github-token>" \
   --notes="Personal access token for GitHub MCP server - expires 2024-12-31"
 
 # Add custom fields

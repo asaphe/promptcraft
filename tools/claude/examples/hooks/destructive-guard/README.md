@@ -6,12 +6,12 @@ PreToolUse hook with two-tier blocking for destructive operations.
 
 | Tier | Mechanism | Override by `Bash(*)`? | Use for |
 |------|-----------|------------------------|---------|
-| **Hard block** | `exit 2` + stderr | No — always blocks | Irreversible data loss (AWS deletions, push to main) |
-| **Soft block** | JSON `permissionDecision` + `exit 0` | Yes — user can approve | Risky but approvable (PR ops, force-push, terraform destroy) |
+| **Hard block** | `exit 2` + stderr | No — always blocks | Irreversible data loss and forbidden PR ops (AWS deletions, push/force-push to main, PR close/merge) |
+| **Soft block** | JSON `permissionDecision: ask` + `exit 0` | Yes — user can approve | Risky but approvable (PR create, force-push to a branch, terraform destroy) |
 
 Hard blocks stop the tool call unconditionally — no override is possible. The user must run the command themselves in their terminal.
 
-Soft blocks surface a warning. With `Bash(*)` in the allow list, the user sees the warning and can approve in the permission prompt.
+Soft blocks emit `permissionDecision: ask` JSON on stdout and exit 0. Claude Code shows the reason in a permission prompt where the user can approve or deny — even when `Bash(*)` is in the allow list.
 
 ## What It Blocks
 
@@ -21,7 +21,8 @@ Soft blocks surface a warning. With `Bash(*)` in the allow list, the user sees t
 |---------|-----|
 | `git push` to main/master | Must go through PRs |
 | `git push --force` to main/master | Rewrites shared history on default branch |
-| `git reset --hard` | Permanent loss of uncommitted work |
+| `gh pr close` | Loses PR context — never without explicit user instruction |
+| `gh pr merge` | The user merges PRs themselves |
 | `git clean -f` | Permanently deletes untracked files |
 | `git stash drop/clear` | Permanently discards stashed changes |
 | `aws * delete-*`, `aws s3 rm`, `aws ec2 terminate-*` | Cloud resource destruction |
@@ -30,10 +31,10 @@ Soft blocks surface a warning. With `Bash(*)` in the allow list, the user sees t
 
 | Pattern | Why |
 |---------|-----|
-| `gh pr create/merge` | Visible shared actions |
-| `gh pr close` | Loses PR context — verify reason and check for unmerged work |
+| `gh pr create` | Visible shared action |
 | `gh run delete` | Permanently removes CI run history |
-| `git push --force` | History rewriting (reversible via reflog) |
+| `git push --force` to a non-default branch | History rewriting (reversible via reflog) |
+| `git reset --hard` | Discards uncommitted changes (recoverable via reflog) |
 | `git branch -D`, `git checkout --`, `git restore` | Discards local changes |
 | `terraform destroy/state rm/force-unlock/workspace delete` | Infrastructure changes |
 | `kubectl delete/drain/cordon/scale/rollout undo/patch` | Live cluster mutations |
@@ -80,8 +81,8 @@ Move patterns between tiers based on your risk tolerance:
 # Move terraform destroy to hard block (no approval possible)
 HARD_REASON="terraform destroy — blocked unconditionally."
 
-# Move git reset --hard to soft block (user can approve)
-SOFT_REASON="git reset --hard — discards uncommitted changes (recoverable via reflog)."
+# Move git stash drop to soft block (user can approve)
+SOFT_REASON="git stash drop — permanently discards stashed changes."
 ```
 
 Add patterns for your stack:
@@ -100,7 +101,7 @@ fi
 
 ## Why Two Tiers?
 
-A single `exit 2` for everything is too strict — it blocks operations the user explicitly asked for (like creating a PR) with no way to approve. A single JSON block is too weak — `Bash(*)` wildcards silently override it for operations that should never be auto-approved (like deleting an RDS instance).
+A single `exit 2` for everything is too strict — it blocks operations the user explicitly asked for (like creating a PR) with no way to approve. A single `ask` prompt for everything is too weak — one keystroke in the permission prompt approves an operation that should never be approvable mid-session (like deleting an RDS instance).
 
 The two-tier approach gives you both: unconditional safety for irreversible operations, and a confirmation prompt for everything else.
 

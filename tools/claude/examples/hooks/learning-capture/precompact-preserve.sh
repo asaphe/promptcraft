@@ -3,26 +3,26 @@ set -euo pipefail
 
 # PreCompact hook: preserve correction context before compaction loses it.
 #
-# Runs before context compaction. Scans recent transcript for corrections
-# that haven't been captured as rules yet, and appends to pending-learnings.md.
+# Runs before context compaction. Scans the current transcript for corrections
+# that haven't been captured as rules yet, and appends them to pending-learnings.md.
 # Cannot block compaction — used for side effects only.
 #
-# Input: JSON on stdin with transcript_path, session_id, cwd, trigger.
+# Input: JSON on stdin with transcript_path, session_id, cwd, trigger, custom_instructions.
+# Stdin is small hook metadata JSON (not the full transcript) — safe to buffer.
+
+command -v jq &>/dev/null || exit 0
 
 INPUT=$(cat)
-TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
-SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
-CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
-TRIGGER=$(echo "$INPUT" | jq -r '.trigger // "unknown"')
+TRANSCRIPT_PATH=$(printf '%s\n' "$INPUT" | jq -r '.transcript_path // empty')
+SESSION_ID=$(printf '%s\n' "$INPUT" | jq -r '.session_id // empty')
+CWD=$(printf '%s\n' "$INPUT" | jq -r '.cwd // empty')
+TRIGGER=$(printf '%s\n' "$INPUT" | jq -r '.trigger // "unknown"')
 
 if [[ -z "$TRANSCRIPT_PATH" || ! -f "$TRANSCRIPT_PATH" ]]; then
   exit 0
 fi
 
 PROJECT_DIR=$(dirname "$TRANSCRIPT_PATH")
-if [[ "$PROJECT_DIR" != *".claude/projects"* ]]; then
-  exit 0
-fi
 while [[ ! -d "$PROJECT_DIR/memory" && "$PROJECT_DIR" == *".claude/projects"* ]]; do
   PROJECT_DIR=$(dirname "$PROJECT_DIR")
 done
@@ -31,7 +31,7 @@ MEMORY_DIR="$PROJECT_DIR/memory"
 mkdir -p "$MEMORY_DIR"
 PENDING_FILE="$MEMORY_DIR/pending-learnings.md"
 
-# Extract recent corrections (last 200 lines to avoid scanning huge files)
+# Extract recent corrections (last 200 lines of transcript to avoid scanning huge files)
 CORRECTIONS=$(tail -200 "$TRANSCRIPT_PATH" | jq -r '
   select(.type == "user") |
   .message.content // [] |

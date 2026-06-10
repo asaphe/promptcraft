@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # Destructive operation guard — two-tier blocking system.
 #
-# HARD BLOCK (exit 2): Irreversible data loss. Cannot be overridden by
-#   Bash(*) permissions. User must run the command themselves.
-#   Examples: AWS resource deletion, git reset --hard, push to main.
+# HARD BLOCK (stderr + exit 2): Irreversible data loss or forbidden shared-state
+#   actions. Cannot be overridden by Bash(*) permissions. User must run the
+#   command themselves.
+#   Examples: AWS resource deletion, push/force-push to main, gh pr close/merge.
 #
-# SOFT BLOCK (JSON + exit 0): Visible/risky actions that need confirmation.
-#   Bash(*) permissions can override, allowing user to approve in the prompt.
-#   Examples: PR create/close/merge, force-push, terraform destroy, kubectl delete.
+# SOFT BLOCK (JSON permissionDecision "ask" + exit 0): Visible/risky actions
+#   that need confirmation. Emits hookSpecificOutput JSON on stdout so Claude
+#   Code prompts the user, who can approve in the permission prompt.
+#   Examples: PR create, force-push to a feature branch, terraform destroy,
+#   kubectl delete, git reset --hard.
 #
 # Install: add to settings.json under hooks.PreToolUse[].hooks[]
 #   { "type": "command", "command": "/path/to/destructive-guard.sh" }
@@ -31,12 +34,14 @@ HARD_REASON=""
 SOFT_REASON=""
 
 # =====================================================================
-# HARD BLOCKS — irreversible data loss, exit 2
+# HARD BLOCKS — irreversible data loss or forbidden shared-state ops, exit 2
 # =====================================================================
 
-# git push to main/master (bypass PR process). Pattern allows flags between
-# `git` and `push` (e.g., `git -C dir push`, `git --git-dir=foo push`).
-if echo "$CMD_STRIPPED" | grep -qE 'git[[:space:]]([^|;&]* )?push([[:space:]]|$)' && ! echo "$CMD_STRIPPED" | grep -qE 'git[[:space:]]([^|;&]* )?push.*--(force|force-with-lease)'; then
+# git push targeting main/master (bypass PR process). Plain pushes and force
+# pushes are both checked: force-push to main/master hard-blocks with its own
+# message; force-push to other refs falls through to the soft tier below.
+# Pattern allows flags between `git` and `push` (e.g., `git -C dir push`).
+if echo "$CMD_STRIPPED" | grep -qE 'git[[:space:]]([^|;&]* )?push([[:space:]]|$)'; then
   # Determine the effective git directory — if the command does
   # "cd /tmp/worktree && ... && git push", check the branch there,
   # not in the hook's CWD (which stays on main per worktree rules).
@@ -73,7 +78,12 @@ if echo "$CMD_STRIPPED" | grep -qE 'git[[:space:]]([^|;&]* )?push([[:space:]]|$)
   fi
 
   if [ -n "$WILL_PUSH_MAIN" ]; then
-    HARD_REASON="git push on main — changes must go through a PR. Create a branch first."
+    # Force flags: --force, --force-with-lease(=ref), or short -f (possibly bundled, e.g. -uf).
+    if echo "$PUSH_PORTION" | grep -qE '(^|[[:space:]])(--force(-with-lease)?(=[^[:space:]]*)?|-[a-zA-Z]*f[a-zA-Z]*)([[:space:]]|$)'; then
+      HARD_REASON="git push --force to main — rewrites shared history on the default branch."
+    else
+      HARD_REASON="git push on main — changes must go through a PR. Create a branch first."
+    fi
   fi
 fi
 
@@ -129,6 +139,16 @@ if echo "$CMD_STRIPPED" | grep -qE 'aws[[:space:]]([^|;&]* )?iam +delete-(role|p
   HARD_REASON="aws iam delete — permanently removes IAM resources."
 fi
 
+# GitHub PR close/merge — shared PR state; deliberately hard so an allow-list
+# cannot auto-approve them. Pattern allows flags between `gh` and the subcommand.
+if echo "$CMD_STRIPPED" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +close([[:space:]]|$)'; then
+  HARD_REASON="gh pr close — STOP. Cannot close PRs without explicit user instruction. Verify: (1) Read the PR fully, (2) Check for open review threads, (3) Confirm reason with user, (4) Verify no unmerged work will be lost."
+fi
+
+if echo "$CMD_STRIPPED" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +merge([[:space:]]|$)'; then
+  HARD_REASON="gh pr merge — STOP. Never merge a PR without explicit user instruction. The user merges PRs themselves."
+fi
+
 # Branch switching outside session directory — disrupts other sessions.
 # Any git checkout/switch that changes branches in a repo other than the
 # session's working directory must use worktrees instead.
@@ -158,21 +178,13 @@ if echo "$CMD_STRIPPED" | grep -qE 'git[[:space:]]([^|;&]* )?(checkout|switch)([
 fi
 
 # =====================================================================
-# SOFT BLOCKS — risky but approvable, JSON + exit 0
+# SOFT BLOCKS — risky but approvable, JSON permissionDecision ask + exit 0
 # =====================================================================
 
 # GitHub CLI — visible shared actions. Pattern allows flags between `gh` and
 # the subcommand (e.g., `gh --repo X pr create`).
 if echo "$CMD_STRIPPED" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +create([[:space:]]|$)'; then
   SOFT_REASON="gh pr create — creating a PR is a visible shared action. Confirm with the user first."
-fi
-
-if echo "$CMD_STRIPPED" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +close([[:space:]]|$)'; then
-  HARD_REASON="gh pr close — STOP. Cannot close PRs without explicit user instruction. Verify: (1) Read the PR fully, (2) Check for open review threads, (3) Confirm reason with user, (4) Verify no unmerged work will be lost."
-fi
-
-if echo "$CMD_STRIPPED" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +merge([[:space:]]|$)'; then
-  HARD_REASON="gh pr merge — STOP. Never merge a PR without explicit user instruction. The user merges PRs themselves."
 fi
 
 if echo "$CMD_STRIPPED" | grep -qE 'gh[[:space:]]([^|;&]* )?run +delete([[:space:]]|$)'; then
@@ -267,8 +279,16 @@ if [ -n "$HARD_REASON" ]; then
 fi
 
 if [ -n "$SOFT_REASON" ]; then
-  echo "$SOFT_REASON" >&2
-  exit 1
+  jq -n \
+    --arg reason "$SOFT_REASON" \
+    '{
+      "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "ask",
+        "permissionDecisionReason": $reason
+      }
+    }'
+  exit 0
 fi
 
 exit 0

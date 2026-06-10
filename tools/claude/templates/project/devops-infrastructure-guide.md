@@ -713,8 +713,3 @@ aws secretsmanager get-secret-value --secret-id prod/database/credentials
 - [AWS Well-Architected Framework](https://aws.amazon.com/architecture/well-architected/)
 - [Kubernetes Best Practices](https://kubernetes.io/docs/concepts/configuration/overview/)
 - [Helm Documentation](https://helm.sh/docs/)
-
----
-
-**Model**: Claude Sonnet 4.5
-**Confidence**: High - Based on existing infrastructure patterns and project-specific configurations
