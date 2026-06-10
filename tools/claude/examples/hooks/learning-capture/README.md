@@ -38,6 +38,10 @@ Writes candidates to `pending-learnings.md` with session metadata.
 
 Runs before context compaction. Scans recent transcript for corrections that haven't been captured yet. Prevents correction context from being lost during compaction.
 
+### `learn-detect.lib.sh` (library, sourced — not a hook)
+
+Shared detection logic: correction/codify regexes, transcript jq helpers, and `learn_evaluate` threshold gating. Thresholds are env-tunable (`LEARN_CORRECTION_MIN`, `LEARN_TOOL_FAIL_MIN`, `LEARN_TOOL_FAIL_RATE`). See the Automated Candidate Detection section of `../../../guides/learning-system-guide.md`.
+
 ## Signal detection
 
 The hooks look for these patterns in user messages:

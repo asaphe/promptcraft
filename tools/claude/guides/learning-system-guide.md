@@ -47,7 +47,7 @@ Three hooks capture learning signals without manual intervention:
 - `SessionEnd` is the right time to scan — the session is over, async execution has zero UX impact.
 - `SessionStart` is the right time to surface — the agent has full context to evaluate candidates.
 - `PreCompact` catches corrections in long sessions that might compact before ending.
-- `Stop` (fires every turn) was considered and rejected — a prompt-type Stop hook adds latency to every interaction. A command-type Stop hook is fast but fires too frequently for transcript scanning.
+- `Stop` (fires every turn) was considered and rejected — a prompt-type Stop hook adds latency to every interaction. A command-type Stop hook is fast but fires too frequently for transcript scanning. A shared detection library changes this calculus — see [Automated Candidate Detection](#automated-candidate-detection).
 
 ### Layer 2: Staging File
 
@@ -249,6 +249,54 @@ a classification system that routes learnings to the right location, and a manua
 | User preference for this project only | Personal project | `CLAUDE.local.md` or auto memory |
 | Temporary or experimental insight | Memory only | `~/.claude/projects/<project>/memory/` |
 ```
+
+## Automated Candidate Detection
+
+The hooks above scan one session at a time with inline detection logic. The next refinement extracts detection into a shared library so the same signals can be evaluated per-session (hook) and in batch (history miner) — see [`learn-detect.lib.sh`](../examples/hooks/learning-capture/learn-detect.lib.sh) in the learning-capture example.
+
+### What It Catches
+
+Two signal classes, evaluated against the transcript JSONL:
+
+| Signal | Mechanism | Trigger |
+| ------ | --------- | ------- |
+| **Correction patterns** | Regex over user-typed text: pushback phrasing ("stop doing", "not that", "I said", "why did you", "you assumed") | 2+ matches per session |
+| **Explicit codify requests** | Regex over user-typed text: "remember this", "codify this", "new rule", "keep happening", "every session" | 1 match — the user asked |
+| **Tool failure rate** | Count `tool_result` blocks with `is_error: true` vs total | Both thresholds: 6+ failures AND ≥25% failure rate |
+
+Two details make the regexes reliable:
+
+- **Scan only human-typed text.** User-role messages in the transcript mix text blocks with tool results. The extraction filter keeps `type == "text"` blocks only — otherwise correction phrases inside tool output (error messages, file contents, quoted logs) produce false positives.
+- **Split correction phrasing from codify phrasing.** They warrant different thresholds: pushback needs repetition to be signal (a single "no, not that" is routine), while "codify this" is signal on the first occurrence.
+
+The tool-failure signal exists because corrections only catch what the user noticed and verbalized. A session where a third of tool calls failed is friction worth examining even if the user silently absorbed every failure.
+
+### Thresholds
+
+All tunables are environment overrides with defaults in the library:
+
+| Variable | Default | Meaning |
+| -------- | ------- | ------- |
+| `LEARN_CORRECTION_MIN` | 2 | Correction-pattern matches needed to flag a session |
+| `LEARN_TOOL_FAIL_MIN` | 6 | Absolute floor of failed tool calls |
+| `LEARN_TOOL_FAIL_RATE` | 25 | Minimum failure percentage |
+
+The failure gate is deliberately dual: the absolute floor filters short sessions (2 failures out of 5 calls is normal exploration, not a pattern), while the rate filters long sessions (8 failures out of 300 calls is statistically unremarkable). Both must pass.
+
+### Per-Session vs Batch
+
+The library is sourced by two consumers:
+
+- **Per-session hook** (`Stop` or `SessionEnd`) — evaluates the session that just ended, writes flagged candidates to a pending file (one JSON object per candidate: quoted correction, session id, timestamp; tool-failure entries add counts and sample error text), and prints a one-line nudge to run the review skill next session. With the detection logic reduced to a few `jq` passes and `grep` calls, even a command-type `Stop` hook is cheap enough to run every turn-end.
+- **Batch scanner** — walks every project's transcripts from the last N days (`find ~/.claude/projects -name '*.jsonl' -mtime -N`), applies identical thresholds, and writes one consolidated candidate file.
+
+Batch scanning is not redundant with the hook — it covers what per-session detection structurally cannot:
+
+1. **Sessions that never fired the hook.** Crashed sessions, killed terminals, and sessions on machines where the hook wasn't registered produce no per-session signal. The transcripts still exist; batch mining recovers them.
+2. **Cross-session recurrence.** One flagged session is weak evidence; the same correction surfacing across several sessions and projects in a week is a strong rule candidate. Only a consolidated cross-project view exposes that recurrence.
+3. **Retroactive tuning.** Tightening a regex or lowering a threshold in the per-session hook only affects future sessions. The batch scanner re-applies the current detection logic to existing history immediately.
+
+Because both consumers source the same library, the detection logic can't drift between them — a regex improvement applies to the next session's hook and the next batch run alike. This is the same single-source-of-truth reasoning behind symlinking plugin scripts (Key Principle 8).
 
 ## Rule Retirement
 

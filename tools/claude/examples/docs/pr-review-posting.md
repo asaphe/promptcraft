@@ -135,7 +135,42 @@ ENDOFPAYLOAD
 | `comments` | Yes* | Array of inline comments on specific files/lines (*omit only if zero findings map to diff lines) |
 | `comments[].path` | Yes | File path relative to repo root — must appear in `gh pr diff --name-only` |
 | `comments[].line` | Yes | Line number in the **right side** of the diff (new file). Must exist in a diff hunk. |
-| `comments[].body` | Yes | Finding text in markdown — prefix with severity (`**BLOCKING:**`, `**ISSUE:**`, `**SUGGESTION:**`) |
+| `comments[].body` | Yes | Finding text in markdown — prefix with severity (`**BLOCKING:**`, `**ISSUE:**`, `**SUGGESTION:**`), or the structured `[SEV][rule:<id>]` prefix below |
+
+### Rule ID Tagging (recommended when automated post-processing exists)
+
+When a CI post-gate (dedup, aggregation, severity routing) processes review comments, start every inline comment body with a structured prefix on the first line:
+
+```text
+[SEV][rule:<kebab-case-id>] <one-line headline of the finding>
+
+<rest of the body — rationale, evidence, suggested fix>
+```
+
+- `SEV` is one of `BLOCKING`, `ISSUE`, `SUGGESTION` — the existing severity contract.
+- `<kebab-case-id>` is a short identifier for the *class* of finding, in kebab-case (`[a-z0-9-]+`). Free-text — pick what reads naturally. Use the same id when the same class fires on multiple files in one review.
+- Headline on the same line as the prefix; full rationale on subsequent lines.
+
+A post-gate script can key on the `rule_id` to (a) collapse same-rule findings that fire repeatedly into one inline comment plus an aggregated PR-body comment, and (b) compute per-class metrics across PRs. Comments without the prefix pass through unchanged but lose dedup benefits.
+
+**Seed vocabulary** (use these where they fit; add new kebab-case ids freely when the class doesn't already have one):
+
+| Rule ID | Use for |
+| ------- | ------- |
+| `unpinned-action` | GitHub Action `uses:` on floating tag (`@v4`, `@main`) instead of commit SHA |
+| `iam-wildcard` | IAM policy with `*:*` Action/Resource or otherwise overscoped principal |
+| `hardcoded-secret` | Secret material or credential committed inline |
+| `missing-permissions` | Workflow / IAM role missing a permission required by its steps |
+| `obvious-comment` | Inline comment that restates what the code does (per `pr-review-rules.md`) |
+| `dead-code` | Unused import, unreachable branch, unreferenced variable, orphaned file |
+| `untyped-any` | Python `Any` / TS `any` / Java `Object` / Go `interface{}` without justification |
+| `missing-tenant-scope` | Multi-tenant query/mutation without explicit tenant validation |
+| `secret-naming-drift` | Secret path that doesn't follow the project's naming convention |
+| `coverage-gap` | A reviewer-domain checklist item that's surfaced but not codified anywhere |
+| `injection-risk` | User input flowing into shell / SQL / template without sanitization |
+| `unsafe-default` | New config defaulting to insecure value (open ingress, public bucket, weak crypto) |
+
+When a finding doesn't match the seed list, invent a kebab-case id that names the *class* (not the instance) — e.g. `stale-helm-image-tag`, `floating-base-image`, `unguarded-env-var`. Promote an id to the seed table when it recurs across multiple PRs.
 
 ### Event Selection
 

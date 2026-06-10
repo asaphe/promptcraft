@@ -141,7 +141,7 @@ op item create \
   --vault="Private" \
   --url="https://github.com" \
   username="your-github-username" \
-  password="ghp_your_token_here"
+  password="<your-github-token>"
 
 # Test access
 op item get "GitHub MCP Token" --fields password
@@ -151,7 +151,7 @@ op item get "GitHub MCP Token" --fields password
 
 ```bash
 # Add to your shell profile (~/.zshrc, ~/.bashrc)
-export GITHUB_MCP_TOKEN="ghp_your_token_here"
+export GITHUB_MCP_TOKEN="<your-github-token>"
 
 # Update MCP configuration
 {

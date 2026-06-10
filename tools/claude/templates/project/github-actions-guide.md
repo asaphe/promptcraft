@@ -391,9 +391,4 @@ jobs:
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 - [Act - Local Testing](https://github.com/nektos/act)
 - [Actionlint - Workflow Linter](https://github.com/rhysd/actionlint)
-- [Our Workflow Examples](.github/workflows/)
-
----
-
-**Model**: Claude Sonnet 4.5
-**Confidence**: High - Based on existing CLAUDE.md specification and project-specific patterns
+- Your repo's own workflows: `.github/workflows/`

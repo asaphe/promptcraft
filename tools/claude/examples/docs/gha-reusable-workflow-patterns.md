@@ -59,6 +59,28 @@ deploy_rds:
   if: needs.resolve_scope.outputs.deploy_rds == 'true'
 ```
 
+## Skip-Cascade Gates for Conditional Jobs
+
+**Universal-for-GHA.** Any conditional job (like the scope-gated jobs above, or a "create resource only if absent" job) poisons its entire downstream `needs:` chain: GitHub's implicit `success()` gate evaluates the **transitive** ancestry, so one skipped ancestor auto-skips every descendant — even those whose direct dependencies succeeded.
+
+```yaml
+# ecr_create is skipped on the common repo-already-exists path
+build:
+  needs: [ecr_check, ecr_create]
+  if: ${{ !cancelled() && needs.ecr_check.result == 'success' && (needs.ecr_create.result == 'success' || needs.ecr_create.result == 'skipped') }}
+
+# push_manifest only directly needs build — but the skipped ecr_create
+# propagates through build's ancestry and auto-skips this job too
+push_manifest:
+  needs: build
+  if: ${{ !cancelled() && needs.build.result == 'success' }}
+```
+
+- `!cancelled()` is the status-check function that stops GitHub from auto-skipping the job past a skipped ancestor; `always()` is deliberately not used — it would also run the job on cancellation.
+- The explicit `needs.<dep>.result == 'success'` clauses keep the job gated on real success, replacing the implicit gate the override disabled.
+- **Every future job added downstream of the conditional job must carry the same override** — otherwise it silently never runs. This is lintable: a CI script can fail the build when a job relying on the implicit `success()` gate has a conditionally-skippable ancestor, with an inline marker comment to declare intentional cascade-skips.
+- Related verification gotcha: branch protection counts a `skipped` required check as passing — a merge-green workflow does not prove the gated jobs executed. Enumerate job conclusions via `gh api .../actions/runs/{id}/jobs` before trusting green.
+
 ## Multi-Tenant Tenant Matrix
 
 MT workflows dynamically build JSON matrices at runtime:

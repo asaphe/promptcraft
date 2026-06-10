@@ -132,6 +132,10 @@ When explicitly asked to post:
 #### SUGGESTIONS
 - [{file}:{line}] {description} — {hardening recommendation}
   **Evidence:** {verification details}
+
+## Steelman against the change
+
+At least one credible failure mode per modified contract surface — never roll up multiple surfaces (separate IAM statements, separate OIDC trusts, separate RBAC bindings, separate auth boundaries) into one Steelman line. Framed as the strongest case against the diff a hostile reviewer would make. Mandatory per `pr-review-rules.md` § Steelman Output Section — placed immediately after per-file findings; the review is incomplete without it. "No concerns" is allowed only when the diff is genuinely trivial; in that case, state so explicitly rather than omitting.
 ```
 
 Every finding MUST have an Evidence line. For security findings: trace the data flow from input to sink, show the missing guard, or reference a specific CVE/advisory. Findings without evidence will be dropped by the caller.

@@ -166,6 +166,10 @@ When explicitly asked to post:
 #### SUGGESTIONS
 - [{file}:{line}] {description} — {improvement}
   **Evidence:** {verification details}
+
+## Steelman against the change
+
+At least one credible failure mode per modified agent/skill/rule, framed as the strongest case against the diff a hostile reviewer would make — common steelmans: mandate-without-wiring (rule references a tool/file that doesn't exist), self-inconsistency (new rule violated by an example in the same file), scope drift (specialist-list parity gap across cross-references). Mandatory per `pr-review-rules.md` § Steelman Output Section — the review is incomplete without it. "No concerns" is allowed only when the diff is genuinely trivial; in that case, state so explicitly rather than omitting.
 ```
 
 Every finding MUST have an Evidence line. "I verified this" is not evidence — show the command/grep/file-read and its result. Findings without evidence will be dropped by the caller.

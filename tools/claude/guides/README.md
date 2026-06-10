@@ -15,6 +15,7 @@ Design guides and reference docs for Claude Code.
 | `mcp-management-guide.md` | MCP server lifecycle — add, remove, team connectors, pitfalls. |
 | `portability-guide.md` | Dotfiles, symlinks, backups, Desktop vs Code config. |
 | `learning-system-guide.md` | Learning from corrections — capturing patterns into rules. |
+| `multi-repo-kernel-sync.md` | Distributing shared rule kernels across repos via CI fan-out and local overlays. |
 | `session-analytics-guide.md` | Analyzing `~/.claude/projects/*.jsonl` for token waste. |
 | `pr-review-protocol.md` | Structured PR review routing and posting via `gh api`. |
 | `github-actions-integration.md` | Using Claude Code in GitHub Actions workflows. |

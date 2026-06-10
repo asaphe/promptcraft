@@ -264,6 +264,10 @@ When explicitly asked to post:
 #### SUGGESTIONS
 
 - [{file}:{line}] {description} — {improvement}
+
+## Steelman against the change
+
+At least one credible failure mode per modified table/query/migration, framed as the strongest case against the diff a hostile reviewer would make — common steelmans: ORDER BY that degrades at production cardinality, dedup correctness depending on merge timing (ReplacingMergeTree without FINAL where it matters), migration unsafe against live inserts, partition design that explodes part counts. Mandatory per `pr-review-rules.md` § Steelman Output Section — the review is incomplete without it. "No concerns" is allowed only when the diff is genuinely trivial; in that case, state so explicitly rather than omitting.
 ```
 
 If no findings exist for a severity level, omit that section.

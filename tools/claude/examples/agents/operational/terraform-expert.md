@@ -136,13 +136,13 @@ Provider lock must include all platforms:
 terraform providers lock -platform=darwin_amd64 -platform=darwin_arm64 -platform=linux_amd64 -platform=linux_arm64
 ```
 
-## External Modules (tf-modules repo)
+## External Modules (shared modules repo)
 
-Reusable modules come from `git::ssh://git@github.com/<org>/tf-modules.git`. Access requires the TF_MODULES_DEPLOY_KEY.
+Reusable modules come from `git::ssh://git@github.com/<org>/<modules-repo>.git`. Access requires the repo's deploy key.
 
-- **Check if the module source is tf-modules** — Look for `source = "git::ssh://...tf-modules.git//modules/{name}?ref={tag}"` in `main.tf`. If it is, the fix may need to go there, not in this repo.
-- **Pin to specific tags** — Module refs use `?ref=v1.2.3`. Never use `?ref=main`. When updating a module version, check the tf-modules changelog/tags first.
-- **Local clone for investigation** — If the user has a local clone of tf-modules, read module source from there. If not available, use `gh api` or read from `.terraform/modules/`.
+- **Check if the module source is the shared modules repo** — Look for `source = "git::ssh://...<modules-repo>.git//modules/{name}?ref={tag}"` in `main.tf`. If it is, the fix may need to go there, not in this repo.
+- **Pin to specific tags** — Module refs use `?ref=v1.2.3`. Never use `?ref=main`. When updating a module version, check the modules repo changelog/tags first.
+- **Local clone for investigation** — If the user has a local clone of the modules repo, read module source from there. If not available, use `gh api` or read from `.terraform/modules/`.
 - **Common shared modules** — IAM roles, S3 buckets, Helm values generators, secret stores, database instances, and node pool configs.
 
 ## Failure Triage Table

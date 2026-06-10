@@ -124,6 +124,10 @@ When explicitly asked to post:
 #### SUGGESTIONS
 - [{file}:{line}] {description} — {improvement}
   **Evidence:** {verification details}
+
+## Steelman against the change
+
+At least one credible failure mode per modified script, framed as the strongest case against the diff a hostile reviewer would make — common steelmans: word-splitting on space-containing inputs, behavior divergence between macOS (bash 3.2 / BSD tools) and Linux (bash 5.x / GNU tools), early exit under `set -e` skipping cleanup or error reporting, unquoted expansion with adversarial filenames. Mandatory per `pr-review-rules.md` § Steelman Output Section — the review is incomplete without it. "No concerns" is allowed only when the diff is genuinely trivial; in that case, state so explicitly rather than omitting.
 ```
 
 Every finding MUST have an Evidence line. Shellcheck output counts as evidence when cited.

@@ -22,6 +22,7 @@ Non-obvious gotchas and conventions when invoking the Bash tool, `gh`, and other
 ## `gh pr edit` and bodies
 
 - **Compose PR bodies in one shot** — never incrementally patch via repeated `gh pr edit --body`. Each call rewrites the full body. Build the complete body first, then post once.
+- **For PR / issue bodies with backticks, always use `--body-file`** — write the body to `/tmp/body.md` then `gh pr create/edit --body-file /tmp/body.md`. This sidesteps the entire `$()` + heredoc escaping question. If you do use `--body "$(cat <<'EOF'...)"` instead: `<<'EOF'` passes everything literally so backticks are safe raw — but the temptation to escape them with `` \` `` is high, and `` \` `` renders as a literal backslash-backtick in GitHub markdown, not a code span. `--body-file` eliminates the ambiguity entirely. Verify the rendered body after posting.
 
 ## GitHub rulesets
 
@@ -30,6 +31,11 @@ Non-obvious gotchas and conventions when invoking the Bash tool, `gh`, and other
 ## CLI flag refactors
 
 - **Check `--help` before committing CLI flag refactors** — shellcheck and actionlint validate shell syntax, not CLI semantics. Before committing any change that alters how a CLI is invoked (adding / removing / reordering flags, changing arg structure, switching between URL-embedded and flag-based args), check the tool's actual runtime behavior. Default behaviors shift in subtle ways: `gh api` switches GET to POST on any `-f` / `-F`; `aws` flag order changes stdout vs stderr for some subcommands; `kubectl --force` means different things per resource.
+- **A flag existing ≠ the flag combination working — run the exact command line before committing.** CLI tools reject specific flag *combinations* at runtime with no static signal (`gh api --slurp` exists but is rejected together with `--jq`; `--paginate --jq` runs jq per-page instead of once over the combined result). Checking `--help` for the flag, or testing each flag separately, proves nothing about the composed invocation. Before committing any non-trivial CLI line (gh, aws, jq pipelines, terraform): execute the exact line — all flags together, against a real endpoint — and verify the output shape, not just exit 0. Same discipline as "lint is not a runtime test", applied to single commands.
+
+## jq defaults
+
+- **`jq`'s `//` operator triggers on null AND false, not just null** — for boolean defaults that must distinguish explicit `false` from absent, `.features.enabled // true` returns `true` when the value is explicitly `false`, silently defeating the gate. Use `if . == null then DEFAULT else . end` instead. `// false` happens to work because both null and false yield the default; `// true` is broken.
 
 ## Path expansion gotchas
 
