@@ -18,7 +18,7 @@ Coordination protocols for multi-agent teams. Teams compose existing agents (`.c
 
 **Purpose:** Coordinated review of mixed-domain PRs with file-scope assignment, parallel review, and finding deduplication.
 
-### Roles
+### PR Review Team — roles
 
 | Role | Agent Type | Responsibility |
 | --- | --- | --- |
@@ -29,7 +29,7 @@ Coordination protocols for multi-agent teams. Teams compose existing agents (`.c
 | **db-reviewer** | `clickhouse-reviewer` (or your DB reviewer) | Reviews SQL, schema, migrations |
 | **agent-config-reviewer** | `agent-config-reviewer` | Reviews `.claude/` configuration |
 
-### Protocol
+### PR Review Team — protocol
 
 1. **Lead reads PR diff** — `gh pr diff --name-only` to get file list
 2. **Lead classifies files** — Maps each file to a reviewer domain using the routing table in `pr-review-policy.md`
@@ -46,7 +46,7 @@ Coordination protocols for multi-agent teams. Teams compose existing agents (`.c
 
 **Purpose:** Parallel investigation of production failures with shared context and "found it" broadcasting.
 
-### Roles
+### Incident Response Team — roles
 
 | Role | Agent Type | Responsibility |
 | --- | --- | --- |
@@ -64,7 +64,7 @@ Coordination protocols for multi-agent teams. Teams compose existing agents (`.c
 | Deployment rollout failure | `deployment-expert` + `k8s-troubleshooter` + `secrets-expert` |
 | Multiple / unclear symptoms | `k8s-troubleshooter` + `deployment-expert` + `secrets-expert` |
 
-### Protocol
+### Incident Response Team — protocol
 
 1. **Lead reads initial signal** — CI log, alert, user report
 2. **Lead classifies symptoms** — Maps to investigator set above
@@ -78,7 +78,7 @@ Coordination protocols for multi-agent teams. Teams compose existing agents (`.c
 
 **Purpose:** Persistent context across implementation phases — no re-reading between implement, self-review, and PR creation.
 
-### Roles
+### SDLC Feature Team — roles
 
 | Role | Agent Type | Responsibility |
 | --- | --- | --- |
@@ -86,7 +86,7 @@ Coordination protocols for multi-agent teams. Teams compose existing agents (`.c
 | **implementer** | `general-purpose` | Writes code following engineering plan |
 | **self-reviewer** | domain-appropriate reviewer | Reviews after each step |
 
-### Protocol
+### SDLC Feature Team — protocol
 
 1. **Lead loads context once** — issue-tracker task, branch, engineering plan, domain references
 2. **Lead shares context with team** — Via initial message to implementer
@@ -99,7 +99,7 @@ Coordination protocols for multi-agent teams. Teams compose existing agents (`.c
 
 **Purpose:** Overlapping deployment phases — monitoring starts during apply, troubleshooter has full context on failure.
 
-### Roles
+### Deployment Orchestration Team — roles
 
 | Role | Agent Type | Responsibility |
 | --- | --- | --- |
@@ -108,7 +108,7 @@ Coordination protocols for multi-agent teams. Teams compose existing agents (`.c
 | **deploy-monitor** | `deployment-expert` | Monitors rollout health |
 | **k8s-standby** | `k8s-troubleshooter` | Activates on pod failure (standby until needed) |
 
-### Protocol
+### Deployment Orchestration Team — protocol
 
 1. **TF expert runs plan** — Messages lead with result
 2. **Lead presents plan to user** — Waits for approval

@@ -15,6 +15,7 @@ Incident narrative belongs in the PR description, the issue tracker, and `git lo
 Scope: rule bodies, hook comments, doc bodies, ticket descriptions, anywhere durable content lives.
 
 **Allowed exceptions** (state the reason on inclusion):
+
 - Decision logs / ADRs where the date is the load-bearing fact
 - External calendar events with hard cutoffs (deprecation, freeze window)
 - Memory entries where a relative date must be converted to remain interpretable later
@@ -25,6 +26,7 @@ Scope: rule bodies, hook comments, doc bodies, ticket descriptions, anywhere dur
 `.claude/rules/general/` auto-loads on **every** session — reserve it for patterns that apply in the majority of sessions. Rules for narrow-scenario or infrequent operations (e.g., "enable this setting only during a specific access window", "run this CLI only for queue cleanup") waste context budget on sessions where they're irrelevant.
 
 Placement decision:
+
 - **Needed in >80% of sessions?** → `rules/general/`
 - **Specific to one domain/provider?** → `{provider}/.claude/rules/`
 - **Rare operation or narrow scenario?** → on-demand doc under `.claude/docs/`, linked from CLAUDE.md

@@ -17,6 +17,7 @@ local.x = var.flag ? var.databases : {
 `merge(typed_object, {...})` returns a synthesized object whose inferred type can differ from `var.databases`'s `map(object({...}))` schema (after `optional()` materialization). The conditional rejects the mismatch.
 
 Fixes:
+
 - Construct both branches explicitly with all attributes (typed match guaranteed), OR
 - Drop the conditional and use a single comprehension with conditional logic on individual fields/filter predicates.
 
@@ -64,6 +65,7 @@ If a TF feature flag filters resources via `local.X = var.flag ? var.X : { filte
 Concrete failure mode: PostgreSQL roles are cluster-scoped. If the same role name appears in multiple databases AND your TF derives a "canonical" entry per role-name (e.g., first alphabetically) before creating the role + secret, then filtering only top-level keys can shift the canonical to a different database. TF plans DESTROY of the old canonical address + CREATE of the new one — the cluster-scoped role can't exist twice, the create races the destroy, apply fails with "role X already exists".
 
 When a `<prefix>*` filter is meant to remove "everything <prefix>", filter:
+
 - Top-level keys (databases, modules)
 - User maps inside each remaining item
 - `default_privilege_owners` and similar role-name lists
