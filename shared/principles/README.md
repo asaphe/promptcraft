@@ -10,6 +10,7 @@ Universal principles — apply to any AI coding assistant.
 - `tool-safety.md` — destructive commands, approval gates, blast radius.
 - `operational-safety-patterns.md` — state-before-mutate, backups, consumer verification.
 - `agent-design-patterns.md` — when to split agents, deferral patterns, roster design.
+- `consent-gated-capabilities.md` — enumerated-consent gating for high-cost (not destructive) capabilities: multi-agent fan-out, cloud execution, deep-research sweeps.
 - `prompting-examples.md` — XML structuring, few-shot patterns, format breakers.
 - `cli-design.md` — CLI tool conventions (flag names, verbose/summary modes, exit codes).
 - `personal.md` — repo owner's personal environment conventions (pyenv, shell, naming). Not universal; adapt or skip.

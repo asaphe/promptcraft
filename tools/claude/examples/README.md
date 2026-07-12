@@ -28,6 +28,7 @@ Supporting documentation referenced by agents and skills:
 - **Diagrams** — `drawio-authoring.md`
 - **Doc / authoring** — `doc-authoring.md`, `doc-quality-checklist.md`
 - **Codification templates** — `secret-naming-template.md`, `1password-caching.md`
+- **Orchestration mechanics** — `workflow-scripting.md` (deterministic multi-agent workflow scripting: pipeline vs. barrier, structured returns, budget-scaled loops), `self-paced-loops.md` (dynamic wakeup-delay selection for open-ended recurring tasks), `deferred-tool-loading.md` (name-only tool deferral to cut standing schema-token cost)
 
 ### `hooks/`
 

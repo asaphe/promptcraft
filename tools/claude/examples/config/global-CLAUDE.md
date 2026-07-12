@@ -144,6 +144,8 @@ _Scope: opinionated. A specific scratch-space convention; useful if you frequent
 
 A scratch-space convention for multi-session tasks. Useful if you frequently resume work across multiple Claude Code sessions on the same ticket; skip if your sessions are short-lived or single-task.
 
+This is the middle tier of a three-tier memory model: **durable reference material** (`~/.claude/docs/` — see Domain Configuration below; curated, outlives any task) → **task-local scratch** (lives for one ticket, spans sessions) → **session context** (gone at session end). Route content by lifetime, not by convenience.
+
 When starting work on a multi-session task or ticket, create a per-task scratch directory:
 
 ```text
