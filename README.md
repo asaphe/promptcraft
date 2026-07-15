@@ -66,6 +66,13 @@ TL;DR:
 - **Cursor:** copy `tools/cursor/rules/user/*.md` into Settings → Rules → User Rules; drop `tools/cursor/rules/mdc/*.mdc` into your repo's `.cursor/rules/`.
 - **ChatGPT:** paste `tools/chatgpt/global/*.md` into Settings → Custom Instructions; paste `tools/chatgpt/projects/*.md` into a Project's instructions.
 
+## Built with this
+
+Real repos using patterns adopted from here:
+
+- **[claude-learning-loop](https://github.com/asaphe/claude-learning-loop)** — a Claude Code plugin implementing the self-improvement feedback-loop pattern.
+- **[clickup-mcp](https://github.com/asaphe/clickup-mcp)** — an MCP server for ClickUp, built with the Claude Code agent/skill/hook conventions from `tools/claude/`.
+
 ## Conventions
 
 - **Shared is canonical.** Universal rules live in `shared/` once; tool dirs reference them, not duplicate.
