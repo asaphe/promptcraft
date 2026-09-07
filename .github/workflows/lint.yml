@@ -1,10 +1,10 @@
 name: Lint Markdown
 
+# No base-branch filter on pull_request: a PR stacked on another branch would otherwise get no lint at all and read as verified.
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 permissions:
   contents: read

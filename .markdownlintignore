@@ -8,7 +8,6 @@ tools/claude/guides/pr-review-protocol.md
 tools/claude/specs/ci-cd-specification.md
 tools/claude/examples/evals/README.md
 tools/claude/examples/hooks/post-compact-reinject/README.md
-tools/claude/examples/hooks/pr-create-guard/README.md
 tools/claude/templates/rules/operational-rules-guide.md
 shared/principles/agent-design-patterns.md
 shared/principles/operational-safety-patterns.md

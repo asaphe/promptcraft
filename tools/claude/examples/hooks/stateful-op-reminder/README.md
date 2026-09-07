@@ -24,10 +24,10 @@ This hook bridges the gap: it detects mutations to external systems and reminds 
 ## Behavior
 
 - **Exit 0 always** — never blocks, only reminds
-- Reminder is emitted to stderr, which Claude Code injects into the conversation as model-facing context
+- Reminder is emitted on stdout as `hookSpecificOutput.additionalContext`, which Claude Code injects into the conversation as model-facing context. On exit 0 the harness discards stderr, so a reminder written there would reach no one
 - Every detection also appends a **TEAM HEADS-UP** block: draft a team-chat message (`:warning:` / What / Impact / Window-ETA / Status) and present it for the user's approval — never auto-send. The hook is non-blocking, so the command may already be executing; the draft announces in-progress state and gates further mutations in the same change window. Posting via a team-chat MCP (e.g. Slack) happens only on explicit OK, followed by a "resolved" message once the change is verified
 - The model sees the protocol steps and is expected to follow them
-- The user sees nothing unless they check stderr — this is intentional (it's a model nudge, not a user prompt)
+- The user sees nothing in their prompt — this is intentional (it's a model nudge, not a user prompt)
 
 ## Installation
 

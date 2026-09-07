@@ -3,7 +3,7 @@
     "label": "kubectl apply → reminder",
     "command": "kubectl apply -f deployment.yaml",
     "expected_exit": 0,
-    "expected_output": "STATEFUL OP"
+    "expected_stdout": "STATEFUL OP"
   },
   {
     "label": "kubectl get → silent (read-only)",
@@ -14,7 +14,7 @@
     "label": "terraform apply → reminder",
     "command": "terraform apply -auto-approve",
     "expected_exit": 0,
-    "expected_output": "STATEFUL OP"
+    "expected_stdout": "STATEFUL OP"
   },
   {
     "label": "terraform plan → silent (read-only)",
@@ -25,7 +25,7 @@
     "label": "helm upgrade → reminder",
     "command": "helm upgrade my-release ./chart",
     "expected_exit": 0,
-    "expected_output": "STATEFUL OP"
+    "expected_stdout": "STATEFUL OP"
   },
   {
     "label": "helm upgrade --dry-run → silent",
@@ -36,7 +36,7 @@
     "label": "aws iam attach-role-policy → reminder",
     "command": "aws iam attach-role-policy --role-name test --policy-arn arn:aws:iam::aws:policy/test",
     "expected_exit": 0,
-    "expected_output": "STATEFUL OP"
+    "expected_stdout": "STATEFUL OP"
   },
   {
     "label": "aws iam list-roles → silent (read-only)",
@@ -52,18 +52,25 @@
     "label": "terraform apply → team heads-up appended to reminder",
     "command": "terraform apply -auto-approve",
     "expected_exit": 0,
-    "expected_output": "TEAM HEADS-UP"
+    "expected_stdout": "TEAM HEADS-UP"
   },
   {
     "label": "kubectl apply → team heads-up appended to reminder",
     "command": "kubectl apply -f deployment.yaml",
     "expected_exit": 0,
-    "expected_output": "TEAM HEADS-UP"
+    "expected_stdout": "TEAM HEADS-UP"
   },
   {
     "label": "helm upgrade → heads-up includes approval-gating instruction",
     "command": "helm upgrade my-release ./chart",
     "expected_exit": 0,
-    "expected_output": "approved before any further mutations"
+    "expected_stdout": "approved before any further mutations"
+  },
+  {
+    "label": "reminder is emitted as additionalContext JSON on stdout, not stderr",
+    "command": "terraform apply -auto-approve",
+    "expected_exit": 0,
+    "expected_stdout": "hookSpecificOutput",
+    "note": "Regression guard. On exit 0 the harness discards stderr, so a reminder written there is silently inert; asserting via expected_output would pass either way."
   }
 ]
