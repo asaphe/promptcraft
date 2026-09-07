@@ -15,9 +15,9 @@ PreToolUse hook that verifies pre-creation conditions before allowing `gh pr cre
 
 ### Verification Checklist (exit 0 — model-facing reminder)
 
-When all hard checks pass, the hook emits a checklist to stderr:
+When all hard checks pass, the hook emits a checklist on stdout as `hookSpecificOutput.additionalContext`:
 
-```
+```text
 PR PRE-CREATION VERIFICATION — 5 files, 3 commits, +120/-30 lines:
   [ ] Diff reviewed — changes match what was intended (no accidental inclusions)
   [ ] PR body accurately describes the FINAL state of changes
@@ -26,7 +26,9 @@ PR PRE-CREATION VERIFICATION — 5 files, 3 commits, +120/-30 lines:
   [ ] Tests pass locally (or explicitly noted as untestable)
 ```
 
-The model sees this and is expected to verify each item before proceeding. The user sees nothing unless they check stderr — this is a model nudge, not a user prompt.
+The model sees this and is expected to verify each item before proceeding — it is a model nudge, not a user prompt.
+
+The channel matters. On exit 0 the harness discards stderr, so a checklist written there reaches no one; only `additionalContext` on stdout is injected into the conversation. Writing it to stderr is the difference between a working reminder and one that has silently never fired. Note the contrast with the hard blocks above, which are exit 2 — there stderr *is* the mechanism, and it is shown to the model.
 
 ## Installation
 

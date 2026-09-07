@@ -64,7 +64,8 @@ COMMIT_COUNT=$(git rev-list --count origin/main..HEAD 2>/dev/null)
 INSERTIONS=$(echo "$DIFF_STAT" | tail -1 | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+')
 DELETIONS=$(echo "$DIFF_STAT" | tail -1 | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+')
 
-cat >&2 <<CHECKLIST
+# additionalContext on stdout, not stderr: the harness discards stderr on exit 0, so a checklist written there reaches no one.
+read -r -d '' CHECKLIST <<CHECKLIST || true
 PR PRE-CREATION VERIFICATION — ${FILE_COUNT:-0} files, ${COMMIT_COUNT:-0} commits, +${INSERTIONS:-0}/-${DELETIONS:-0} lines:
   [ ] Diff reviewed — changes match what was intended (no accidental inclusions)
   [ ] PR body accurately describes the FINAL state of changes
@@ -72,5 +73,8 @@ PR PRE-CREATION VERIFICATION — ${FILE_COUNT:-0} files, ${COMMIT_COUNT:-0} comm
   [ ] Linked ticket/issue updated
   [ ] Tests pass locally (or explicitly noted as untestable)
 CHECKLIST
+
+jq -n --arg ctx "$CHECKLIST" \
+  '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: $ctx}}'
 
 exit 0

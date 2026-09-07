@@ -30,13 +30,17 @@ def load_cases(hook_dir: Path) -> list[dict]:
     return json.loads(path.read_text())
 
 
-def run_hook(hook_path: Path, command: str) -> tuple[int, str]:
-    """Run a hook with a simulated tool_input and return (exit_code, combined_output).
+def run_hook(hook_path: Path, command: str) -> tuple[int, str, str]:
+    """Run a hook with a simulated tool_input and return (exit_code, stdout, stderr).
 
-    Combines stdout and stderr since hooks use different channels:
-    - Hard blocks: stderr (exit 2)
+    The channel a hook writes to is load-bearing, not cosmetic:
+    - Hard blocks: stderr (exit 2) — the harness shows stderr to the model
     - Soft blocks: stdout JSON with permissionDecision (exit 0)
-    - Reminders: stderr (exit 0)
+    - Reminders: stdout JSON with hookSpecificOutput.additionalContext (exit 0),
+      because on exit 0 the harness discards stderr entirely
+
+    Cases assert against the union via `expected_output`, or against one channel
+    via `expected_stdout` / `expected_stderr` when the channel is the point.
     """
     input_json = json.dumps({"tool_input": {"command": command}})
     result = subprocess.run(
@@ -46,32 +50,38 @@ def run_hook(hook_path: Path, command: str) -> tuple[int, str]:
         text=True,
         timeout=10,
     )
-    combined = (result.stdout.strip() + "\n" + result.stderr.strip()).strip()
-    return result.returncode, combined
+    return result.returncode, result.stdout.strip(), result.stderr.strip()
 
 
 def check_case(hook_path: Path, case: dict) -> tuple[bool, str]:
     """Run one test case and return (passed, detail)."""
     command = case["command"]
     expected_exit = case.get("expected_exit")
-    expected_output = case.get("expected_output")
 
     try:
-        exit_code, combined = run_hook(hook_path, command)
+        exit_code, stdout, stderr = run_hook(hook_path, command)
     except subprocess.TimeoutExpired:
         return False, "TIMEOUT (>10s)"
     except FileNotFoundError:
         return False, f"Hook not found: {hook_path}"
 
+    combined = (stdout + "\n" + stderr).strip()
+
     if expected_exit is not None and exit_code != expected_exit:
         return False, f"exit {exit_code} (expected {expected_exit}), output: {combined}"
 
-    if expected_output and expected_output not in combined:
-        return False, (
-            f"exit {exit_code} OK, but output missing expected text.\n"
-            f"  Expected substring: {expected_output}\n"
-            f"  Actual output: {combined}"
-        )
+    for field, actual, label in (
+        ("expected_output", combined, "output"),
+        ("expected_stdout", stdout, "stdout"),
+        ("expected_stderr", stderr, "stderr"),
+    ):
+        expected = case.get(field)
+        if expected and expected not in actual:
+            return False, (
+                f"exit {exit_code} OK, but {label} missing expected text.\n"
+                f"  Expected substring: {expected}\n"
+                f"  Actual {label}: {actual}"
+            )
 
     return True, f"exit {exit_code}, output: {combined[:80]}" if combined else f"exit {exit_code}"
 

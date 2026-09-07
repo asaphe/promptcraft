@@ -1,6 +1,6 @@
 # Hook Evals
 
-Automated test suite for the PreToolUse hooks in `.claude/hooks/`. Unlike skill evals (which require manual testing in Claude Code), hook evals are fully automated — the runner pipes JSON input through each hook and checks exit codes and stderr.
+Automated test suite for the PreToolUse hooks in `.claude/hooks/`. Unlike skill evals (which require manual testing in Claude Code), hook evals are fully automated — the runner pipes JSON input through each hook and checks its exit code and output.
 
 ## Running
 
@@ -26,13 +26,15 @@ Each hook has a `cases.json`:
     "command": "the bash command to test",
     "expected_exit": 2,
     "expected_output": "substring that must appear in stdout or stderr",
+    "expected_stdout": "substring that must appear on stdout specifically",
     "note": "optional context about preconditions"
   }
 ]
 ```
 
 - `expected_exit`: optional — 0 = allow, 2 = hard block. Soft blocks (JSON output) also exit 0. Omit to accept any exit code (useful for environment-dependent cases).
-- `expected_output`: optional — if set, combined stdout+stderr must contain this substring. Covers both hard blocks (stderr) and soft blocks (JSON on stdout).
+- `expected_output`: optional — if set, combined stdout+stderr must contain this substring. Use when the channel does not matter.
+- `expected_stdout` / `expected_stderr`: optional — assert against one channel only. Use these when the channel *is* the behaviour under test. A reminder on exit 0 must land on stdout as `hookSpecificOutput.additionalContext`, because the harness discards stderr at exit 0; asserting it via `expected_output` alone would pass whether the hook works or is silently inert.
 - `note`: not checked by the runner, just documentation.
 
 ## When to Run

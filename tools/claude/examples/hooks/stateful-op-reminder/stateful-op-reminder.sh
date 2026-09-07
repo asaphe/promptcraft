@@ -79,8 +79,10 @@ TEAM HEADS-UP: This change can disrupt the team. Draft a team-chat message now a
 After the user approves, offer to post via your team-chat MCP (e.g. Slack); post only on explicit OK. Send a follow-up 'resolved / completed' message once the change is verified."
 fi
 
+# additionalContext on stdout, not stderr: the harness discards stderr on exit 0, so a reminder written there reaches no one.
 if [ -n "$REMINDER" ]; then
-  echo "$REMINDER" >&2
+  jq -n --arg ctx "$REMINDER" \
+    '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: $ctx}}'
 fi
 
 exit 0
