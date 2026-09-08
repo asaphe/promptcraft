@@ -1,6 +1,6 @@
 # Bash Command Patterns
 
-Non-obvious gotchas and conventions when invoking the Bash tool, `gh`, and other CLIs from Claude Code or shell scripts.
+Non-obvious gotchas and conventions when invoking the Bash tool, `gh`, and other CLIs from Claude Code or shell scripts. This doc is read on demand. Constructs that return a *confident wrong answer* rather than an error live in `../rules/general/shell-traps.md`, which is always-loaded because they have to fire while a command is being written; two bullets below overlap it deliberately.
 
 - **Never start bash commands with `#` comments** — use the Bash tool's `description` parameter instead.
 - **When writing inline Python / scripts with heredocs containing `#` comments and quotes**, write the script to a file first, then run it separately. Heredoc quoting interactions with `#` and embedded quotes silently produce wrong content otherwise.

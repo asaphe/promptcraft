@@ -55,7 +55,7 @@ Supporting documentation referenced by agents and skills:
 
 Operational rules captured from real incidents. Organized by scope:
 
-- **`general/`** — Cross-cutting principles that apply regardless of stack: git safety, PR workflows, operational discipline, idempotent operations, communication discipline, security scanning.
+- **`general/`** — Cross-cutting principles that apply regardless of stack: git safety, PR workflows, operational discipline, idempotent operations, communication discipline, security scanning. Three of them are the always-loaded companions to `config/global-CLAUDE.md` — `evidence-nulls.md` (result shapes that look like answers), `shell-traps.md` (commands that return a confident wrong answer instead of an error), and `review-verdicts.md` (which review state to pick, and how to grade a finding).
 - **`devops/`** — DevOps-domain rules: AWS / IAM / SSO / VPC gotchas, Terraform module structure and discipline, GHA authoring, Kyverno validation style, ESO Go templates, Datadog config gotchas, S3 lifecycle, EKS+VPC gotchas, AWS WAF on ALB, security-group co-management, ElastiCache auth-token rotation.
 - **`observability/`** — OTel resource-attribute precedence.
 - **`frontend/`** — Stack-locked frontend rules (e.g., React + TanStack + Radix/Shadcn + Tailwind quality).
