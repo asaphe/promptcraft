@@ -1,0 +1,34 @@
+# stateful-op-reminder — nudges before a mutation to an external system, and stays
+# out of the way otherwise. It never blocks, so every case here is `ctx` or `allow`:
+# the interesting axis is whether it fired, not what exit code it chose.
+#
+# `ctx` rather than `allow` is the whole point. A reminder emits no permissionDecision,
+# so on an exit-code-only harness a fired reminder and a silent pass score identically
+# and no case can tell them apart.
+
+# --- must nudge: mutations to cluster, infra and identity state ---
+ctx	kubectl apply -f deploy.yaml
+ctx	helm upgrade --install web ./chart
+ctx	terraform apply -auto-approve
+
+# --- must stay silent: the read-only siblings of each of the above ---
+# Plus `kubectl delete`, which is deliberately NOT this hook's job: deletion belongs
+# to destructive-guard, which asks or blocks rather than merely reminding. Pinned
+# here so a future widening of this matcher shows up as two hooks firing on one
+# command rather than as a silently doubled prompt.
+allow	kubectl delete pod web-0
+allow	kubectl get pods
+allow	kubectl describe deploy web
+allow	helm list
+allow	terraform plan
+allow	git status
+allow	ls -la
+
+# --- must stay silent on the pattern as message text rather than as an invocation.
+# A reminder that matches its own trigger inside a commit subject fires on the commit
+# that documents it — and because it only adds context, nobody notices it is wrong.
+allow	git commit -m "chore: stop running kubectl apply by hand"
+allow	git commit -m "docs: explain when terraform apply is safe"
+
+# --- input unavailable ---
+allow	<absent>

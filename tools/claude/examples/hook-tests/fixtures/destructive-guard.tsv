@@ -1,0 +1,54 @@
+# destructive-guard — two tiers. `hard` (exit 2) has no approval path; `ask` turns the
+# command into an explicit confirmation prompt. The two are worth separating in a fixture
+# because they are different promises: a hard block says "never", an ask says "not without
+# you". A suite comparing exit codes alone scores them identically, since both exit 2 and
+# ask-at-exit-0 look like "the hook did something".
+#
+# This is a representative set, not exhaustive coverage of a large hook. Each block below
+# pins one class, plus the false-positive defence for that class — the half that actually
+# regresses, because widening a matcher is easy and re-checking its blast radius is not.
+
+# --- hard: pushes to the default branch, every spelling ---
+hard	git push origin main
+hard	git push --force origin main
+hard	git push -f origin main
+hard	git push origin HEAD:main
+
+# --- allow: the same verb aimed somewhere it is allowed ---
+allow	git push origin feature/my-branch
+allow	git push
+
+# --- hard: merges. The maintainer merges; there is no approval path here. ---
+hard	gh pr merge 42 --squash
+hard	gh api -X PUT repos/o/r/pulls/42/merge
+hard	gh stack merge
+
+# --- allow: reading a PR is not merging one ---
+allow	gh pr view 42
+allow	gh pr list --state open
+allow	gh pr diff 42
+
+# --- ask: risky but legitimately approvable ---
+ask	terraform destroy
+ask	git reset --hard HEAD~1
+ask	kubectl delete pod web-0
+ask	git push --force origin feature/my-branch
+
+# --- allow: their read-only or non-destructive siblings ---
+allow	terraform plan
+allow	git reset --soft HEAD~1
+allow	kubectl get pods
+
+# --- allow: the trigger as message text rather than as an invocation. The commit that
+# documents a rule must not be blocked by the rule it documents.
+allow	git commit -m "docs: never git push origin main directly"
+allow	git commit -m "chore: remove the gh pr merge step from the runbook"
+
+# --- allow: the trigger inside a heredoc body, which is data being written to a file
+# rather than a command being run.
+#!escapes
+allow	cat <<EOF > runbook.md\ngit push origin main\nEOF
+
+# --- input unavailable: the extraction returns nothing, which is indistinguishable from
+# "no command to guard". Pinned so a later edit cannot flip it silently.
+allow	<absent>

@@ -1,13 +1,25 @@
 [
   {
-    "label": "non-pr command → pass through silently",
+    "label": "non-pr command \u2192 pass through silently",
     "command": "git status",
     "expected_exit": 0
   },
   {
-    "label": "gh pr create → never silent (blocks or emits checklist)",
+    "label": "gh pr create \u2192 never silent (blocks or emits checklist)",
     "command": "gh pr create --title test --body test",
     "expected_output": "PR",
     "note": "Exit code depends on git state: exit 2 (block) when uncommitted changes or zero diff exist, exit 0 (checklist) on a clean pushed branch. Both outputs contain 'PR'. Omit expected_exit to accept either."
+  },
+  {
+    "label": "stack submit -> never silent (blocks on a dirty tree, else emits the stack checklist)",
+    "command": "gh stack submit",
+    "expected_output": "STACK",
+    "note": "Exit code depends on git state: exit 2 when the tree is dirty, exit 0 with the checklist otherwise. Both outputs contain 'STACK'. Omit expected_exit to accept either. Before this hook covered the stack form it exited 0 silently here, which no output assertion could distinguish from a considered pass."
+  },
+  {
+    "label": "trigger quoted in a commit message -> pass through silently",
+    "command": "git commit -m \"docs: when to run gh pr create vs gh stack submit\"",
+    "expected_exit": 0,
+    "note": "The guard matches the stripped command, so the commit documenting a rule is not blocked by the rule it documents."
   }
 ]
