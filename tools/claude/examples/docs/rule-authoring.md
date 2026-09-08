@@ -1,5 +1,18 @@
 # Rule Authoring Standards
 
+## Confirm a rule is the right mechanism first
+
+A rule is context loaded into every session — it is not enforced config, and it is not free. Before writing one, pick the mechanism by what the requirement actually needs:
+
+- Must happen regardless of model judgment → **hook**
+- Live authenticated external system with no adequate CLI → **MCP server**
+- Standing fact true in most sessions → **rule** (see placement scope below)
+- Multi-step procedure worth self-triggering → **skill**
+- Reference material only useful when you are pointed at it → **doc**
+- Deterministic logic → **script**
+
+Read it as a decision order, not a preference order: take the first line whose condition genuinely holds. The common authoring error is reaching for a rule because it is the easiest thing to write, when the requirement was "must happen regardless of model judgment" — which only a hook satisfies.
+
 ## Incident-agnostic bodies
 
 Rules autoload as evergreen context; incidents are point-in-time events. Rule bodies must NOT contain ticket numbers, PR refs, specific role/module/file names that exist solely because of the originating incident, or dates. Use generic placeholders (`<role>`, `<module>`, `<path>`). Stable codebase pointers (canonical IDs, long-lived paths, sibling rule filenames) are fine in a Reference / Related section.
@@ -46,6 +59,15 @@ A rule's title must surface the gotcha, not name the tool. "`repository_owner` i
 ## Validate before presenting
 
 Run a new or edited rule through an agent-config reviewer, and cross-reference existing rules for overlap, before presenting it. A rule that duplicates an always-loaded rule or contradicts a sibling is worse than no rule.
+
+For wording whose entire job is holding up under pressure — a behavioral constraint a model could talk itself out of, as opposed to a factual reference — pressure-test it before shipping. Run the trigger scenario against a fresh agent *without* the new wording and confirm it produces the violation, then re-run *with* the wording and confirm it holds. Static review catches contradictions and duplication; it does not catch wording a capable model can rationalize around. Skip this for reference-only content.
+
+## Don't author reasoning-echo or over-prescription into agents and skills
+
+Two authoring hazards that show up specifically on more-capable model tiers:
+
+- **No "show your reasoning" instructions.** Never tell an agent, skill, or prompt to echo, transcribe, narrate, or explain its internal reasoning as response text. Observed consequence on a frontier tier: the request is refused and the harness silently falls back to a different model, which quietly breaks any cost-tier routing you built (see `multi-model-orchestration.md`). Asking for cited *evidence* — `file:line`, command output — is not reasoning-echo and is fine. Where reasoning visibility is genuinely needed, read the structured thinking blocks instead of asking for a narration.
+- **Brief steering beats enumerated patterns.** A capable model follows one short principle better than a long list of cases, and instructions over-specified for a weaker model can actively *degrade* output on a stronger one. When editing an agent or skill, prefer trimming to the load-bearing instruction over adding another enumerated case.
 
 ## Adjust rules to allow needed patterns — don't add bypasses
 
