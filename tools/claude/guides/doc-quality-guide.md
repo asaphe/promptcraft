@@ -93,6 +93,6 @@ Periodic indicators that your docs need attention:
 ## Related Resources
 
 - [Operational Rules Guide](../templates/rules/operational-rules-guide.md) — Rule deprecation and auditing
-- [Learning System Guide](learning-system-guide.md) — Session mining for doc gaps
+- [Learning System Guide](learning-system-guide.md) — Detecting friction worth codifying, and where the result belongs
 - [PII Prevention Guide](pii-prevention-guide.md) — Preventing sensitive data in docs
 - [Global CLAUDE.md Guide](global-claude-md-guide.md) — On-demand reference design

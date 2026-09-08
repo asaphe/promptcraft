@@ -1,60 +1,22 @@
-# 1Password Read Guard
+# 1Password Read Guard — retired from this repo
 
-A **PreToolUse** hook that blocks duplicate `op read` and `op item get` calls within the same session.
+This hook is no longer maintained as an example here. It ships as
+`scripts/op-read-guard.sh` in a Claude Code plugin:
+**[claude-secret-guard](https://github.com/asaphe/claude-secret-guard)**.
 
-## Why
-
-Every `op read` call triggers a biometric prompt (Touch ID, password). The AI agent has no awareness that it already read the same secret earlier in the session — it just calls `op read` again, forcing the user to authenticate again.
-
-In practice, the same secret gets read 3-5 times per session: once to check its value, once to compare with something, once to set an env var, etc. This hook blocks the duplicates with a reminder to reuse the cached value.
-
-## Behavior
-
-| Situation | Action |
-|-----------|--------|
-| First `op read` for a secret | Allow + record the reference |
-| Second+ `op read` for same secret | Block with "reuse cached value" message |
-| `op read` for a different secret | Allow + record |
-| Non-op commands | Allow |
-
-## Setup
-
-Register as a PreToolUse hook on `Bash` in `~/.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/path/to/op-read-guard.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
+```text
+/plugin marketplace add asaphe/claude-secret-guard
+/plugin install secret-guard@claude-secret-guard
 ```
 
-## State Tracking
+## What the plugin does that this example did not
 
-Uses a session-scoped temp file (`/tmp/claude-op-reads-<session-id>`) to track which secrets have been read. The file is keyed by `CLAUDE_SESSION_ID`, which Claude Code sets automatically.
+The example deduplicated `op read` to save biometric prompts. The plugin treats the same
+commands as a secret-exposure problem first: `op read`, `op item get --reveal`/`--otp`, and
+`op run --no-masking` are blocked outright and redirected to a masked cache wrapper, so the
+value never reaches the transcript. Deduplication is a side effect of the cache, not the goal.
 
-### Why Not `$$` (PID)?
-
-Each hook invocation runs in a new subprocess with a different PID. Using `$$` would create a new tracking file per invocation, defeating deduplication entirely. `CLAUDE_SESSION_ID` persists across the entire session.
-
-## Companion Rules
-
-This hook works best with a CLAUDE.md rule that tells the agent to cache secret values:
-
-```markdown
-- **1Password token reuse** — NEVER call `op read` more than once per secret per session.
-  Each call prompts for biometric approval. On first use, read the secret and remember
-  the value. For subsequent Bash calls, re-export the remembered value.
-```
-
-The hook enforces the rule deterministically; the rule teaches the agent *why* and how to work around it.
+It also closes fail-opens the example had: no wrapper-path exemption (a `# see op-cache.sh`
+comment used to turn a real fetch into a pass), per-segment evaluation so
+`op item get X && op-cache.sh --reveal <uri>` is judged on the segment that owns the flag,
+and a symlink defense plus `umask 077` on the session track file.

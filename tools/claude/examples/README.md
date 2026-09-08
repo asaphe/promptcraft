@@ -2,6 +2,8 @@
 
 Reference examples for `~/.claude/` and project-level `.claude/` configurations: agents, skills, hooks, rules, docs, scripts. Each example has been refined through daily use; company-specific details have been replaced with placeholders.
 
+Several examples that used to live here now ship as maintained Claude Code plugins — intent routing, learning capture, the 1Password/Secrets Manager guards, and the PR review and finalize skills. [`RETIRED.md`](RETIRED.md) maps each old path to its replacement.
+
 ## Directory Structure
 
 ### `agents/`
@@ -37,7 +39,6 @@ Supporting documentation referenced by agents and skills:
 - **`commit-attribution-guard/`** — Hard-blocks AI attribution markers in commit messages and `claude/` branch prefix.
 - **`worktree-preflight/`** — Blocks `git` write ops on a guarded repo's root when it's not on `main`.
 - **`gha-lint-guard/`** — Pre-commit `actionlint` on staged `.github/workflows/*.yaml`; blocks on failure.
-- **`op-cache-cleanup/`** — Stop hook that purges `/tmp/op-cache-<session>/` when the session ends. Pairs with `scripts/op-cache.sh`.
 - **`model-recommendation/`** — UserPromptSubmit advisory hook (config-driven) that nudges on model-tier mismatch.
 - **`post-push-hygiene/`** — Reminds to resolve threads, update PR body, update tracker after a successful `git push`.
 - **`pr-create-guard/`** — Blocks `gh pr create` when prerequisites are missing (zero diff, unpushed commits, uncommitted changes).
@@ -45,12 +46,10 @@ Supporting documentation referenced by agents and skills:
 - **`pre-push-quality/`** — Pre-push lint enforcement; blocks the push on lint failures.
 - **`review-verification-guard/`** — Emits verification checklists before posting PR reviews / comments.
 - **`stateful-op-reminder/`** — Nudges on mutations to external systems — identity providers, IAM, databases, Kubernetes, Helm, Terraform apply — and appends a team heads-up template (draft a chat message for user approval — never auto-send; gates further mutations in the same change window).
-- **`intent-router/`** — UserPromptSubmit hook that routes short free-text intents ("merged", "status?", "comments?") to the matching skill via injected context.
 - **`post-apply-state-check/`** — PostToolUse nudge after a successful `terraform apply` / `kubectl apply`: exit 0 proves syntax, not correctness — verify the resource live.
-- **`pre-claim-guard/`** — PreToolUse nudge before posting PR comments that assert cloud resource state: verify against the live API, not local IaC.
 - **`rtk/`** — PreToolUse hook that rewrites Bash commands through RTK (Rust Token Killer) for token savings.
 - **`statusline/`** — Statusline command showing directory, git branch/worktree, AWS profile, model name, effort level, context-window usage, PR review state, lines changed, and rate-limit reset.
-- Plus several auto-lint, AWS auth check, kubectl context inject, and learning-capture hook examples.
+- Plus several auto-lint, AWS auth check, and kubectl context inject hook examples.
 
 ### `rules/`
 
@@ -63,19 +62,17 @@ Operational rules captured from real incidents. Organized by scope:
 
 ### `scripts/`
 
-- **`op-cache.sh`** — Per-session 1Password value cache to avoid biometric re-prompts. Pairs with the `op-cache-cleanup` Stop hook.
 - **`inventory/`** — `generate-inventory.sh` regenerates `agent-roster.md` and `skill-inventory.md` from frontmatter on disk; `doc-maintenance.sh` validates `.claude/` doc health (path resolution, skill depth, inventory sync, cross-references). See the directory's README for scope and CI integration.
 
 ### `skills/`
 
 User-invocable slash-command skills:
 
-- **PR lifecycle** — `pr-review`, `pr-check`, `pr-resolver`, `pr-finalize`
+- **PR lifecycle** — `pr-check`, `pr-resolver` (review and finalize moved to [claude-reviewkit](https://github.com/asaphe/claude-reviewkit))
 - **Ticket / branch** — `open-ticket`
 - **DevOps** — `eks-check`, `check-secret`, `new-gh-action`
 - **Frontend** — `sentry-react`
 - **Tooling evaluation** — `eval-tool`
-- **Knowledge management** — `scan-history`, `graduate-learnings`
 
 ### `evals/`
 

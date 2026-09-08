@@ -19,6 +19,7 @@ You are probably in the wrong place. Go to **[`tools/claude/`](../tools/claude/)
 - `rules/` — contributor rules (PII discipline, git discipline, content quality).
 - `hooks/` — safety hooks dogfooded from `../tools/claude/examples/hooks/`.
 - `evals/` — regression cases for the dogfooded hooks.
+- `scripts/` — the CI checkers: `check-mirrors.py` (dogfooded copy matches its published example) and `check-guard-gate.py` (the guard's fast-path gate covers every rule).
 
 ## Why live here vs `tools/claude/examples/`?
 

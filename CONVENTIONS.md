@@ -17,7 +17,7 @@ Structural and stylistic rules for content in this repo. If you're editing anyth
 │   ├── cursor/
 │   └── chatgpt/
 ├── .claude/                 # Contributor config (editing THIS repo)
-└── Root files               # README, AGENTS, ADOPTION, CONVENTIONS, DECISIONS, llms.txt
+└── Root files               # README, AGENTS, ADOPTION, CONTRIBUTING, CONVENTIONS, DECISIONS, llms.txt
 ```
 
 Each second-level directory has a `README.md` that lists contents and routing rules.
@@ -33,7 +33,7 @@ Each second-level directory has a `README.md` that lists contents and routing ru
 - Lowercase, hyphenated: `operational-safety-patterns.md`, not `OperationalSafetyPatterns.md`.
 - Extension reflects format: `.md` for markdown, `.mdc` for Cursor project rules, `.sh` for shell, `.py` for Python, `.json` / `.jsonc` for data.
 - Avoid version numbers or dates in filenames — use git history and frontmatter.
-- Top-level root files use ALL-CAPS: `README.md`, `AGENTS.md`, `ADOPTION.md`, `CONVENTIONS.md`, `DECISIONS.md`, `LICENSE`. Everything else is lowercase.
+- Top-level root files use ALL-CAPS: `README.md`, `AGENTS.md`, `ADOPTION.md`, `CONTRIBUTING.md`, `CONVENTIONS.md`, `DECISIONS.md`, `LICENSE`. Everything else is lowercase.
 
 ## Markdown structure
 
@@ -46,8 +46,8 @@ Each second-level directory has a `README.md` that lists contents and routing ru
 ## Frontmatter
 
 - Cursor `.mdc` files MUST have YAML frontmatter with `description`, `globs`, and `alwaysApply` per Cursor's spec.
-- Claude skill files (`SKILL.md`) MUST have frontmatter with `name`, `description`, `invoke_with`, `tools` per Claude Code's skill spec.
-- Claude agent files MUST have frontmatter with `name`, `description`, `tools`, and optional `model` per Claude Code's agent spec.
+- Claude skill files (`SKILL.md`) MUST have frontmatter with `name`, `description`, `user-invocable` and `allowed-tools`, plus `argument-hint` when the skill takes arguments. Template: `tools/claude/templates/skills/skill-template.md`.
+- Claude agent files MUST have frontmatter with `name`, `description`, `tools`, `model` and `memory`. Template: `tools/claude/templates/agents/agent-template.md`.
 - Plain markdown files under `shared/` and guides do NOT need frontmatter.
 
 ## Cross-links
