@@ -32,8 +32,8 @@ Supporting documentation referenced by agents and skills:
 
 ### `hooks/`
 
-- **`_lib/`** — Shared utilities sourced by hooks: `strip-cmd.sh` (heredoc / `-m` body stripping for pattern matching) and `hook-diag.sh` (re-emits captured stderr to Claude Code on exit 1/2 so block reasons are visible).
-- **`destructive-guard/`** — Two-tier PreToolUse hook that hard-blocks irreversible operations (AWS deletions, any push to main — force included, PR close/merge) and turns risky-but-approvable ones (terraform destroy, `git reset --hard`) into explicit approval prompts. Worktree-aware push detection.
+- **`_lib/`** — Shared utilities sourced by hooks: `strip-cmd.sh` + `strip-quoted-args.pl` (blank heredoc, `-m` and quoted-argument bodies so patterns match the command surface), `split-cmd-segments.pl` (split on unquoted separators so a flag test runs against the segment that owns it), `resolve-workdir.sh` (the repo a git command acts on, `cd <dir> &&` included), `pr-author.sh` (cached PR-authorship and repo-visibility predicates), and `hook-diag.sh` (re-emits captured stderr on exit 1/2 so block reasons are visible, and flags a hook that wrote to stderr on exit 0, where the harness discards it).
+- **`destructive-guard/`** — Two-tier PreToolUse hook that hard-blocks irreversible operations (AWS data destruction, any push to main — force included, PR close, all three merge forms, bulk branch deletion) and turns risky-but-approvable ones (terraform destroy, force-push to a feature branch, `git reset --hard`, `gh issue` mutations) into explicit approval prompts. Worktree-aware push detection.
 - **`commit-attribution-guard/`** — Hard-blocks AI attribution markers in commit messages and `claude/` branch prefix.
 - **`worktree-preflight/`** — Blocks `git` write ops on a guarded repo's root when it's not on `main`.
 - **`gha-lint-guard/`** — Pre-commit `actionlint` on staged `.github/workflows/*.yaml`; blocks on failure.

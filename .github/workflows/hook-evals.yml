@@ -1,0 +1,30 @@
+name: Hook Evals
+
+# No base-branch filter on pull_request: a PR stacked on another branch would otherwise get no run at all and read as verified.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Printed rather than assumed: runner.py's annotations need 3.10+, and a failure here should name the reason.
+      - run: python3 --version
+
+      # Before the suite: it only exercises the .claude/ copy, so drift in the published example is invisible to it.
+      - name: Check dogfooded copies match the published examples
+        run: python3 .claude/scripts/check-mirrors.py
+
+      # The fast-path gate skips the rule cascade; a rule keying on a binary it omits silently stops firing.
+      - name: Check the fast-path gate covers every rule
+        run: python3 .claude/scripts/check-guard-gate.py
+
+      - name: Run hook evals
+        run: python3 .claude/evals/runner.py
