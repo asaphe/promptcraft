@@ -12,7 +12,7 @@ Hooks are shell commands that execute automatically in response to Claude Code e
 | `SessionStart` | When a session begins (matcher: `"compact"` for post-compaction) | stdout (plain text) | Re-inject critical context after compaction, load session state |
 | `PreCompact` | Before context compaction (matcher: `"auto"` or `"manual"`) | Side-effects only | Preserve corrections/learnings before context is compressed |
 | `Notification` | When Claude Code sends a notification | None | Custom alerting, logging, external integrations |
-| `Stop` | When Claude finishes a response | None | Self-check reminders, structured output, handoff prompts |
+| `Stop` | When Claude finishes a response | `{"decision":"block","reason":…}` | Self-check reminders, structured output, handoff prompts — **and gating the yield**, see below |
 | `SubagentStop` | When a subagent completes | None | Aggregate results, chain to next agent |
 | `SessionEnd` | When a session ends | Side-effects only | Capture session metrics, export learnings |
 
@@ -67,6 +67,17 @@ Hooks receive a JSON payload on stdin with context about the event:
 }
 ```
 
+**PostToolUse: the result field is `tool_response`, not `tool_result`.** This is the single most expensive typo in hook authoring, because it fails silently in both directions: `jq -r '.tool_result.stdout'` returns an empty string for every command that ever ran, and a hook that then finds nothing to say exits 0 with no output — which is exactly what a correctly-working hook that had nothing to flag also does. Nothing distinguishes them without a canary. Note also that **the payload carries no exit code** — if your hook needs to know whether the command succeeded, it has to infer it from the response content.
+
+```json
+{
+  "session_id": "abc123",
+  "tool_name": "Bash",
+  "tool_input": { "command": "terraform apply" },
+  "tool_response": { "stdout": "...", "stderr": "..." }
+}
+```
+
 ### Hook Output
 
 Hooks communicate back via exit codes and optional stdout/stderr:
@@ -101,6 +112,32 @@ if [ -n "$REASON" ]; then
   exit 0
 fi
 ```
+
+#### The third mechanism: `permissionDecision`
+
+Exit codes and `"decision"` are not the whole surface. A PreToolUse hook can also return a `hookSpecificOutput` object whose `permissionDecision` is `allow`, `ask`, or `deny`:
+
+```bash
+# Force a prompt for this specific invocation, even under a broad allow list
+jq -n --arg r "$REASON" \
+  '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"ask",permissionDecisionReason:$r}}'
+exit 0
+```
+
+`ask` is the mechanism with no equivalent among the exit codes: it neither blocks nor waves through, it puts the decision in front of the user with your reason attached. That makes it the right choice for a command that is legitimate but whose blast radius the user should see first — where `exit 2` would be too strict and a soft block too weak.
+
+The same object carries `updatedInput`, which is how a rewrite hook returns a modified command alongside `permissionDecision: "allow"`.
+
+#### Stop hooks can block the yield
+
+The `Stop` event is not advisory. A Stop hook that emits `{"decision":"block","reason":…}` with exit 0 prevents Claude from ending its turn and feeds the reason back as an instruction — the mechanism behind self-check gates like "you touched a PR but never handed over its link" or "your closing message defers work you were asked to finish."
+
+```bash
+jq -n --arg reason "$REASON" '{"decision": "block", "reason": $reason}'
+exit 0
+```
+
+Use it sparingly and make the predicate precise. A Stop hook that fires when it shouldn't is worse than most bad hooks, because it fires at the exact moment the user is waiting for an answer, and a gate that cries wolf trains its reader to stop reading it.
 
 ## Design Patterns
 
@@ -325,7 +362,21 @@ Hooks follow the same layering as settings:
 
 **Principle:** If the hook enforces a team standard (linting, formatting, testing), put it at project level. If it reflects a personal preference (safety guards, notifications, quality bar), put it at global level. If it's experimental, put it at local level until proven.
 
-Multiple hooks on the same event run sequentially. If any PreToolUse hook returns `"block"`, the tool call is prevented.
+### Multiple hooks on one event: the override race
+
+Multiple hooks registered on the same event run sequentially, but **"any block wins" is not a guarantee you can rely on when the hooks return different kinds of output.** A hook that returns `updatedInput` — a rewriter, a proxy, a context injector — is returning a decision about the same tool call as an earlier hook's block, and the later response can end up being the one that takes effect. The failure is silent: the command runs, rewritten, with no sign that a guard ever objected.
+
+This matters most in the arrangement that invites it: a chain of separately-registered PreToolUse hooks where one rewrites commands and another blocks dangerous ones. That is a guard which fails *open*, and it fails open on exactly the commands the guard exists for.
+
+**The fix is structural, not ordering.** Consolidate everything that can decide the fate of one tool call into a single authority script with an explicit internal precedence:
+
+```text
+block  >  ask  >  rewrite  >  allow
+```
+
+One hook registration, one exit path, one place where precedence is written down and can be tested. Sub-checks become functions inside it rather than separate registrations. You lose the tidiness of one file per concern and gain a guard whose failure mode you can actually reason about — and a single fixture suite can then assert the precedence directly, which is impossible when the outcome depends on registration order.
+
+If you keep hooks separate, never mix a blocking guard and a rewriting hook on the same event and matcher.
 
 ## Token Optimization via Command Rewriting
 

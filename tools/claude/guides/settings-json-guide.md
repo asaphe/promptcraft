@@ -20,7 +20,7 @@ Settings load in order, with later layers overriding earlier ones:
 
 ## Permissions
 
-Permissions control which tools Claude can use without asking:
+Permissions control which tools Claude can use without asking. There are **three** tiers, not two — `ask` is the one most setups miss:
 
 ```json
 {
@@ -34,6 +34,10 @@ Permissions control which tools Claude can use without asking:
       "Bash(git diff:*)",
       "Bash(git log:*)"
     ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)"
+    ],
     "deny": [
       "Bash(rm -rf:*)",
       "Bash(git push --force:*)"
@@ -41,6 +45,16 @@ Permissions control which tools Claude can use without asking:
   }
 }
 ```
+
+| Tier | Effect |
+|------|--------|
+| `allow` | Runs with no prompt |
+| `ask` | Always prompts, even under a broad `allow` like `Bash(*)` |
+| `deny` | Blocked outright, no approval path |
+
+`ask` is what makes the wildcard strategy below workable: it lets you keep a broad `allow` for velocity while forcing a decision on the specific commands whose blast radius you want to see first. Without it, the only way to gate one command inside a broad allow is `deny`, which removes it entirely.
+
+`permissions` also takes `defaultMode` and `additionalDirectories` (extra paths the session may read and write outside the project root).
 
 ### Permission Patterns
 
@@ -130,7 +144,9 @@ See [hooks-guide.md](hooks-guide.md) for detailed hook design patterns. The sett
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/validate-bash.sh"
+            "command": ".claude/hooks/validate-bash.sh",
+            "if": "Bash(sleep *)",
+            "timeout": 60
           }
         ]
       }
@@ -138,6 +154,13 @@ See [hooks-guide.md](hooks-guide.md) for detailed hook design patterns. The sett
   }
 }
 ```
+
+Two fields on the inner hook object are easy to miss, and both belong there rather than on the matcher:
+
+- **`if`** — a second, narrower predicate. `matcher` selects the tool (`"Bash"`); `if` selects which invocations of it actually run the script, using permission-pattern syntax (`"Bash(sleep *)"`). Without it, a hook matched on `Bash` pays its startup cost on every single Bash call, so `if` is how you keep a narrow guard cheap.
+- **`timeout`** — seconds before the hook is killed. A hook that shells out to a network call needs this raised; the default is short.
+
+Hooks are available on more events than most configs use. A mature setup registers `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `SessionEnd`, and `PreCompact` — seven, not one.
 
 ## Model Preferences
 
@@ -148,27 +171,50 @@ See [hooks-guide.md](hooks-guide.md) for detailed hook design patterns. The sett
 }
 ```
 
-## MCP Servers
+## Plugins and Marketplaces
 
-Configure MCP servers that Claude Code can connect to:
+Installed plugins and the marketplaces they came from are recorded in `settings.json`, so they travel with a dotfiles-managed config the same way permissions do:
 
 ```json
 {
-  "mcpServers": {
-    "browser": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-browser"],
-      "env": {}
+  "extraKnownMarketplaces": {
+    "example-marketplace": {
+      "source": { "source": "github", "repo": "owner/repo" }
     }
+  },
+  "enabledPlugins": {
+    "plugin-name@example-marketplace": true
   }
 }
 ```
 
-### MCP in Global vs Project
+`/plugin marketplace add` and `/plugin install` write these keys for you — edit them by hand only to disable a plugin (`false`) or to prune an entry whose marketplace is gone.
 
-- **Global** — Servers you always want (browser automation, personal tools)
-- **Project** — Servers the team uses (project-specific APIs, databases)
-- Avoid duplicating servers across layers — project-level takes precedence
+## Other Top-Level Keys
+
+Beyond `permissions`, `env`, `hooks`, and `model`, the keys most worth knowing:
+
+| Key | What it does |
+|-----|--------------|
+| `sandbox` | Filesystem and network sandboxing for Bash commands |
+| `autoMode` | Autonomy behavior when the session runs unattended |
+| `autoMemoryEnabled` | Toggles the automatic memory feature — see [auto-memory-guide.md](auto-memory-guide.md) for why you might want this `false` |
+| `attribution` | Controls AI-attribution trailers in commits and PRs |
+| `cleanupPeriodDays` | How long transcripts are retained |
+| `statusLine` | Command that renders the status line |
+| `additionalDirectories` (under `permissions`) | Paths outside the project root the session may read and write |
+
+## MCP Servers — not in this file
+
+**`settings.json` has no `mcpServers` key.** MCP servers are configured in a different file entirely, by scope:
+
+| Scope | File | Command |
+|-------|------|---------|
+| User (all your projects) | `~/.claude.json` | `claude mcp add -s user` |
+| Project (this repo, committed) | `.mcp.json` in the project root | `claude mcp add -s project` |
+| Local (this repo, this machine) | `~/.claude.json`, keyed by project path | `claude mcp add -s local` (default) |
+
+Putting an `mcpServers` block in `settings.json` gets you no server: the key is ignored and the declared servers never appear in `claude mcp list`. Don't count on a warning to tell you — whether an unrecognized key is flagged depends on your version and on how the session was launched, and in a non-interactive run it passes silently. That quiet failure is why the mistake survives. See [mcp-management-guide.md](mcp-management-guide.md) for scope precedence, listing, and removal.
 
 ## Design Principles
 
@@ -177,7 +223,8 @@ Configure MCP servers that Claude Code can connect to:
 | Concern | Where It Goes |
 |---------|--------------|
 | Coding standards, behavioral rules, project context | CLAUDE.md |
-| Permissions, hooks, env vars, MCP servers | settings.json |
+| Permissions, hooks, env vars, plugins | settings.json |
+| MCP servers | `~/.claude.json` (user) or `.mcp.json` (project) |
 | Personal overrides | settings.local.json |
 
 CLAUDE.md is a document Claude reads for guidance. settings.json is a configuration file that Claude Code's runtime enforces. Don't mix them.

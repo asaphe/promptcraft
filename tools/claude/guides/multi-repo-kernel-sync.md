@@ -53,6 +53,17 @@ The most common mistake is putting repo-specific content in a kernel — it then
 
 Overlays need no workflow — edit them in place in their one repo.
 
+### Content-identical sync PRs from different sources are not duplicates
+
+Step 1 says edit in the source repo only, and that is the rule. But when more than one repo is a legitimate *source* for the same kernel file, and the same change is authored into two of them and merged close together, each source re-broadcasts — so a common peer repo can collect two sync PRs whose diffs are byte-identical.
+
+They look like an obvious duplicate to close. They are not: they carry different head branches and originate from different source repos, so closing one drops a real propagation. Check the source and the diff before declaring either redundant:
+
+```bash
+gh pr view <number> --json headRepository,headRefName
+gh pr diff <number>
+```
+
 ## The Sync Workflow
 
 The caller in the source repo is small — path-triggered, delegating to a reusable workflow:

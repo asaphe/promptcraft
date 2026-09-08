@@ -38,11 +38,13 @@ These three severities are what a review **posts**, and this table stays canonic
 
 Three severity levels, from highest to lowest:
 
-| Severity | Meaning | GitHub event | When to use |
-|----------|---------|--------------|-------------|
-| **BLOCKING** | Must fix before merge | `REQUEST_CHANGES` | Bugs, security issues, data loss, broken contracts |
-| **ISSUE** | Real problem, should fix — not merge-blocking | `COMMENT` | Silent failures, privilege escalation, fragile patterns, error handling gaps |
-| **SUGGESTION** | Nice to have, style, minor improvement | `COMMENT` | Code style, consolidation opportunities, defensive hardening |
+| Severity | Meaning | When to use |
+|----------|---------|-------------|
+| **BLOCKING** | Must fix before merge | Bugs, security issues, data loss, broken contracts |
+| **ISSUE** | Real problem, should fix — not merge-blocking on its own | Silent failures, privilege escalation, fragile patterns, error handling gaps |
+| **SUGGESTION** | Nice to have, style, minor improvement | Code style, consolidation opportunities, defensive hardening |
+
+**Severity is not the review event, and mapping one to the other mechanically is how a review that wants changes ends up authorizing merge.** Severity classifies each finding; the event answers a different question — do you want *anything in this review* acted on before merge? An ISSUE you want fixed means `REQUEST_CHANGES`, even though the severity is not "blocking". Pick the event per the table in [`pr-review-posting.md`](pr-review-posting.md) § Event Selection, not from a per-severity lookup.
 
 - **ISSUE is for real problems that won't prevent merge but should be addressed** — If a finding describes something that will cause user-facing confusion, debugging difficulty, or silent data loss in edge cases, it's an ISSUE — not a SUGGESTION. The test: would you file a bug for it? If yes, it's at least an ISSUE.
 

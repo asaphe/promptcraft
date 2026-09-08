@@ -4,7 +4,7 @@ How to make your Claude Code configuration portable across machines using dotfil
 
 ## The Problem
 
-Claude Code stores configuration in `~/.claude/`, but most of that directory is ephemeral (cache, telemetry, session data). The valuable files — your global CLAUDE.md, settings, docs, commands, and memory — are mixed in with runtime state. Without a portability strategy, a new machine means rebuilding your setup from scratch.
+Claude Code stores configuration in `~/.claude/`, but most of that directory is ephemeral (cache, telemetry, session data). The valuable files — your global CLAUDE.md, settings, hooks, rules, docs, and commands — are mixed in with runtime state. Without a portability strategy, a new machine means rebuilding your setup from scratch.
 
 Additionally, Claude Desktop (the Electron app) has its own separate config at `~/Library/Application Support/Claude/` (macOS) that isn't part of `~/.claude/`.
 
@@ -68,12 +68,17 @@ In the table and scripts below, `$DOTFILES_DIR` is the `claude/` subdirectory of
 |---------------|---------|---------------|
 | `CLAUDE.md` | Global behavioral rules | `$DOTFILES_DIR/CLAUDE.md` |
 | `settings.json` | Permissions, hooks, env vars | `$DOTFILES_DIR/settings.json` |
+| **`hooks/`** | **The scripts `settings.json` invokes — see below** | **`$DOTFILES_DIR/hooks/`** |
+| `rules/` | Always-loaded rule files | `$DOTFILES_DIR/rules/` |
 | `docs/` | On-demand reference docs | `$DOTFILES_DIR/docs/` |
 | `commands/` | Custom slash commands | `$DOTFILES_DIR/commands/` |
 | `statusline-command.sh` | Status line customization | `$DOTFILES_DIR/statusline-command.sh` |
 | `LOCAL_SENSITIVE.md` | Machine-local sensitive reference (see below) | `$DOTFILES_DIR/LOCAL_SENSITIVE.md` |
-| `memory/` | Persistent auto-memory | `$DOTFILES_DIR/memory/` |
 | `scripts/` | Utility scripts used by hooks | `$DOTFILES_DIR/scripts/` |
+
+**`hooks/` is not optional, and omitting it is the failure that looks like nothing is wrong.** `settings.json` refers to hook scripts by absolute path — a mature config has dozens of such references. Symlink `settings.json` without `hooks/` and the new machine gets a config whose every hook points at a file that does not exist. Claude Code starts fine and the session looks normal; the guardrails are simply absent. Symlink both, or neither.
+
+`memory/` is deliberately **not** in this table. It holds per-project auto-memory state, which is scoped to project paths that differ between machines, so symlinking it moves state that will not resolve. See [auto-memory-guide.md](auto-memory-guide.md).
 
 ### What NOT to Symlink
 
@@ -101,17 +106,18 @@ set -euo pipefail
 DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles/claude}"
 CLAUDE_DIR="$HOME/.claude"
 
-mkdir -p "$DOTFILES_DIR/docs" "$DOTFILES_DIR/commands" "$DOTFILES_DIR/memory" "$DOTFILES_DIR/scripts"
+mkdir -p "$DOTFILES_DIR/hooks" "$DOTFILES_DIR/rules" "$DOTFILES_DIR/docs" "$DOTFILES_DIR/commands" "$DOTFILES_DIR/scripts"
 
 # Files to symlink
 SYMLINKS=(
   "CLAUDE.md"
   "settings.json"
+  "hooks"
+  "rules"
   "docs"
   "commands"
   "statusline-command.sh"
   "LOCAL_SENSITIVE.md"
-  "memory"
   "scripts"
 )
 
@@ -164,6 +170,7 @@ Some reference material is valuable on every machine but shouldn't be committed 
 ```
 
 This file:
+
 - Lives in your dotfiles (private repo or encrypted)
 - Is symlinked into `~/.claude/` so Claude Code can read it
 - Is NOT committed to any project repo

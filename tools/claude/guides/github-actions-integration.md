@@ -207,7 +207,7 @@ jobs:
 |-------|-------------|----------|
 | `anthropic_api_key` | Anthropic API key | Yes |
 | `prompt` | Instructions for Claude | Yes |
-| `model` | Model to use (default: `claude-sonnet-4-6`) | No |
+| `model` | Model to use — omit to take the action's default | No |
 | `max_tokens` | Maximum response tokens | No |
 | `allowed_tools` | Tools Claude can use | No |
 
@@ -222,8 +222,7 @@ jobs:
 
 ### Cost Management
 
-- Use `claude-sonnet-4-6` for routine tasks (review, triage) — it's cheaper and fast
-- Reserve `claude-opus-4-6` for complex analysis (architecture review, security audit)
+- **Choose by tier, and pin the ID only if you must.** Use a mid-tier model for routine work (review, triage) — cheaper and faster — and reserve the top tier for complex analysis (architecture review, security audit). Model identifiers turn over every few months, so a pinned ID in a public workflow is a maintenance item with a short fuse; omitting `model` and taking the action's default is usually the better trade. If you do pin, check the current identifiers in Anthropic's model documentation rather than copying one from a guide.
 - Use path filters in workflow triggers to avoid running on irrelevant changes
 - Set `max_tokens` to limit response size
 
