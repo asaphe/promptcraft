@@ -80,6 +80,10 @@ User-invocable slash-command skills:
 - **Frontend** — `sentry-react`
 - **Tooling evaluation** — `eval-tool`
 
+### `hook-tests/`
+
+Three harnesses for testing hooks, each covering an axis the others cannot: `run-fixtures.py` (one hook deeply, asserting the *outcome* rather than the exit code), `probe-hooks.py` (every hook shallowly, asserting which stream carried the payload — a hook can be individually correct and collectively unarmed), and `mutate-fixtures.py` (breaks each hook on purpose and requires the suite to notice). `fixture_env.py` builds the git state that state-reading guards decide from.
+
 ### `evals/`
 
 Skill evaluation framework — validates that Claude Code routes queries to the correct skill and that skills produce expected behavior. Includes a Python runner, example trigger / functional eval JSON schemas, and a CI workflow pattern for PR reminders.

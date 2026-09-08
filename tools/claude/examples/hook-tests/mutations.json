@@ -1,0 +1,60 @@
+{
+  "_README": "Each mutation breaks ONE behaviour the fixture claims to cover. Aim them at distinct branches \u2014 a mutation that neuters the whole hook only proves the suite notices a corpse. `why` is printed in the run output, so write it as the thing that would be silently broken. A key names the file to mutate, resolved the same way run-fixtures resolves a hook. Add \"suite\": \"<hook>\" when the mutated file is a shared library, so the run exercises a suite that actually consumes it.",
+  "pr-create-guard": [
+    {
+      "why": "the stack form stops being recognised, so a stack submit skips every check",
+      "delete_matching": "stack \\+\\(submit\\|link\\)"
+    },
+    {
+      "why": "the dirty-tree block on a stack submit becomes advisory instead of blocking",
+      "replace": {
+        "from": "    printf \"STACK SUBMIT/LINK BLOCKED",
+        "to": "    exit 0\n    printf \"STACK SUBMIT/LINK BLOCKED"
+      }
+    },
+    {
+      "why": "the working directory stops being resolved, so every git check reads the session repo",
+      "delete_matching": "GITC=\\(-C \"\\$WORK_DIR\"\\)"
+    },
+    {
+      "why": "an unresolvable default branch goes back to blocking, asserting a zero diff nobody measured",
+      "replace": {
+        "from": "if ! git \"${GITC[@]}\" rev-parse --verify --quiet \"origin/${DEFAULT_BRANCH}\" >/dev/null 2>&1; then\n  exit 0\nfi\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "the command stops being stripped, so the guard fires on its own trigger in a -m body",
+      "replace": {
+        "from": "  CMD_MATCH=$(strip_cmd \"$CMD\")",
+        "to": "  CMD_MATCH=\"$CMD\""
+      }
+    },
+    {
+      "why": "only the FIRST cd is read, so `cd a && cd b` grades the repo the command left",
+      "replace": {
+        "from": "| tail -1)",
+        "to": "| head -1)"
+      }
+    }
+  ],
+  "stateful-op-reminder": [
+    {
+      "why": "the command stops being stripped, so the reminder fires on its trigger in a -m body",
+      "replace": {
+        "from": "  CMD=$(strip_cmd \"$CMD\")",
+        "to": "  CMD=\"$CMD\""
+      }
+    }
+  ],
+  "_lib/strip-cmd": [
+    {
+      "why": "an executed heredoc is blanked again, hiding a real invocation behind three lines of shell",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "  if ! _heredoc_is_executed \"$cmd\"; then",
+        "to": "  if true; then"
+      }
+    }
+  ]
+}

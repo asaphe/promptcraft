@@ -1,0 +1,56 @@
+# pr-create-guard — blocks PR creation when a prerequisite is missing, and emits a
+# checklist when none is. Every case runs against a repo built by fixture_env.pr_create,
+# because this guard decides from git state rather than from the command string: point
+# it at whatever happens to be checked out and the verdicts flap with the day.
+#
+# `cd {token} && ...` is how each case selects its repo. The guard runs bare git, so
+# the leading cd is what puts it in the right tree.
+
+#!setup pr-create
+
+# --- must block: the four states where the PR would be wrong or empty ---
+hard	cd {zero} && gh pr create --title x --body y
+hard	cd {unpushed} && gh pr create --title x --body y
+hard	cd {dirty} && gh pr create --title x --body y
+
+# --- must emit the checklist: everything is in order ---
+ctx	cd {ready} && gh pr create --title x --body y
+
+# --- unmeasurable is not empty. With no origin/main the zero-diff check could not run,
+# and blocking on that would assert a measurement nobody took, so a branch that is
+# otherwise in order passes.
+allow	cd {noorigin_ready} && gh pr create --title x --body y
+
+# --- but an unresolvable default branch must not take down the checks that never needed
+# it. {noorigin} is also unpushed, which is still knowable, so it still blocks.
+hard	cd {noorigin} && gh pr create --title x --body y
+
+# --- the stack form. `gh stack submit` creates or updates EVERY pull request in the
+# stack, so a dirty tree costs N pull requests missing the work, not one. The guard
+# matched only the single-PR spelling until this fixture was written, exiting 0 here
+# while hard-blocking the create form in the same tree.
+hard	cd {dirty} && gh stack submit
+ctx	cd {ready} && gh stack submit
+
+# --- the LAST cd wins. `cd a && cd b` runs in b, so a guard reading the first grades
+# the repo the command already left — and a clean one launders a dirty one.
+hard	cd {ready} && cd {dirty} && gh pr create --title x --body y
+ctx	cd {dirty} && cd {ready} && gh pr create --title x --body y
+
+# --- a mid-command `git -C <other>` names a different repo than the one the PR would be
+# created in, so it must not redirect the checks.
+hard	cd {dirty} && git -C {ready} log -1 && gh pr create --title x --body y
+
+# --- must not fire: neither spelling present ---
+allow	cd {ready} && git status
+allow	cd {ready} && gh pr view 1
+allow	cd {ready} && gh pr list
+
+# --- must not fire on the words appearing as message text rather than as an
+# invocation. A guard that matches its own trigger inside a commit subject blocks
+# the commit that documents it.
+allow	cd {ready} && git commit -m "docs: explain when to run gh pr create vs gh stack submit"
+
+# --- input unavailable: the extraction returns nothing, which is indistinguishable
+# from "no command to guard". Pinned so a later edit cannot flip it silently.
+allow	<absent>

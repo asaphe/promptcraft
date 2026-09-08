@@ -17,6 +17,14 @@
 INPUT=$(cat)
 CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 
+LIB="$(dirname "$0")/../_lib"
+# shellcheck source=/dev/null  # runtime-only source
+[ -f "$LIB/strip-cmd.sh" ] && source "$LIB/strip-cmd.sh"
+# Match the stripped form, or the reminder fires on its own trigger quoted in a -m body.
+if command -v strip_cmd >/dev/null 2>&1; then
+  CMD=$(strip_cmd "$CMD")
+fi
+
 if [ -z "$CMD" ]; then
   exit 0
 fi
