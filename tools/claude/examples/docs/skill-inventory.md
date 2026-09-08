@@ -1,6 +1,6 @@
 # Skill Inventory
 
-Skills shipped under `tools/claude/examples/skills/`. Invoke with `/{skill-name}` or via the Skill tool. The list below describes what each skill does at a high level — the authoritative description and `argument-hint` live in each skill's frontmatter and body.
+Skills shipped under `tools/claude/examples/skills/`. Invoke with `/{skill-name}` or via the Skill tool. The tables below describe each skill at a high level — the authoritative description and `argument-hint` live in each skill's frontmatter and body.
 
 ## PR Lifecycle
 
@@ -36,6 +36,17 @@ Review and finalize moved to [claude-reviewkit](https://github.com/asaphe/claude
 | Slash Command | Skill | Purpose |
 |---|---|---|
 | `/eval-tool [tool-name-or-url]` | eval-tool | Security evaluation framework for adopting a new dev tool / extension / MCP server / dependency |
+| `/eval-routing [cases-file]` | eval-routing | Measure whether your skill descriptions let a context-free router pick the right skill; code-graded by exact/set match |
+| `/council [input]` | council | Multi-perspective parallel review by a roster of expert subagents, each in its own context |
+| `/delete-failed-runs [workflow]` | delete-failed-runs | List and delete failed or cancelled workflow runs |
+
+## Verification & Investigation
+
+| Slash Command | Skill | Purpose | Notes |
+|---|---|---|---|
+| `/aws-resource-state <service> <id>` | aws-resource-state | Fetch live AWS resource state before asserting a fact about it ("role exists", "secret has a value") | Read-only; the answer to "is this claim true right now" |
+| `/cross-repo-grep <repo> <path>` | cross-repo-grep | Quote lines from another repo in your org at `main` without cloning it | Verifies a cross-repo claim; adapt the org slug |
+| `/history-search <pattern> [days]` | history-search | Search prior conversations by date window and regex | Finds the *wording* of a past prompt → for session STATE use `/sessions` |
 
 ## Session State
 

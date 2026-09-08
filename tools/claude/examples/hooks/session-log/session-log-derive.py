@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 
 # Unset means the machine's local zone. see: README.md § Environment
@@ -29,8 +30,9 @@ SESSIONS_DIR = os.environ.get(
 LEDGER_DIR = os.environ.get(
     "SESSION_LOG_LEDGER_DIR", os.path.expanduser("~/.claude/local/action-ledger"))
 
-# Matched against branch, title and every cwd the session saw. see: README.md § Environment
-TICKET_RE = re.compile(os.environ.get("SESSION_LOG_TICKET_RE", r"[A-Za-z]{2,10}-\d{1,6}"))
+# Opt-in: a generic default fabricates keys from version suffixes. see: README.md § Environment
+_TICKET_PAT = os.environ.get("SESSION_LOG_TICKET_RE", "")
+TICKET_RE = re.compile(_TICKET_PAT) if _TICKET_PAT else None
 
 # `type == "user"` alone is ~80% machine-authored; promptSource is what separates them.
 HUMAN_SOURCES = ("typed", "queued")
@@ -44,9 +46,11 @@ def parse_ts(raw):
     try:
         if isinstance(raw, (int, float)):
             return datetime.fromtimestamp(raw / 1000, timezone.utc)
-        return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
     except Exception:
         return None
+    # A ledger stamp with no offset would otherwise crash every aware/naive comparison below.
+    return dt if dt.tzinfo else dt.astimezone()
 
 
 def local_hhmm(dt):
@@ -108,9 +112,9 @@ def is_machine(text):
     return not text or text.lstrip().startswith(MACHINE_PREFIXES)
 
 
-def derive_entries(records, meta, pending=None, seen_prs=None):
-    """Transcript records -> [(datetime, kind, text)]. Mutates meta and `pending`."""
-    out, last_edit = [], None
+def derive_entries(records, meta, pending=None, seen_prs=None, last_edit=None):
+    """Transcript records -> [(datetime, kind, text)]. Mutates meta, `pending` and `meta["last_edit"]`."""
+    out = []
     pending = pending if pending is not None else []
     seen_prs = seen_prs if seen_prs is not None else set()
     for rec in records:
@@ -160,6 +164,7 @@ def derive_entries(records, meta, pending=None, seen_prs=None):
                 out.append((ts, "agent", a))
             for n in notes:
                 out.append((ts, "note", n))
+            meta["last_edit"] = last_edit
         elif kind == "queue-operation":
             op, body = rec.get("operation"), rec.get("content") or ""
             if op == "enqueue" and not is_machine(body):
@@ -213,13 +218,13 @@ def header_lines(meta, session):
     # The ticket hides in whichever of branch / title / worktree path the session used.
     ticket = ""
     for hay in [meta.get("branch"), meta.get("title")] + sorted(meta.get("seen") or []):
-        m = TICKET_RE.search(hay or "")
+        m = TICKET_RE.search(hay or "") if TICKET_RE else None
         if m:
             ticket = m.group(0).upper()
             break
     cwd = meta.get("cwd") or ""
     return [
-        "# %s" % (meta.get("title") or "(untitled session)"),
+        "# %s" % (squash(meta.get("title"), 200) or "(untitled session)"),
         "session: %s" % session,
         "project: %s" % (cwd.replace(os.path.expanduser("~"), "~", 1) if cwd else "?"),
         "branch:  %s" % (meta.get("branch") or "-"),
@@ -246,15 +251,16 @@ def write_log(path, meta, session, entries):
     # A lost or reset .mark re-derives the session, which without this dedup doubles every entry.
     try:
         with open(path, errors="replace") as fh:
-            already = {line.rstrip("\n") for line in fh if line.startswith("- ")}
+            already = Counter(ln.rstrip("\n") for ln in fh if ln.startswith("- "))
     except OSError:
-        already = set()
+        already = Counter()
     with open(path, "a") as fh:
         for ts, kind, text in entries:
             line = "- %s %s · %s" % (local_hhmm(ts), kind, text)
-            if line in already:
+            # Counted, not a set: two real events can render identically inside one minute.
+            if already[line]:
+                already[line] -= 1
                 continue
-            already.add(line)
             fh.write(line + "\n")
 
 
@@ -277,6 +283,11 @@ def last_state(path):
     try:
         hh, mm = (int(x) for x in stamp.split(":"))
     except ValueError:
+        return turns, None
+    # A state line carries HH:MM and no date, so its age is only derivable inside the log's
+    # own day. A session resumed across days keeps writing into day one's file, where the
+    # same stamp could be minutes or days old — report unknown and let `turns` decide.
+    if os.path.basename(os.path.dirname(path)) != now.strftime("%Y-%m-%d"):
         return turns, None
     mins = (now.hour * 60 + now.minute) - (hh * 60 + mm)
     return turns, mins if mins >= 0 else mins + 1440
@@ -302,11 +313,12 @@ def run(transcript, session, sessions_dir=SESSIONS_DIR, force_offsets=None):
     records, total = read_records(transcript, mark_meta["records"])
     cached = mark_meta.get("header") or {}
     meta = {"asks": 0, "title": cached.get("title"), "branch": cached.get("branch"),
-            "cwd": cached.get("cwd"), "seen": set(cached.get("seen") or [])}
+            "cwd": cached.get("cwd"), "seen": set(cached.get("seen") or []),
+            "last_edit": cached.get("last_edit")}
 
     pending = list(mark_meta.get("pending") or [])
     seen_prs = set(mark_meta.get("prs") or [])
-    entries = derive_entries(records, meta, pending, seen_prs)
+    entries = derive_entries(records, meta, pending, seen_prs, cached.get("last_edit"))
     led, led_total = derive_ledger(session, mark_meta["ledger"])
     entries.extend(led)
     entries.sort(key=lambda e: e[0] or datetime.min.replace(tzinfo=timezone.utc))
@@ -326,7 +338,8 @@ def run(transcript, session, sessions_dir=SESSIONS_DIR, force_offsets=None):
         json.dump({"records": total, "ledger": led_total, "pending": pending,
                    "prs": sorted(seen_prs),
                    "header": {"title": meta["title"], "branch": meta["branch"],
-                              "cwd": meta["cwd"], "seen": sorted(meta["seen"])}}, fh)
+                              "cwd": meta["cwd"], "seen": sorted(meta["seen"]),
+                              "last_edit": meta.get("last_edit")}}, fh)
 
     turns, mins = last_state(log_path)
     with open(log_path, errors="replace") as fh:

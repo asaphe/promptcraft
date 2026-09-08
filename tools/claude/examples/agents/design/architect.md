@@ -8,6 +8,7 @@ description: >-
   cheaper tier. Read-only: produces a design or recommendation, never implements.
   For step-by-step implementation task breakdown use `planner`.
 model: opus
+memory: none
 maxTurns: 40
 tools: Read, Glob, Grep, WebFetch, WebSearch, Bash(git log *), Bash(git show *), Bash(git diff *), Bash(git blame *), Bash(git rev-parse *), Bash(git branch *), Bash(git worktree list*), Bash(ls *), Bash(wc *), Bash(jq *), Bash(terraform show *), Bash(terraform state list *), SendMessage
 ---

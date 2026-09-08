@@ -39,7 +39,7 @@ ticket:  PROJ-412
 - 10:02 dropped · never answered: also check whether the DLQ replays these
 ```
 
-Alongside each `.md` sits a `.mark` file holding the resume offsets, so the next run reads only the new transcript lines.
+The `ticket:` line above assumes `SESSION_LOG_TICKET_RE` is configured; unset, it reads `-`. Alongside each `.md` sits a `.mark` file holding the resume offsets, so the next run reads only the new transcript lines.
 
 ### Entry kinds
 
@@ -57,6 +57,8 @@ Alongside each `.md` sits a `.mark` file holding the resume offsets, so the next
 **`dropped` is the highest-signal kind in the file.** Each one is something the human typed that never became a turn — a prompt removed from the queue, or one still queued long after it was submitted. Nothing else in Claude Code surfaces these, and they are exactly what "where did we stop" is asking about.
 
 **`state` is the only kind that records a decision.** A derived log records what happened, never what was concluded. If a session has no `state` line, say so when reading it rather than inferring intent from the mechanical entries.
+
+A `state` line carries `HH:MM` and no date, so its age is only derivable inside the log's own day. A session resumed across days keeps writing into day one's file, where the same stamp could be minutes or days old — so the hook reports the minutes as unknown there and decides staleness from the number of entries appended after the line instead. That count is exact and never ambiguous.
 
 ## Install
 
@@ -99,10 +101,16 @@ python3 sessions.py grep  <regex> [--days 30]
 | Variable | Default | Purpose |
 |---|---|---|
 | `SESSION_LOG_DIR` | `~/.claude/session-logs` | Where logs are written and read. Read by all three files. |
-| `SESSION_LOG_TZ` | machine local zone | Rendering timezone for entry times, e.g. `UTC`. Set it when logs are read somewhere other than where they were written. |
-| `SESSION_LOG_TICKET_RE` | `[A-Za-z]{2,10}-\d{1,6}` | Your tracker's key format. Matched against branch, title, and every cwd the session saw — the ticket hides in whichever of those the session used. |
-| `SESSION_LOG_RETENTION_DAYS` | `90` | Age at which a date directory is pruned. |
+| `SESSION_LOG_TZ` | machine local zone | Rendering timezone for entry times, e.g. `UTC`. Applied when a line is **written** — `sessions.py` prints the stored `HH:MM` and never converts — so set it on the machine running the hook, not the one reading. |
+| `SESSION_LOG_TICKET_RE` | unset — **no ticket extraction** | Your tracker's key format, e.g. `[Pp][Rr][Oo][Jj]-\d+`. Matched against branch, title, and every cwd the session saw, since the ticket hides in whichever of those the session used. Opt-in on purpose: see below. |
+| `SESSION_LOG_RETENTION_DAYS` | `90` | Age in days at which a date directory is pruned. **`0` is not "disabled"** — it means "older than today", which deletes almost everything. To disable pruning, point `SESSION_LOG_DIR` at a path not ending in `session-logs`. |
 | `SESSION_LOG_LEDGER_DIR` | `~/.claude/local/action-ledger` | Optional; see below. |
+
+### Why ticket extraction is opt-in
+
+There is no generic pattern that separates a tracker key from a version suffix. `PROJ-412` and `bump-node-20` are the same shape, as are `release-2.1`, `ubuntu-24`, and any path under a versioned toolchain (`python-3.12`). A default pattern therefore *fabricates* keys — and because `header_lines` tries `branch` first, a false match wins exactly on the untracked `main` sessions that should show no ticket at all. Since `sessions.py list` groups by `(day, project, branch, ticket)`, a fabricated key silently splits or merges groups in the reader.
+
+So the default extracts nothing, and every log shows `ticket: -` until you set the variable to your own tracker's format.
 
 ## Optional — the action ledger
 
@@ -111,6 +119,8 @@ python3 sessions.py grep  <regex> [--days 30]
 ```text
 <ISO-8601 timestamp>\t<class>\t<exit code>\t<command>
 ```
+
+Give the timestamp a UTC offset (`2026-09-08T12:00:00Z`). One without an offset is read as machine-local, which is right for `date +%Y-%m-%dT%H:%M:%S` and silently wrong by your offset for `datetime.utcnow().isoformat()`.
 
 Nothing in this repo writes that file — supply it from whatever already classifies your commands (a `PostToolUse` hook, a shell wrapper), or leave it absent. When the file is missing, `derive_ledger` returns nothing and the rest of the log is unaffected: there are simply no `run` lines.
 

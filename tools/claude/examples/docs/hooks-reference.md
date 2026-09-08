@@ -53,6 +53,7 @@ Compaction is the one boundary where in-session reasoning is destroyed while any
 | `agent-config-review-guard.sh` | `git push*` | Flags agent config changes on push | Warning | Conditional |
 | `pre-push-lint-guard.sh` | `git push*` | Runs the linter before push | Blocks on errors | Conditional |
 | `pr-create-guard.sh` | `gh pr create*` | Pre-flight checklist for PR creation | Blocks or warns | Conditional |
+| `session-log.sh` | Stop | Appends the turn to a per-session log; nudges when its newest `state` line is stale | `systemMessage` to the user | Conditional |
 | `pr-edit-counter.sh` | `gh pr edit*` | Tracks PR edit count | Advisory | Conditional |
 
 ## PreToolUse: Edit / MultiEdit / Write — 3 entries

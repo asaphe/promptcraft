@@ -7,6 +7,7 @@ description: >-
   structured summary — raw output stays out of the caller's context. Never
   modifies files, commits, or pushes.
 model: haiku
+memory: none
 maxTurns: 20
 tools: Read, Glob, Grep, Bash(git status*), Bash(git log*), Bash(git diff*), Bash(git branch*), Bash(git show*), Bash(git rev-parse*), Bash(git worktree list*), Bash(git remote -v*), Bash(git stash list*), Bash(ls *), Bash(wc *), Bash(jq *), Bash(aws * describe*), Bash(aws * list*), Bash(aws * get*), Bash(kubectl get *), Bash(kubectl describe *), Bash(helm list *), Bash(helm get *), Bash(gh pr view *), Bash(gh pr list *), Bash(gh run list *), Bash(terraform show *), Bash(terraform state list *), SendMessage
 ---

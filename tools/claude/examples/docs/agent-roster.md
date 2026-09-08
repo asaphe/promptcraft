@@ -13,7 +13,7 @@ Design agents are read-only and produce a document, never an edit. They exist so
 | **architect** | Module boundaries, contracts, cross-repo trade-offs, refactor and migration strategy, API/schema design | The *shape* is still open — "how should this be structured" |
 | **planner** | Ordered file-level implementation plans, sequencing, acceptance checks, executor routing | The shape is decided and you need the execution plan |
 
-The pairing is the point: `architect` decides *what*, `planner` decides *in what order and proven how*. Sending a still-open question to `planner` gets you a confident plan for the wrong design, so it is told to refuse and name `architect` instead.
+The pairing is the point: `architect` decides *what*, `planner` decides *in what order and proven how*. Sending a still-open question to `planner` gets you a confident plan for the wrong design, so it is told to defer to `architect` and say so, rather than planning around the gap.
 
 ## Operational Agents
 

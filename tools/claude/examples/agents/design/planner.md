@@ -10,6 +10,7 @@ description: >-
   architecture and "how should this be structured" use `architect`; this agent
   assumes the shape is decided and plans the execution.
 model: opus
+memory: none
 maxTurns: 40
 tools: Read, Glob, Grep, WebFetch, WebSearch, Bash(git log *), Bash(git show *), Bash(git diff *), Bash(git blame *), Bash(git rev-parse *), Bash(git branch *), Bash(git status*), Bash(git worktree list*), Bash(ls *), Bash(wc *), Bash(jq *), Bash(terraform show *), Bash(terraform state list *), Bash(gh pr view *), Bash(gh pr list *), SendMessage
 ---

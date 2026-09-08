@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 
 SESSIONS_DIR = os.environ.get("SESSION_LOG_DIR", os.path.expanduser("~/.claude/session-logs"))
 ENTRY_RE = re.compile(r"^- (\d\d:\d\d) (\w+) · (.*)$")
-KINDS = ("ask", "edit", "run", "pr", "agent", "state", "dropped", "note", "end")
+KINDS = ("ask", "edit", "run", "pr", "agent", "state", "dropped", "note")
 
 
 def load(days=None):
@@ -60,10 +60,17 @@ def group_key(s):
 
 
 def last_state(s):
-    for _, kind, text in reversed(s["entries"]):
+    """(HH:MM, text) of the newest state entry in one session, or None."""
+    for stamp, kind, text in reversed(s["entries"]):
         if kind == "state":
-            return text
-    return ""
+            return (stamp, text)
+    return None
+
+
+def newest_state(members):
+    """Newest state line across a group. Members are UUID-named, so file order is not time order."""
+    found = [st for st in (last_state(m) for m in members) if st]
+    return max(found)[1] if found else ""
 
 
 def counts(entries):
@@ -87,7 +94,7 @@ def cmd_list(args):
             continue
         entries = [e for m in members for e in m["entries"]]
         title = members[0].get("title", "(untitled)")
-        state = next((last_state(m) for m in members if last_state(m)), "")
+        state = newest_state(members)
         span = "%s-%s" % (entries[0][0], entries[-1][0]) if entries else "--:--"
         print("%s  %s  %-11s %s" % (key[0], span, key[3], title))
         print("        %s%s" % (key[1], "" if key[2] in ("-", "") else "  (%s)" % key[2]))
