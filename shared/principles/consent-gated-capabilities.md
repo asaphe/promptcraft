@@ -33,6 +33,10 @@ Never route around the gate by decomposing the expensive action into small steps
 
 "Invoke when appropriate" degrades under pressure: an agent optimizing for task success will always find the expensive path appropriate. A closed list is checkable — by the model, by a hook, and by the user reading the transcript. It converts a vibes call ("did they *want* the big version?") into a string match. The same structure generalizes to any powerful tool a setup adds later: define the consent list *when you add the capability*, not after the first surprise.
 
+## Sizing the consent: batch grants
+
+Consent is not always all-or-nothing per call. When a guard prompts on each of N *identical* calls, a batch grant lets one prompt authorize a known-size set — showing the user the whole list at once instead of one call at a time, without degrading to a session-wide blanket. The mechanism, its bounds, and a worked refusal of a case that looked batchable are in [`../../tools/claude/examples/docs/batch-approval-grants.md`](../../tools/claude/examples/docs/batch-approval-grants.md).
+
 ## Calibrate inside the consent, too
 
 Consent to the mechanism is not consent to unlimited depth. "Find any bugs" with a workflow keyword still means a small pass; "thoroughly audit, be comprehensive" means the large one. Scale within the granted mechanism to the words actually used.

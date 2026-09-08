@@ -142,6 +142,37 @@ for item in "${SYMLINKS[@]}"; do
 done
 ```
 
+### Two Wiring Classes — Why a New Skill Can Be Invisible
+
+The script above links each entry as a **directory symlink**, so a file written anywhere under `$DOTFILES_DIR/hooks/` is live in `~/.claude/hooks/` immediately. Mature setups rarely stay that uniform, and the difference decides whether a newly-authored file is active or silently absent.
+
+| Wiring | Shape | New file live without extra steps? |
+|--------|-------|-----------------------------------|
+| **Directory symlink** | `~/.claude/<subdir>` → `$DOTFILES_DIR/<subdir>` | **Yes** — write into dotfiles, it is instantly visible |
+| **Real directory, per-entry symlinks** | `~/.claude/<subdir>/` is a real dir; each child is its own symlink | **No** — each new entry needs its own link |
+
+The second class appears wherever Claude Code writes into a directory itself. `claude plugin init`, for instance, scaffolds into `~/.claude/skills/<name>/`, so that directory tends to be real rather than a symlink — and then existing skills are individual links while a new one is not linked at all.
+
+**The failure is silent.** Authoring `$DOTFILES_DIR/skills/<name>/SKILL.md` under a per-entry-linked directory produces no error and no warning; the skill is simply never discovered. Create the link explicitly:
+
+```bash
+ln -s "$DOTFILES_DIR/skills/<name>" ~/.claude/skills/<name>
+```
+
+Check which class a subdirectory is in before assuming:
+
+```bash
+# A symlink prints "-> /path/to/dotfiles/<subdir>"; a real directory does not.
+ls -ld ~/.claude/hooks ~/.claude/skills ~/.claude/scripts
+```
+
+Two habits follow:
+
+- Do not infer "it is all symlinked to dotfiles" uniformly — check the specific subdirectory.
+- After adding an entry under a per-entry-linked directory, verify through the `~/.claude/` path (`ls ~/.claude/skills/<name>/`), not the dotfiles path. The dotfiles path always looks correct; it is the one you just wrote.
+
+Editing an *existing* entry needs no link step in either class — the dotfiles file is already the live file.
+
 ## The LOCAL_SENSITIVE.md Pattern
 
 Some reference material is valuable on every machine but shouldn't be committed to a shared repo (account IDs, resource ARNs, internal paths). The `LOCAL_SENSITIVE.md` file solves this:

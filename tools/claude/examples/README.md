@@ -27,6 +27,10 @@ Supporting documentation referenced by agents and skills:
 - **Terraform** — `terraform-module-anatomy.md`, `terraform-state-moves.md`
 - **Datadog** — `datadog-pup.md`, `datadog-dashboard-codification.md`
 - **Bash & CLI** — `bash-patterns.md`, `cli-gotchas.md`, `composite-action-spec.md`, `gha-reusable-workflow-patterns.md`
+- **Git** — `git-worktree-and-squash-safety.md` (worktree pre-flight, restacking after a squash-merge, the squash protocol, and the predicate a force-push auto-allow actually needs)
+- **Testing** — `testing-validation.md` (what has to be true before "done": diagnosis, non-vacuous verification, CI verdicts that survive a correct API read)
+- **Consent & capability gating** — `batch-approval-grants.md` (one prompt for a known-size set of identical guarded calls, and the worked refusal of a case that looked batchable)
+- **Claude Code internals** — `claude-code-plugin-gotchas.md` (the process registry: why an updated plugin agent can serve stale content with no error)
 - **Diagrams** — `drawio-authoring.md`
 - **Doc / authoring** — `doc-authoring.md`, `doc-quality-checklist.md`
 - **Codification templates** — `secret-naming-template.md`, `1password-caching.md`
