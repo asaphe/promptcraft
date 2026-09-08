@@ -63,10 +63,15 @@ Afterwards they are ordinary dependent PRs — each merges by its normal route, 
 
 ### `mergeStateStatus` is not evidence about what a given user may do
 
-It is computed without regard to the viewer's bypass, so it reads `BLOCKED` for a user who can in fact merge. `viewerCanMergeAsAdmin` is the ruleset-aware field — it flips on a ruleset edit alone, with no branch-protection change involved:
+It is computed without regard to the viewer's bypass, so it reads `BLOCKED` for a user who can in fact merge. `viewerCanMergeAsAdmin` is the ruleset-aware field — it flips on a ruleset edit alone, with no branch-protection change involved.
+
+**Read it through GraphQL, not `gh pr view --json`.** The field exists on the GraphQL `PullRequest` type but is not among the fields `gh pr view --json` exposes (checked on `gh` 2.99.0, where it errors with `Unknown JSON field`):
 
 ```bash
-gh pr view <n> --json mergeStateStatus,viewerCanMergeAsAdmin
+gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){
+  repository(owner:$o,name:$r){ pullRequest(number:$n){
+    mergeStateStatus viewerCanMergeAsAdmin reviewDecision } } }' \
+  -f o=<owner> -f r=<repo> -F n=<number>
 ```
 
 A bypass entry must be added to **every** gating ruleset before that field flips; one ruleset short leaves it `false`.
