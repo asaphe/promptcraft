@@ -1,0 +1,3 @@
+# Running the Python examples in place leaves bytecode beside them.
+__pycache__/
+*.py[cod]

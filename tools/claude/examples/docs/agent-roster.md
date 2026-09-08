@@ -4,6 +4,17 @@ Agents shipped under `tools/claude/examples/agents/`. Each agent's authoritative
 
 When your task crosses into another domain, recommend the appropriate sibling agent rather than attempting deep work outside your expertise.
 
+## Design & Planning Agents
+
+Design agents are read-only and produce a document, never an edit. They exist so a session running a cheap model tier can buy frontier-tier judgment for one call without switching the session's model.
+
+| Agent | Domain | Dispatch when |
+|-------|--------|---------------|
+| **architect** | Module boundaries, contracts, cross-repo trade-offs, refactor and migration strategy, API/schema design | The *shape* is still open — "how should this be structured" |
+| **planner** | Ordered file-level implementation plans, sequencing, acceptance checks, executor routing | The shape is decided and you need the execution plan |
+
+The pairing is the point: `architect` decides *what*, `planner` decides *in what order and proven how*. Sending a still-open question to `planner` gets you a confident plan for the wrong design, so it is told to defer to `architect` and say so, rather than planning around the gap.
+
 ## Operational Agents
 
 Operational agents perform read-only diagnostics or scoped operational tasks. They explain root causes and surface findings; they don't modify production state autonomously.
@@ -15,6 +26,7 @@ Operational agents perform read-only diagnostics or scoped operational tasks. Th
 | **k8s-troubleshooter** | Pod crashes, scheduling, Karpenter, ingress/ALB, DNS, IRSA |
 | **karpenter-expert** | Karpenter NodePool config, instance sizing, pool taxonomy, scheduling failures |
 | **secrets-expert** | Secrets Manager → ExternalSecret → K8s Secret → pod env chain; drift detection |
+| **shell-diagnostics** | Batching 3+ independent read-only ops (git state, greps, cloud/K8s describes) into one cheap-tier call that returns a summary instead of raw output |
 
 ## Review Agents
 
