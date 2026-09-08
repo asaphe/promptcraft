@@ -34,6 +34,8 @@ This file is a kernel: the rules here apply to every reviewer agent. Per-repo ov
 
 ## Severity Classification
 
+These three severities are what a review **posts**, and this table stays canonical for that. `../rules/general/review-verdicts.md` carries the layer above it: which review state to submit at all, and six internal grades (adding `GAP`, `WARNING`, `NIT`) that map onto the three below before posting.
+
 Three severity levels, from highest to lowest:
 
 | Severity | Meaning | GitHub event | When to use |
