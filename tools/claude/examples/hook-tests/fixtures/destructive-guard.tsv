@@ -44,10 +44,19 @@ allow	kubectl get pods
 allow	git commit -m "docs: never git push origin main directly"
 allow	git commit -m "chore: remove the gh pr merge step from the runbook"
 
-# --- allow: the trigger inside a heredoc body, which is data being written to a file
-# rather than a command being run.
+# --- a heredoc body is data when written to a file, and CODE when fed to an interpreter.
+# strip-cmd.sh blanks the first and preserves the second; blanking both would hide a real
+# invocation behind three lines of shell.
 #!escapes
 allow	cat <<EOF > runbook.md\ngit push origin main\nEOF
+hard	bash <<EOF\ngit push origin main\nEOF
+
+# --- KNOWN GAP, pinned rather than described. A command substitution now survives
+# stripping (it is code, and `strip_quoted_args` preserves it by design), but the push
+# rule still does not match an invocation NESTED inside one, so this reaches no verdict.
+# Recorded as `allow` because that is what the hook does today, not because it is right:
+# when the matcher learns to descend into a substitution this line goes red on purpose.
+allow	git commit -m "$(git push origin main)"
 
 # --- input unavailable: the extraction returns nothing, which is indistinguishable from
 # "no command to guard". Pinned so a later edit cannot flip it silently.

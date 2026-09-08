@@ -16,10 +16,14 @@ hard	cd {dirty} && gh pr create --title x --body y
 # --- must emit the checklist: everything is in order ---
 ctx	cd {ready} && gh pr create --title x --body y
 
-# --- unmeasurable is not empty. With no origin/main the zero-diff check could not
-# run, and blocking there would assert a measurement nobody took. The guard allows,
-# and this case pins that as a decision rather than an accident.
-allow	cd {noorigin} && gh pr create --title x --body y
+# --- unmeasurable is not empty. With no origin/main the zero-diff check could not run,
+# and blocking on that would assert a measurement nobody took, so a branch that is
+# otherwise in order passes.
+allow	cd {noorigin_ready} && gh pr create --title x --body y
+
+# --- but an unresolvable default branch must not take down the checks that never needed
+# it. {noorigin} is also unpushed, which is still knowable, so it still blocks.
+hard	cd {noorigin} && gh pr create --title x --body y
 
 # --- the stack form. `gh stack submit` creates or updates EVERY pull request in the
 # stack, so a dirty tree costs N pull requests missing the work, not one. The guard
@@ -27,6 +31,15 @@ allow	cd {noorigin} && gh pr create --title x --body y
 # while hard-blocking the create form in the same tree.
 hard	cd {dirty} && gh stack submit
 ctx	cd {ready} && gh stack submit
+
+# --- the LAST cd wins. `cd a && cd b` runs in b, so a guard reading the first grades
+# the repo the command already left — and a clean one launders a dirty one.
+hard	cd {ready} && cd {dirty} && gh pr create --title x --body y
+ctx	cd {dirty} && cd {ready} && gh pr create --title x --body y
+
+# --- a mid-command `git -C <other>` names a different repo than the one the PR would be
+# created in, so it must not redirect the checks.
+hard	cd {dirty} && git -C {ready} log -1 && gh pr create --title x --body y
 
 # --- must not fire: neither spelling present ---
 allow	cd {ready} && git status

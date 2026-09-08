@@ -87,9 +87,10 @@ def _pr_repo(tmp, name, *, ahead=True, pushed=True, dirty=False, origin_main=Tru
 def pr_create(tmp):
     """The five branch states a PR-creation guard has to tell apart.
 
-    `noorigin` has no origin/main, so the zero-diff check could not run. A guard
-    that blocks there asserts a zero diff nobody measured, which is why the case
-    exists: it pins the fail-open as a considered decision rather than an accident.
+    The two noorigin states split one rule in half. Neither can measure a diff, so
+    neither may be blocked for that — but `noorigin` is ALSO unpushed, and that check
+    needs no origin/<default> at all. A guard that skips it too has let an unresolvable
+    default branch take down checks that never depended on it.
     """
     return {"tokens": {
         "zero": _pr_repo(tmp, "pr-zero", ahead=False),
@@ -97,6 +98,7 @@ def pr_create(tmp):
         "dirty": _pr_repo(tmp, "pr-dirty", dirty=True),
         "ready": _pr_repo(tmp, "pr-ready"),
         "noorigin": _pr_repo(tmp, "pr-noorigin", origin_main=False, pushed=False),
+        "noorigin_ready": _pr_repo(tmp, "pr-noorigin-ready", origin_main=False),
     }}
 
 

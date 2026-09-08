@@ -13,17 +13,26 @@ how a whole tier of guards can pass their tests while delivering nothing.
 
 Recognised outcomes:
 
-    allow   exit 0, nothing on stdout the harness understands
+    allow   exit 0, clean stderr, nothing on stdout the harness understands
     ctx     exit 0 carrying hookSpecificOutput.additionalContext
     ask     exit 0 carrying permissionDecision "ask"
     deny    exit 0 carrying permissionDecision "deny"
     soft    exit 1  (NOT a block — Claude Code prints a notice and runs the tool)
     hard    exit 2  (the only blocking code)
     block   exit 0 carrying top-level {"decision": "block"} — a Stop hook refusing
+    halt    exit 0 carrying top-level {"continue": false} — stops the whole turn
+    error   exit 0 with output on stderr, or an unrecognised permissionDecision
     raw     for a rewrite hook: ran, but emitted no updatedInput
     =<cmd>  for a rewrite hook: emitted exactly this rewritten command
 
 `0`, `1` and `2` are accepted as aliases for allow / soft / hard.
+
+`error` is the outcome that keeps the rest honest. Claude Code discards stderr at
+exit 0, so a hook that fails to load — a missing helper, an unbound variable — still
+exits 0 and prints its bash errors to a stream nobody reads. Without `error` that
+scores `allow`; and since most cases in any guard suite are allow-cases, a hook that
+never ran at all passes almost its whole suite. An unrecognised `permissionDecision`
+lands here too: a renamed or typo'd verdict is a defect, never a considered allow.
 
 `ctx` exists because a reminder-only hook emits no permissionDecision: without its
 own outcome, a fired reminder and a silent pass both score `allow`, and no fixture
@@ -66,6 +75,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -75,7 +85,11 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import fixture_env  # noqa: E402
 
 NUMERIC_ALIAS = {"0": "allow", "1": "soft", "2": "hard"}
-OUTCOMES = ("allow", "ask", "deny", "soft", "hard", "ctx", "block", "TIMEOUT")
+OUTCOMES = ("allow", "ask", "deny", "soft", "hard", "ctx", "block", "halt", "error", "TIMEOUT")
+# Only these three are permission verdicts; a decision typo must not reach the exit-code namespace.
+PERMISSION_DECISIONS = ("allow", "ask", "deny")
+# An unsubstituted token runs the case against the harness cwd, which is what #!setup exists to prevent.
+TOKEN_RE = re.compile(r"\{[a-z_][a-z0-9_]*\}")
 # Each tool carries new content under a different key; a hook reads exactly one.
 TOOL_INPUT = {
     "Bash": lambda path, body, prev="": {"command": path},
@@ -144,29 +158,37 @@ def rewritten(rc, stdout):
         return "raw"
 
 
-def classify(rc, stdout):
-    if rc == -1:
-        return "TIMEOUT"
+def classify(rc, stdout, stderr=""):
+    """Outcome of one run. `stderr` is load-bearing — see the `error` case below."""
     if rc == 2:
         return "hard"
     if rc == 1:
         return "soft"
+    if rc < 0:
+        return "signal%d" % -rc
     if rc != 0:
         return "exit%d" % rc
+    # Exit 0 with stderr is a hook that broke, not one that passed. see: README.md § Why three
+    if stderr.strip():
+        return "error"
     try:
         parsed = json.loads(stdout)
     except ValueError:
         return "allow"
-    if isinstance(parsed, dict) and parsed.get("decision") == "block":
-        return "block"
-    try:
-        out = parsed["hookSpecificOutput"]
-    except (TypeError, KeyError):
+    if not isinstance(parsed, dict):
         return "allow"
-    decision = out.get("permissionDecision") if isinstance(out, dict) else None
+    if parsed.get("continue") is False:
+        return "halt"
+    if parsed.get("decision") == "block":
+        return "block"
+    out = parsed.get("hookSpecificOutput")
+    if not isinstance(out, dict):
+        return "allow"
+    decision = out.get("permissionDecision")
     if decision:
-        return decision if decision in OUTCOMES else "allow"
-    if isinstance(out, dict) and out.get("additionalContext"):
+        # An unrecognised value is a typo or a rename, never a considered allow.
+        return decision if decision in PERMISSION_DECISIONS else "error"
+    if out.get("additionalContext"):
         return "ctx"
     return "allow"
 
@@ -204,6 +226,9 @@ def parse_fixture(path):
             sys.exit("malformed fixture line (needs a TAB): %r" % raw)
         cmd, _, tail = rest.partition("\t")
         output, _, flags = tail.partition("\t")
+        # A doubled tab empties column 2, and an empty command passes while testing nothing.
+        if cmd != ABSENT and not cmd.strip():
+            sys.exit("empty command in fixture line (a stray extra TAB?): %r" % raw)
         if escapes and cmd != ABSENT:
             cmd = unescape_cmd(cmd)
         # Bound per case: a mid-file directive must not apply to earlier cases too.
@@ -254,6 +279,11 @@ def run_cases(cases, tokens, cwd, env, args, hook_path, failures, tmp):
         if cmd != ABSENT:
             cmd = substitute(cmd, tokens)
         output = substitute(output, tokens)
+        if tokens:
+            left = TOKEN_RE.findall(cmd) + TOKEN_RE.findall(output)
+            if left:
+                sys.exit("unknown token(s) %s in %r\n  known: %s"
+                         % (", ".join(sorted(set(left))), cmd, ", ".join(sorted(tokens))))
         payload = build_payload(cmd, output, flags, tool, event, cwd, tmp)
         try:
             proc = subprocess.run(
@@ -265,13 +295,15 @@ def run_cases(cases, tokens, cwd, env, args, hook_path, failures, tmp):
             if expected == "raw" or expected.startswith(REWRITE):
                 got = rewritten(proc.returncode, proc.stdout)
             else:
-                got = classify(proc.returncode, proc.stdout)
+                got = classify(proc.returncode, proc.stdout, proc.stderr)
         except subprocess.TimeoutExpired:
             got = "TIMEOUT"
         if got != expected:
             failures.append((expected, got, cmd))
         print("%s want=%-7s got=%-7s %s"
               % ("ok  " if got == expected else "FAIL", expected, got, cmd[:78]))
+        if got == "error" and expected != "error":
+            print("       stderr: %s" % " ".join(proc.stderr.split())[:150])
 
 
 def main():

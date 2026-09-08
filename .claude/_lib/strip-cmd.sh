@@ -9,18 +9,33 @@
 #   echo "$CMD_STRIPPED" | grep -qE '<dangerous-pattern>'
 
 # see: README.md § strip-cmd.sh — why the marker-line class excludes command boundaries
+# A heredoc fed to an interpreter is CODE, not data: blanking it hides a real invocation.
+# see: README.md § strip-cmd.sh
+# A heredoc fed to an interpreter is CODE: blanking it hides a real invocation.
+# POSIX ERE only — no \b, \s or \d; macOS grep -E rejects them.
+_heredoc_is_executed() {
+  printf '%s' "$1" \
+    | grep -qE '(^|[;&|(]|\$\()[[:space:]]*(bash|sh|zsh|ksh|dash|eval|ssh|python3?|perl|ruby|node)[[:space:]][^;&|]*<<'
+}
+
 strip_cmd() {
+  local cmd="$1"
   # No perl: return the command UNCHANGED (over-fire), never empty, which would silently disable every caller.
   if ! command -v perl >/dev/null 2>&1; then
-    printf '%s' "$1"
+    printf '%s' "$cmd"
     return
   fi
-  printf '%s' "$1" | perl -0777 -pe '
-    s/<<-?["\x27]?([A-Za-z_][A-Za-z0-9_]*)["\x27]?[^\n;&|(`]*\n.*?\n[ \t]*\1\b/<<STRIPPED_HEREDOC>>/gs;
-    s/(-m|--message)([ =]+)"((?:\\.|[^"\\])*)"/\1\2"STRIPPED_MSG"/g;
-    s/(-m|--message)([ =]+)\x27[^\x27]*\x27/\1\2\x27STRIPPED_MSG\x27/g;
+  if ! _heredoc_is_executed "$cmd"; then
+    cmd=$(printf '%s' "$cmd" | perl -0777 -pe \
+      's/<<-?["\x27]?([A-Za-z_][A-Za-z0-9_]*)["\x27]?[^\n;&|(`]*\n.*?\n[ \t]*\1\b/<<STRIPPED_HEREDOC>>/gs')
+  fi
+  # index(), not a match: a m{} in the replacement would reset $1..$3. see: README.md
+  printf '%s' "$cmd" | perl -0777 -pe '
+    s/(-m|--message)([ =]+)"((?:\\.|[^"\\])*)"/index($3, q{$(}) >= 0 || index($3, chr(96)) >= 0 ? qq{$1$2"$3"} : qq{$1$2"STRIPPED_MSG"}/ge;
+    s/(-m|--message)([ =]+)\x27([^\x27]*)\x27/index($3, q{$(}) >= 0 || index($3, chr(96)) >= 0 ? qq{$1$2\x27$3\x27} : qq{$1$2\x27STRIPPED_MSG\x27}/ge;
   '
 }
+
 
 # strip_quoted_args() — blank quoted literals so an INVOCATION detector cannot fire on the same words as data.
 # see: tools/claude/examples/hooks/_lib/README.md § strip-quoted-args.pl — what survives blanking, and when NOT to use this

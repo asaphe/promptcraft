@@ -33,7 +33,7 @@ fi
 
 # The N-PR form of `pr create`. Every check below is single-branch, so this branches early.
 IS_STACK=""
-if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?stack +submit([[:space:]]|$)'; then
+if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?stack +(submit|link)([[:space:]]|$)'; then
   IS_STACK=yes
 elif ! echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +create([[:space:]]|$)'; then
   exit 0
@@ -41,11 +41,20 @@ fi
 
 ISSUES=""
 
-# A leading `cd <worktree> &&` or `-C <dir>` puts the real repo outside this hook's cwd.
+# Only a LEADING `cd <worktree> &&` redirects: `gh` acts on the cwd, so a mid-command
+# `git -C <other>` names a different repo than the one the PR would be created in.
 GITC=()
-if command -v resolve_workdir >/dev/null 2>&1; then
-  WORK_DIR=$(resolve_workdir "$CMD")
-  [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ] && GITC=(-C "$WORK_DIR")
+# The LAST cd wins: `cd a && cd b && gh ...` runs in b, so taking the first grades the wrong repo.
+WORK_DIR=$(printf '%s\n' "$CMD_MATCH" | tr ';&|' '\n\n\n' \
+  | sed -nE "s/^[[:space:]]*cd[[:space:]]+(\"([^\"]+)\"|'([^']+)'|([^[:space:]]+))[[:space:]]*$/\2\3\4/p" | tail -1)
+# A quoted ~ never expands, so [ -d "~/repo" ] is false and the check silently reads the session repo.
+case "$WORK_DIR" in
+  "~") WORK_DIR="$HOME" ;;
+  "~/"*) WORK_DIR="$HOME/${WORK_DIR#\~/}" ;;
+esac
+# Must be a real repo: a -C at a non-repo makes every check below fail and the guard go silent.
+if [ -n "$WORK_DIR" ] && git -C "$WORK_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  GITC=(-C "$WORK_DIR")
 fi
 
 # Detect default branch name. Falls back to `main` when origin/HEAD is not set.
@@ -55,11 +64,11 @@ DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
 if [ -n "$IS_STACK" ]; then
   DIRTY=$(git "${GITC[@]}" status --porcelain 2>/dev/null | head -5)
   if [ -n "$DIRTY" ]; then
-    printf "STACK SUBMIT BLOCKED — uncommitted changes would be missing from the stack:\n%s\n" "$DIRTY" >&2
+    printf "STACK SUBMIT/LINK BLOCKED — uncommitted changes would be missing from the stack:\n%s\n" "$DIRTY" >&2
     exit 2
   fi
   read -r -d '' STACK_CHECKLIST <<'STACKCHECK' || true
-STACK SUBMIT — this creates or updates EVERY pull request in the stack, not one. Verify before proceeding:
+STACK SUBMIT/LINK — this creates, updates or re-links EVERY pull request in the stack, not one. Verify before proceeding:
   [ ] Every layer branch satisfies your branch-protection naming rules — auto-generated layer names are commonly rejected on push
   [ ] Layer order and each layer's base are what you intend
   [ ] Each layer is independently reviewable: one coherent change, not an arbitrary commit split
@@ -75,17 +84,8 @@ fi
 
 git "${GITC[@]}" fetch origin "$DEFAULT_BRANCH" --quiet 2>/dev/null
 
-# Unresolvable means the check could not run; blocking would assert a zero diff nobody measured.
-if ! git "${GITC[@]}" rev-parse --verify --quiet "origin/${DEFAULT_BRANCH}" >/dev/null 2>&1; then
-  exit 0
-fi
-DIFF_STAT=$(git "${GITC[@]}" diff --stat "origin/${DEFAULT_BRANCH}...HEAD" 2>/dev/null)
-if [ -z "$DIFF_STAT" ]; then
-  BRANCH=$(git "${GITC[@]}" branch --show-current 2>/dev/null)
-  echo "PR CREATE BLOCKED — branch '$BRANCH' has zero diff vs origin/${DEFAULT_BRANCH}. All changes already exist on the default branch." >&2
-  exit 2
-fi
-
+# Checked FIRST: neither reads origin/<default>, so an unresolvable default branch
+# must not take them down with it. see: README.md § When the default branch cannot be resolved
 BRANCH=$(git "${GITC[@]}" branch --show-current 2>/dev/null)
 REMOTE_REF=$(git "${GITC[@]}" rev-parse "origin/$BRANCH" 2>/dev/null)
 LOCAL_REF=$(git "${GITC[@]}" rev-parse HEAD 2>/dev/null)
@@ -104,6 +104,17 @@ fi
 # Block on hard issues
 if [ -n "$ISSUES" ]; then
   printf "PR CREATE BLOCKED — fix before creating:\n%b\n" "$ISSUES" >&2
+  exit 2
+fi
+
+# Now the checks that DO need origin/<default>. Unresolvable means the diff could not be
+# measured, and blocking on that would assert a zero diff nobody took.
+if ! git "${GITC[@]}" rev-parse --verify --quiet "origin/${DEFAULT_BRANCH}" >/dev/null 2>&1; then
+  exit 0
+fi
+DIFF_STAT=$(git "${GITC[@]}" diff --stat "origin/${DEFAULT_BRANCH}...HEAD" 2>/dev/null)
+if [ -z "$DIFF_STAT" ]; then
+  echo "PR CREATE BLOCKED — branch '$BRANCH' has zero diff vs origin/${DEFAULT_BRANCH}. All changes already exist on the default branch." >&2
   exit 2
 fi
 

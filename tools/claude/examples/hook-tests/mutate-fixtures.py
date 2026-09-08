@@ -10,7 +10,9 @@ the hook already does, and a suite of those passes forever while asserting nothi
 This runs the suite against deliberately broken copies and requires each break to
 be caught.
 
-Mutations live in mutations.json as {hook: [{why, delete_matching|replace}, ...]}.
+Mutations live in mutations.json as {file: [{why, delete_matching|replace, suite?}, ...]}.
+The key names the file to mutate; `suite` names the fixture suite to run when that file is
+a shared library with no suite of its own.
 Aim each one at a distinct behaviour — one that kills a block branch, one that kills
 a false-positive defence — because a single "neuter the whole hook" mutation only
 proves the suite notices a corpse.
@@ -88,8 +90,10 @@ def main():
                 print("FAIL %s: INERT MUTATION — %s" % (hook, mutation["why"]))
                 continue
             target.write_text(broken)
+            # A shared library has no suite of its own; run one that consumes it.
+            suite = mutation.get("suite", hook)
             proc = subprocess.run(
-                [sys.executable, str(HERE / "run-fixtures.py"), hook, "--hooks-dir", str(tree)],
+                [sys.executable, str(HERE / "run-fixtures.py"), suite, "--hooks-dir", str(tree)],
                 capture_output=True, text=True,
             )
             target.write_text(pristine)
