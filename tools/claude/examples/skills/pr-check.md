@@ -96,4 +96,4 @@ PR #1234 — "Fix the thing" [branch-name]
 ## Safety
 
 - Commit and push fixes before resolving threads
-- After all comments are resolved and CI is green, use `/pr-finalize` to clean git history, update PR body, and verify docs before merge
+- After all comments are resolved and CI is green, use `/reviewkit:finalize` ([claude-reviewkit](https://github.com/asaphe/claude-reviewkit)) to clean git history, update PR body, and verify docs before merge

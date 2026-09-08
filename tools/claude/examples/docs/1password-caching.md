@@ -10,24 +10,42 @@ On first use, read the secret and remember the value. For all subsequent Bash ca
 
 ## Mechanical enforcement
 
-Use the `op-cache.sh` wrapper (`examples/scripts/op-cache.sh`) as a drop-in replacement for `op read`. It hashes the URI, caches the value under `/tmp/op-cache-<session>/<sha256>`, and serves cached reads without re-invoking `op`.
+The wrapper and its cleanup hook that used to ship here now live in
+**[claude-secret-guard](https://github.com/asaphe/claude-secret-guard)** as
+`scripts/op-cache.sh` and `scripts/op-cache-cleanup.sh`:
 
-```bash
-# First call: reads from 1Password, caches, returns value
-TOKEN=$(~/.claude/scripts/op-cache.sh op://Vault/Item/field)
-
-# Second and subsequent calls (same URI): served from cache, no biometric prompt
-TOKEN=$(~/.claude/scripts/op-cache.sh op://Vault/Item/field)
-
-# Force a fresh read (e.g., secret rotated mid-session)
-TOKEN=$(~/.claude/scripts/op-cache.sh --refresh op://Vault/Item/field)
+```text
+/plugin marketplace add asaphe/claude-secret-guard
+/plugin install secret-guard@claude-secret-guard
 ```
 
-The cache directory uses session ID (`CLAUDE_SESSION_ID` env var, falls back to `pid-<PPID>`). Files are mode 600 inside a 700 directory.
+`op-cache.sh` is a drop-in replacement for `op read` that fetches once per session and caches
+under `/tmp/op-cache-<session>/`, mode 600 inside a 700 directory. It prints a masked
+confirmation and the cache path rather than the value — reference it downstream as
+`$(cat <printed-path>)`:
+
+```bash
+# First call: reads from 1Password, caches, prints a masked confirmation + path
+op-cache.sh op://Vault/Item/field
+
+# Downstream use — the value never enters the transcript
+TOKEN=$(cat /tmp/op-cache-<session>/<sha256>)
+
+# Print the real value when you genuinely need to see it (checking a format)
+op-cache.sh --reveal op://Vault/Item/field
+
+# Force a fresh read (secret rotated mid-session)
+op-cache.sh --refresh op://Vault/Item/field
+```
+
+Masking is the part worth keeping. A cache that prints the value solves the biometric-prompt
+problem and leaves the secret in the transcript on every call, which is the more expensive of
+the two problems.
 
 ## Cleanup
 
-Pair the wrapper with the `op-cache-cleanup` Stop hook (`examples/hooks/op-cache-cleanup/`). The hook removes `/tmp/op-cache-<session>/` when Claude Code's session ends, so cached values don't sit on disk until reboot.
+The plugin's `op-cache-cleanup.sh` is a `Stop` hook that purges the cache directories when
+the session ends, so values don't sit in `/tmp` until reboot.
 
 ## `op` CLI gotchas
 
@@ -47,5 +65,5 @@ The `op-cache.sh` wrapper handles this correctly because it uses `op read`, whic
 
 ## Related
 
-- `examples/scripts/op-cache.sh` — the wrapper
-- `examples/hooks/op-cache-cleanup/` — the Stop hook for end-of-session cleanup
+- [claude-secret-guard](https://github.com/asaphe/claude-secret-guard) — the wrapper, the cleanup hook, and the `PreToolUse` guard that blocks a raw `op read` in the first place
+- [`../RETIRED.md`](../RETIRED.md) — where the rest of the retired examples went

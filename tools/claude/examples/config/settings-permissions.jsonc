@@ -96,8 +96,6 @@
       "WebFetch(domain:docs.anthropic.com)",
 
       // --- Skill permissions ---
-      "Skill(scan-history)",
-      "Skill(pr-review)",
       "Skill(pr-resolver)",
       "Skill(open-ticket)",
       "Skill(deploy)"

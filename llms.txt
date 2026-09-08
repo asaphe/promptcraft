@@ -9,6 +9,7 @@ A reference library meant for humans and AI assistants to browse, copy, and adap
 - [README.md](README.md): human-facing entry point with persona-based routing.
 - [AGENTS.md](AGENTS.md): contributor instructions per [agents.md](https://agents.md) convention — read this before editing the repo.
 - [ADOPTION.md](ADOPTION.md): step-by-step guide to copying content into your own assistant setup.
+- [CONTRIBUTING.md](CONTRIBUTING.md): how to open a PR against this repo.
 - [CONVENTIONS.md](CONVENTIONS.md): file naming, structure, link format conventions used throughout.
 - [DECISIONS.md](DECISIONS.md): rationale for the current structure.
 
@@ -26,7 +27,7 @@ Tool-agnostic — applies to any AI coding assistant.
 
 - [tools/claude/guides/](tools/claude/guides/): end-to-end guides — best practices, hooks, skills, agents, PR review, learning systems, GHA integration, MCP management.
 - [tools/claude/templates/](tools/claude/templates/): starter files — agent templates, skill templates, rule file templates, project-level doc templates.
-- [tools/claude/examples/](tools/claude/examples/): complete reference `.claude/` directory — hooks, agents, rules, skills, evals, config, docs.
+- [tools/claude/examples/](tools/claude/examples/): complete reference `.claude/` directory — hooks, agents, rules, skills, evals, config, docs. [RETIRED.md](tools/claude/examples/RETIRED.md) maps examples that moved into maintained plugins.
 - [tools/claude/scaffolding/](tools/claude/scaffolding/): ready-to-copy `.claude/` skeleton for a new repo.
 - [tools/claude/specs/](tools/claude/specs/): RFC-style specifications (CI/CD standard).
 
@@ -48,7 +49,8 @@ Tool-agnostic — applies to any AI coding assistant.
 - [.claude/README.md](.claude/README.md): explains that `.claude/` is contributor config — not example content.
 - [.claude/CLAUDE.md](.claude/CLAUDE.md): project instructions loaded when editing promptcraft itself.
 - [.claude/rules/](.claude/rules/): contributor rules (PII, git, content quality, operational).
-- [.claude/hooks/](.claude/hooks/): live safety hooks dogfooded from `tools/claude/examples/hooks/`.
+- [.claude/hooks/](.claude/hooks/): live safety hooks dogfooded from `tools/claude/examples/hooks/`, kept byte-identical to them by CI.
+- [.claude/scripts/](.claude/scripts/): the CI checkers that enforce that (`check-mirrors.py`, `check-guard-gate.py`).
 
 ## Optional
 

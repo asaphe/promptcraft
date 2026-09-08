@@ -114,20 +114,21 @@ A `.claude/README.md` disambiguates the two for anyone who lands there by accide
 
 ---
 
-## D8 — Root docs: `README` + `AGENTS` + `ADOPTION` + `CONVENTIONS` + `DECISIONS` + `llms.txt`
+## D8 — Root docs: `README` + `AGENTS` + `ADOPTION` + `CONTRIBUTING` + `CONVENTIONS` + `DECISIONS` + `llms.txt`
 
-**Decision:** Six top-level documents at the repo root, each with a distinct scope:
+**Decision:** Seven top-level documents at the repo root, each with a distinct scope:
 
 | File | Audience | Scope |
 |------|----------|-------|
 | `README.md` | Humans landing on GitHub | Entry point, persona-based routing, layout overview. |
 | `AGENTS.md` | AI agents editing this repo | Contributor conventions, per agents.md spec. |
 | `ADOPTION.md` | Humans adopting content | Per-tool step-by-step setup. |
+| `CONTRIBUTING.md` | Humans opening a PR | Issue templates, branch and PR mechanics, what makes a good contribution. |
 | `CONVENTIONS.md` | Contributors | Structural and stylistic rules. |
 | `DECISIONS.md` | Future-self / reviewers | Rationale for structure. |
 | `llms.txt` | AI assistants indexing the repo | Machine-readable catalog. |
 
-**Why not merge any of them:** Each answers a distinct question ("what is this?", "how do I edit it?", "how do I use it?", "what rules apply?", "why is it shaped this way?", "index everything"). Merging two forces readers to scan past irrelevant content.
+**Why not merge any of them:** Each answers a distinct question ("what is this?", "how do I edit it?", "how do I use it?", "how do I submit a change?", "what rules apply?", "why is it shaped this way?", "index everything"). Merging two forces readers to scan past irrelevant content.
 
 ---
 

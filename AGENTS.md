@@ -14,7 +14,7 @@ For content to *adopt* into your own projects, see `README.md` and the `shared/`
   - `.claude/` — contributor config for working on this repo with Claude Code (not example content).
   - `.github/` — CI, issue/PR templates.
   - `docs/index.html` — GitHub Pages landing page (branding, hero). **Do not edit without a Pages plan.**
-  - Root files: `README.md` (entry), `AGENTS.md` (this file), `ADOPTION.md`, `CONVENTIONS.md`, `DECISIONS.md`, `llms.txt`.
+  - Root files: `README.md` (entry), `AGENTS.md` (this file), `ADOPTION.md`, `CONTRIBUTING.md`, `CONVENTIONS.md`, `DECISIONS.md`, `llms.txt`.
 
 ## Adding Content — Where Does It Go?
 
@@ -44,8 +44,9 @@ If a file in `tools/<tool>/` is restating a universal rule, it should be a point
 
 ## Testing & Validation
 
-- There are no code tests. Validation is:
+- Validation is:
   - Markdown lint passes (CI).
+  - Hook evals pass (CI): `python3 .claude/evals/runner.py`, plus `check-mirrors.py` (dogfooded copies match their published examples) and `check-guard-gate.py` (the guard's fast-path gate covers every rule).
   - All relative links resolve.
   - `llms.txt` is in sync with the current file tree.
   - No broken code fences, YAML frontmatter, or table syntax.

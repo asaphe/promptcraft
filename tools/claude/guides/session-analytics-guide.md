@@ -138,7 +138,7 @@ From an analysis of 716 sessions / 86,693 tool calls:
 | AWS auth boilerplate (export + profile) | 6,700 | 7.7% | [AWS auth check](../examples/hooks/aws-auth-check/) |
 | Sequential secret reads | 2,800 | 3.2% | Batch script |
 | kubectl --context repetition | 1,200 | 1.4% | [kubectl context inject](../examples/hooks/kubectl-context-inject/) |
-| 1Password re-reads | 700 | 0.8% | [1Password read guard](../examples/hooks/op-read-guard/) |
+| 1Password re-reads | 700 | 0.8% | [claude-secret-guard](https://github.com/asaphe/claude-secret-guard)'s masked cache |
 | **Total addressable** | **~17,100** | **~20%** | |
 
 ## Hook Ordering Matters

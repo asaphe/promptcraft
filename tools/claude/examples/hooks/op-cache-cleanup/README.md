@@ -1,37 +1,22 @@
-# op-cache-cleanup
+# op-cache-cleanup — retired from this repo
 
-`Stop` hook that purges the per-session 1Password value cache when Claude Code's session ends.
+This hook and its companion cache script are no longer maintained as examples here. Both
+ship in a Claude Code plugin: **[claude-secret-guard](https://github.com/asaphe/claude-secret-guard)**,
+as `scripts/op-cache-cleanup.sh` and `scripts/op-cache.sh`.
 
-## Why this exists
-
-The companion script `examples/scripts/op-cache.sh` caches `op read` results in `/tmp/op-cache-<session>/` so the user isn't biometric-prompted on every Bash call within the session. Without this cleanup hook, those cached values sit on disk until the next OS reboot. This hook removes them as soon as the session ends.
-
-## What it does
-
-1. Reads the Stop hook payload from stdin
-2. Extracts `session_id` via `jq`
-3. `rm -rf /tmp/op-cache-${session_id}`
-4. Exits 0 unconditionally — Stop hooks shouldn't block
-
-## Configuration
-
-Add to `.claude/settings.json`:
-
-```jsonc
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          { "type": "command", "command": "/absolute/path/to/op-cache-cleanup.sh" }
-        ]
-      }
-    ]
-  }
-}
+```text
+/plugin marketplace add asaphe/claude-secret-guard
+/plugin install secret-guard@claude-secret-guard
 ```
 
-## Pairs with
+## What the plugin does that this example did not
 
-- `examples/scripts/op-cache.sh` — the cache producer
-- `examples/docs/1password-caching.md` — full pattern docs
+The plugin's cleanup hook purges both cache directories — 1Password and AWS Secrets
+Manager — and the caches it purges are masked by default: `op-cache.sh` and `sm-cache.sh`
+print a confirmation and the mode-600 cache path rather than the secret value, so the value
+never enters the transcript in the first place. This example's cache printed the value and
+relied on cleanup alone.
+
+Cache paths key on the Claude Code session id, with a fallback that no longer uses a bare
+parent PID — PIDs recycle, and two unrelated shells could land on one cache path where a
+stale hit serves the wrong value.

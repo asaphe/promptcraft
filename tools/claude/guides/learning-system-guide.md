@@ -1,371 +1,93 @@
-# Automated Learning System Guide
+# Learning System Guide
 
-How to build a self-improving Claude Code setup that captures operational knowledge from mistakes, classifies learnings by scope, and surfaces them across sessions using hooks.
+How to build a Claude Code setup that captures operational knowledge from its own mistakes, judges which of it is worth keeping, and routes the survivors to the right file.
 
-## The Problem
+## The implementation ships as a plugin
 
-Claude Code's learning capture relies on agents noticing corrections during a session. This is reactive — if the agent misses a correction or the session ends before a rule is proposed, the learning is lost. There's also no structured way to distinguish between learnings that should be shared with the team vs those that are personal preferences.
+The three-hook system this guide used to document — `SessionStart` injects, `SessionEnd` and `PreCompact` regex-scan the transcript, everything lands in a `pending-learnings.md` staging file — is no longer maintained here. It ships, rebuilt, as
+**[claude-learning-loop](https://github.com/asaphe/claude-learning-loop)**:
 
-## Architecture
-
-The learning system has three layers:
-
-```
-                  +---------------------------------+
-                  |  Layer 1: Automated Hooks        |
-                  |  (SessionEnd, SessionStart,      |
-                  |   PreCompact)                    |
-                  +----------------+-----------------+
-                                   | writes/reads
-                  +----------------v-----------------+
-                  |  Layer 2: Staging File            |
-                  |  pending-learnings.md             |
-                  |  (in auto-memory dir)             |
-                  +----------------+-----------------+
-                                   | reviewed by
-                  +----------------v-----------------+
-                  |  Layer 3: Classification          |
-                  |  learning-classifier agent        |
-                  |  -> .claude/rules/ (team)         |
-                  |  -> .claude/agents/ (agent)       |
-                  |  -> auto memory (personal)        |
-                  +---------------------------------+
+```text
+/plugin marketplace add asaphe/claude-learning-loop
+/plugin install learning-loop@claude-learning-loop
 ```
 
-### Layer 1: Automated Hooks
+What changed is where the judgment lives. Regex over a transcript is a decent *trigger* and a poor *filter*: it over-captures (any message starting with "no") and it cannot see the failure that matters most — a silent wrong guess the user quietly worked around, which produces no correction phrase at all. The plugin keeps a thin passive layer (a `Stop` hook that suggests capture, a `PreCompact` reminder) and moves the deciding into three skills:
 
-Three hooks capture learning signals without manual intervention:
+| Skill | Phase | What it does |
+|---|---|---|
+| `/learning-loop:wrap-up` | Capture | Model-curated scan of the conversation for friction the regex misses |
+| `/learning-loop:eval` | Quality gate | Scores each candidate on destination fit, recurrence, coverage, severity |
+| `/learning-loop:learn` | Codify | Writes surviving candidates as principles, per a destinations manifest |
 
-| Hook | Event | Async? | Purpose |
-| ---- | ----- | ------ | ------- |
-| `session-end-learnings.sh` | `SessionEnd` | Yes | Scans transcript for corrections and retry patterns |
-| `session-start-learnings.sh` | `SessionStart` | No (5s timeout) | Checks for pending learnings; nudges about auto memory |
-| `precompact-preserve.sh` | `PreCompact` (auto only) | Yes | Preserves correction context before compaction loses it |
+The rest of this guide is the design reasoning behind that system — the part that outlives any particular implementation, and what you need if you are building your own.
 
-**Why these specific events:**
+## What to detect
 
-- `SessionEnd` is the right time to scan — the session is over, async execution has zero UX impact.
-- `SessionStart` is the right time to surface — the agent has full context to evaluate candidates.
-- `PreCompact` catches corrections in long sessions that might compact before ending.
-- `Stop` (fires every turn) was considered and rejected — a prompt-type Stop hook adds latency to every interaction. A command-type Stop hook is fast but fires too frequently for transcript scanning. A shared detection library changes this calculus — see [Automated Candidate Detection](#automated-candidate-detection).
-
-### Layer 2: Staging File
-
-Candidates are written to `~/.claude/projects/<project>/memory/pending-learnings.md` — the user's auto-memory directory. This is per-user, per-project, and persists across sessions.
-
-Each candidate includes:
-
-```markdown
-## Session <id> (<timestamp>)
-
-- **Working directory:** /path/to/repo
-- **Tool calls:** 47
-- **Corrections detected:** 3
-- **Retry patterns:** 1
-
-### Correction signals
-
-\`\`\`
-no, wrong workspace — use staging not prod
-I said use the discovery key, not the team name
-\`\`\`
-```
-
-### Layer 3: Classification
-
-When the next session starts and pending learnings exist, the agent reviews them. For ambiguous cases, the `learning-classifier` agent determines the target:
-
-| Signal | Classification | Target |
-| ------ | ------------- | ------ |
-| Applies to any developer in the repo | **Team-wide** | `.claude/rules/{subdirectory}/{rule}.md` |
-| Specific to one agent's domain | **Agent-specific** | `.claude/agents/{agent}.md` |
-| User workflow preference | **Personal global** | `~/.claude/CLAUDE.md` |
-| User preference for this project | **Personal project** | `CLAUDE.local.md` or auto memory |
-| Temporary / unverified | **Memory only** | `~/.claude/projects/<project>/memory/` |
-
-## Implementation
-
-### Hook Scripts
-
-All hooks receive JSON on stdin with `transcript_path`, `session_id`, `cwd`, and event-specific fields. Stdin is small hook metadata JSON (not the full transcript) — safe to buffer with `INPUT=$(cat)`. The scripts derive the memory directory from `transcript_path` — the auto-memory directory is always a sibling `memory/` folder under the same project path.
-
-#### session-end-learnings.sh
-
-Scans the transcript JSONL for:
-
-1. **User corrections** — Messages containing "no", "wrong", "not that", "I said", "actually,", etc.
-2. **Retry patterns** — Same tool called consecutively (indicates a failed attempt + retry)
-3. **Long sessions** — 50+ tool calls (may indicate complexity or confusion)
-
-Only writes if 2+ signals detected or session had 50+ tool calls. This threshold prevents noise from normal "no, cancel that" interactions.
-
-```bash
-# Signal detection (simplified)
-CORRECTIONS=$(jq -r '
-  select(.type == "user") | .message.content // [] |
-  if type == "array" then .[] else . end |
-  if type == "object" then .text // empty else . end
-' "$TRANSCRIPT_PATH" 2>/dev/null | \
-  grep -iE '(^no[,. !]|wrong|not that|I said)' | \
-  head -10 || true)
-
-RETRIES=$(jq -r '
-  select(.type == "assistant") | .message.content // [] | .[] |
-  select(.type == "tool_use") | .name
-' "$TRANSCRIPT_PATH" 2>/dev/null | \
-  uniq -d | head -5 || true)
-
-TOOL_COUNT=$(jq -r '
-  select(.type == "assistant") | .message.content // [] | .[] |
-  select(.type == "tool_use") | .name
-' "$TRANSCRIPT_PATH" 2>/dev/null | wc -l | tr -d ' ' || true)
-TOOL_COUNT=${TOOL_COUNT:-0}
-```
-
-**Pipefail safety:** Every `jq` pipeline must end with `|| true`. Under `set -eo pipefail`, if `jq` encounters malformed JSON (truncated transcript, partial write), it exits non-zero and `pipefail` propagates that through the pipe, silently aborting the script. The `CORRECTIONS` pipeline also uses `grep` which returns exit code 1 on no-match — same risk.
-
-#### session-start-learnings.sh
-
-Outputs text to stdout (SessionStart stdout is injected into Claude's context):
-
-- If `pending-learnings.md` exists and has content, tells Claude to review candidates
-- If `MEMORY.md` is empty, nudges about auto memory usage
-
-The nudge is lightweight — it only fires if the memory file doesn't exist or is empty.
-
-#### precompact-preserve.sh
-
-Scans the **last 200 lines** of the transcript (not the whole file — compaction means the file is large). Writes any corrections found to the same `pending-learnings.md` staging file.
-
-### Hook Registration
-
-Register in `.claude/settings.json` (shared with team via git):
-
-```json
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start-learnings.sh",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-end-learnings.sh",
-            "async": true,
-            "timeout": 30
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "matcher": "auto",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/precompact-preserve.sh",
-            "async": true,
-            "timeout": 15
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-Key design choices:
-
-- `SessionStart` is **synchronous** — its stdout becomes Claude's context, so it must complete first. The 5s timeout keeps it fast.
-- `SessionEnd` and `PreCompact` are **async** — they run in the background with no UX impact.
-- `PreCompact` uses `matcher: "auto"` — only fires on automatic compaction, not manual `/compact`.
-
-### Learning Classifier Agent
-
-A lightweight agent (Haiku model, 10 max turns) that:
-
-1. Reads the proposed learning
-2. Checks agent definitions to see if it maps to one agent's domain
-3. Checks existing rules for duplicates
-4. Returns classification with reasoning
-
-```yaml
----
-name: learning-classifier
-description: Classifies proposed learnings as team-wide, agent-specific, or personal.
-tools: Read, Glob, Grep
-model: haiku
-maxTurns: 10
----
-```
-
-Using Haiku keeps it fast and cheap. The agent only needs to read a few files and make a classification decision.
-
-### Review Agents
-
-The project has three review agents that produce read-only PR findings:
-
-| Agent | Scope |
-| ----- | ----- |
-| **devops-reviewer** | Terraform, GitHub Actions, Dockerfiles, shell scripts (including hook scripts), Helm charts |
-| **secrets-config-reviewer** | Secret tfvars, helm template secret refs, ExternalSecret configs, naming convention |
-| **agent-config-reviewer** | `.claude/` agent definitions, skills, commands, CLAUDE.md, hooks, plugin validation |
-
-The `secrets-config-reviewer` validates the highest-frequency correction domain — secrets and MT configuration. It checks secret path naming convention, tier classification, TSJ mechanism selection per app, `USE_SECRET_SERVICE` consistency, `mt_secret_template_mode` correctness, token syntax (`.tfvars` uses `<TOKEN>`, `.yaml.tftpl` uses `${variable}`), and cross-environment template consistency.
-
-The `agent-config-reviewer` includes hook and plugin validation: verifying that referenced script paths exist, are executable, have valid timeout/async/matcher fields, and that plugin script copies are byte-identical to their source-of-truth counterparts (or symlinked).
-
-The `devops-reviewer` includes hook-script-specific checks: `jq` filters matching transcript JSONL format, `grep` patterns using `|| true` for pipefail safety, and output written to appropriate directories.
-
-### CLAUDE.md Integration
-
-Add a Learning System section to your project CLAUDE.md:
-
-```markdown
-## Learning System
-
-The learning system captures operational knowledge from mistakes, corrections,
-and recurring patterns. It has three layers: automated hooks that detect signals,
-a classification system that routes learnings to the right location, and a manual
-`/scan-history` skill for deeper analysis.
-
-### Learning Classification
-
-| Signal | Classification | Target |
-|--------|---------------|--------|
-| Applies to any developer in this repo | Team-wide | `.claude/rules/{subdirectory}/{rule}.md` |
-| Specific to one agent's domain | Agent-specific | `.claude/agents/{agent}.md` |
-| User workflow preference | Personal global | `~/.claude/CLAUDE.md` |
-| User preference for this project only | Personal project | `CLAUDE.local.md` or auto memory |
-| Temporary or experimental insight | Memory only | `~/.claude/projects/<project>/memory/` |
-```
-
-## Automated Candidate Detection
-
-The hooks above scan one session at a time with inline detection logic. The next refinement extracts detection into a shared library so the same signals can be evaluated per-session (hook) and in batch (history miner) — see [`learn-detect.lib.sh`](../examples/hooks/learning-capture/learn-detect.lib.sh) in the learning-capture example.
-
-### What It Catches
-
-Two signal classes, evaluated against the transcript JSONL:
+Two signal classes, evaluated against the transcript, plus one that has nothing to do with what the user said:
 
 | Signal | Mechanism | Trigger |
-| ------ | --------- | ------- |
+|---|---|---|
 | **Correction patterns** | Regex over user-typed text: pushback phrasing ("stop doing", "not that", "I said", "why did you", "you assumed") | 2+ matches per session |
 | **Explicit codify requests** | Regex over user-typed text: "remember this", "codify this", "new rule", "keep happening", "every session" | 1 match — the user asked |
-| **Tool failure rate** | Count `tool_result` blocks with `is_error: true` vs total | Both thresholds: 6+ failures AND ≥25% failure rate |
+| **Tool failure rate** | Count `tool_result` blocks with `is_error: true` against the total | Both thresholds: 6+ failures AND ≥25% failure rate |
 
-Two details make the regexes reliable:
+Two details make the regexes usable at all:
 
-- **Scan only human-typed text.** User-role messages in the transcript mix text blocks with tool results. The extraction filter keeps `type == "text"` blocks only — otherwise correction phrases inside tool output (error messages, file contents, quoted logs) produce false positives.
+- **Scan only human-typed text.** User-role messages in the transcript mix text blocks with tool results. Keep `type == "text"` blocks only — otherwise correction phrases inside tool output (error messages, file contents, quoted logs) fire the detector against the assistant's own evidence.
 - **Split correction phrasing from codify phrasing.** They warrant different thresholds: pushback needs repetition to be signal (a single "no, not that" is routine), while "codify this" is signal on the first occurrence.
 
-The tool-failure signal exists because corrections only catch what the user noticed and verbalized. A session where a third of tool calls failed is friction worth examining even if the user silently absorbed every failure.
+The tool-failure signal exists because corrections only catch what the user noticed *and* verbalized. A session where a third of the tool calls failed is friction worth examining even if the user silently absorbed every failure.
 
 ### Thresholds
 
-All tunables are environment overrides with defaults in the library:
-
 | Variable | Default | Meaning |
-| -------- | ------- | ------- |
+|---|---|---|
 | `LEARN_CORRECTION_MIN` | 2 | Correction-pattern matches needed to flag a session |
 | `LEARN_TOOL_FAIL_MIN` | 6 | Absolute floor of failed tool calls |
 | `LEARN_TOOL_FAIL_RATE` | 25 | Minimum failure percentage |
 
-The failure gate is deliberately dual: the absolute floor filters short sessions (2 failures out of 5 calls is normal exploration, not a pattern), while the rate filters long sessions (8 failures out of 300 calls is statistically unremarkable). Both must pass.
+The failure gate is deliberately dual. The absolute floor filters short sessions — 2 failures out of 5 calls is normal exploration, not a pattern. The rate filters long ones — 8 failures out of 300 calls is statistically unremarkable. Both must pass.
 
-### Per-Session vs Batch
+### Per-session and batch are not redundant
 
-The library is sourced by two consumers:
+Per-session detection evaluates the session that just ended. A batch scanner walks every project's transcripts from the last N days and applies identical thresholds. You want both, because batch covers what per-session structurally cannot:
 
-- **Per-session hook** (`Stop` or `SessionEnd`) — evaluates the session that just ended, writes flagged candidates to a pending file (one JSON object per candidate: quoted correction, session id, timestamp; tool-failure entries add counts and sample error text), and prints a one-line nudge to run the review skill next session. With the detection logic reduced to a few `jq` passes and `grep` calls, even a command-type `Stop` hook is cheap enough to run every turn-end.
-- **Batch scanner** — walks every project's transcripts from the last N days (`find ~/.claude/projects -name '*.jsonl' -mtime -N`), applies identical thresholds, and writes one consolidated candidate file.
+1. **Sessions that never fired the hook.** Crashed sessions, killed terminals, machines where the hook was not registered. The transcripts still exist; batch mining recovers them.
+2. **Cross-session recurrence.** One flagged session is weak evidence. The same correction surfacing across several sessions and projects in a week is a strong rule candidate, and only a consolidated view exposes it.
+3. **Retroactive tuning.** Tightening a regex in the per-session hook only affects future sessions. A batch run re-applies current detection logic to existing history immediately.
 
-Batch scanning is not redundant with the hook — it covers what per-session detection structurally cannot:
+Have both consumers source one detection library so the logic cannot drift between them.
 
-1. **Sessions that never fired the hook.** Crashed sessions, killed terminals, and sessions on machines where the hook wasn't registered produce no per-session signal. The transcripts still exist; batch mining recovers them.
-2. **Cross-session recurrence.** One flagged session is weak evidence; the same correction surfacing across several sessions and projects in a week is a strong rule candidate. Only a consolidated cross-project view exposes that recurrence.
-3. **Retroactive tuning.** Tightening a regex or lowering a threshold in the per-session hook only affects future sessions. The batch scanner re-applies the current detection logic to existing history immediately.
+## Where a learning goes
 
-Because both consumers source the same library, the detection logic can't drift between them — a regex improvement applies to the next session's hook and the next batch run alike. This is the same single-source-of-truth reasoning behind symlinking plugin scripts (Key Principle 8).
+Detection is the cheap half. The expensive half is deciding whether a candidate is a durable principle or a one-off, and which file owns it:
 
-## Rule Retirement
+| Signal | Classification | Target |
+|---|---|---|
+| Applies to any developer in the repo | **Team-wide** | `.claude/rules/{subdirectory}/{rule}.md` |
+| Specific to one agent's domain | **Agent-specific** | `.claude/agents/{agent}.md` |
+| User workflow preference | **Personal global** | `~/.claude/CLAUDE.md` |
+| User preference for this project | **Personal project** | `CLAUDE.local.md` |
+| Temporary or unverified | **Not yet a rule** | Leave it as a note; promote once it recurs |
 
-Rules accumulate over time. Without maintenance, they bloat the context window and may become outdated.
+Configure this routing per-user rather than hardcoding it in a hook — the plugin does it with a destinations manifest, so the same detector serves someone whose rules live in a monorepo and someone whose live in a dotfiles repo.
 
-### Review Date Headers
+## Rules organization
 
-Add a review date comment to each rules file:
+As rules accumulate, a flat `.claude/rules/` directory creates token pressure — every rule loads into every session regardless of relevance. Organize into subdirectories with conditional loading.
 
-```markdown
-<!-- Last reviewed: 2026-02-27 -->
-# Terraform Apply Safety Rules
-
-- **Rule one** — ...
-```
-
-### Periodic Review
-
-When running `/scan-history`, cross-reference existing rules against recent sessions:
-
-- Rules that were **never triggered** in the last 30 days may be candidates for retirement
-- Rules that were **violated frequently** may need strengthening or better placement
-- Rules that reference **deprecated tools or patterns** should be updated or removed
-
-### Cross-Clone Memory Audit
-
-If you use multiple checkouts of the same repo (see [Auto Memory Guide — Multi-Clone Strategy](auto-memory-guide.md#multi-clone-memory-strategy)), learnings fragment across clone-specific memory directories. A periodic audit consolidates them:
-
-**1. Discover all memory directories:**
-
-```bash
-ls -d ~/.claude/projects/-*-<repo-name>*/memory/
-```
-
-**2. Read every memory file (not just MEMORY.md indexes) and pending-learnings.md across all clones.**
-
-**3. For each memory file, classify:**
-
-| Verdict | Action |
-|---------|--------|
-| **PROMOTE** | Rule is valuable — move to `~/.claude/CLAUDE.md` (personal) or `.claude/rules/` (team-wide) |
-| **ALREADY COVERED** | Existing rule handles this — delete the memory file |
-| **DELETE** | Stale, incorrect, or project-state data stored as memory |
-
-**4. For pending-learnings.md files:** Most contain noise (false positives from hooks, retry patterns without clear corrections). Look for cross-clone recurring signals — the same correction appearing in 3+ clones is a strong indicator of a real gap.
-
-**5. Clean up:** Delete promoted/redundant memory files, clear pending-learnings, update MEMORY.md indexes.
-
-**Frequency:** Monthly, or whenever the startup hook reports pending learnings from multiple prior sessions.
-
-## Rules Organization
-
-As rules accumulate, a flat `.claude/rules/` directory creates token pressure — every rule loads into every session regardless of relevance. Organize rules into subdirectories with conditional loading using the `paths:` frontmatter feature.
-
-### Directory Structure
-
-```
+```text
 .claude/rules/
 +-- general/              # Always loaded (no paths: filter)
 |   +-- operational-safety.md
 |   +-- pr-review.md
 +-- devops/               # Loaded only when working on devops/ or .github/ files
 |   +-- ci-runners.md
-|   +-- clickhouse-backup.md
-|   +-- mt-deployment.md
 |   +-- terraform-apply.md
 ```
 
-### `paths:` Frontmatter
+### `paths:` frontmatter
 
 Add a YAML frontmatter block to conditionally load a rule:
 
@@ -377,73 +99,59 @@ paths: ["devops/terraform/**", "devops/helm-reusable-chart/**"]
 - **Rule** -- Description.
 ```
 
-Claude Code only loads this rule when the session involves files matching those glob patterns. Without `paths:`, the rule loads unconditionally.
+Claude Code only loads this rule when the session involves files matching those globs. Without `paths:`, the rule loads unconditionally.
 
-### Design Principles
+- **`general/`** is for cross-cutting rules (safety, review standards) — no `paths:` filter, always loaded.
+- **Domain subdirectories** (`devops/`, `backend/`, `frontend/`) use `paths:` to scope loading.
+- **Agents are not affected** — agents reference rules explicitly by path with the Read tool, bypassing auto-loading entirely.
 
-- **`general/`** is for cross-cutting rules (safety, review standards) — no `paths:` filter, always loaded
-- **Domain subdirectories** (e.g., `devops/`, `backend/`, `frontend/`) use `paths:` to scope loading
-- **Agents are not affected** — agents reference rules explicitly via their Key References section (Read tool), bypassing the auto-loading mechanism entirely
-- **New teams** add their own subdirectory with appropriately scoped `paths:` patterns
+One caveat that bites: `paths:` fires on Read-tool access to matching files. A rule whose content must be in context *before* the model touches a matching file — anything a hook depends on, or any always-on discipline — cannot use it.
 
-This keeps token usage proportional to task relevance — a TypeScript session doesn't load Terraform rules, and vice versa.
+## Rule retirement
 
-## Plugin Distribution
+Rules accumulate. Without maintenance they bloat the context window and go stale.
 
-For teams with multiple repositories, package the learning system as a Claude Code plugin:
+- Rules **never triggered** in the last 30 days are retirement candidates.
+- Rules **violated frequently** need strengthening or better placement, not repetition.
+- Rules referencing **deprecated tools or patterns** should be updated or removed.
 
-```
+A review-date comment (`<!-- Last reviewed: YYYY-MM-DD -->`) helps humans track staleness; Claude ignores HTML comments in context, so it costs the model nothing.
+
+### Cross-clone audit
+
+If you keep multiple checkouts of one repo (see [Auto Memory Guide — Multi-Clone Strategy](auto-memory-guide.md#multi-clone-memory-strategy)), learnings fragment across clone-specific directories. Periodically: discover every per-clone notes directory, read all of them rather than just the index files, and classify each entry as **promote** (move to `~/.claude/CLAUDE.md` or `.claude/rules/`), **already covered** (delete), or **stale** (delete). The same correction appearing in three or more clones is strong evidence of a real gap.
+
+## Plugin distribution
+
+For teams with multiple repositories, package the system as a Claude Code plugin rather than copying hooks into each repo:
+
+```text
 team-learning/
 +-- .claude-plugin/
 |   +-- plugin.json
 +-- skills/
-|   +-- scan-history/
+|   +-- <skill-name>/
 |       +-- SKILL.md
 +-- agents/
-|   +-- learning-classifier.md
+|   +-- <agent-name>.md
 +-- hooks/
-|   +-- hooks.json
-+-- scripts/
-    +-- session-end-learnings.sh -> ../../../hooks/session-end-learnings.sh
-    +-- session-start-learnings.sh -> ../../../hooks/session-start-learnings.sh
-    +-- precompact-preserve.sh -> ../../../hooks/precompact-preserve.sh
+    +-- hooks.json
+    +-- <hook>.sh
 ```
 
-**Script symlinks:** Plugin scripts in `scripts/` are symlinks to the canonical `hooks/*.sh` files. This eliminates the duplicate-maintenance burden — edits to the repo-level hooks are automatically reflected in the plugin. Agent and skill files are still copies (symlinks don't work for those in the plugin loader).
+Reference hook scripts from `hooks.json` via `${CLAUDE_PLUGIN_ROOT}` so the plugin is relocatable, and keep exactly one copy of each script — a plugin that ships a second copy of a hook you also maintain elsewhere is how a fix gets applied in one place and not the other.
 
-Install for the team:
+**Do not install the plugin in a project whose `settings.json` already registers the same hooks.** They fire twice, in no guaranteed order. Pick one.
 
-```bash
-claude plugin install team-learning --scope project
-```
+## Complementary tools
 
-This writes to `.claude/settings.json`, which is committed to git so every team member gets it on clone.
-
-**Important:** If hooks are already configured in the project's `settings.json`, don't also install the plugin in the same project — the hooks would fire twice. The plugin is for **other repos** that want the same learning system.
-
-## Evolution History
-
-This system evolved through three stages:
-
-1. **Flat learnings file** — Dated entries with confirmation counts and session references. Too much metadata, not actionable enough.
-2. **Domain-split learnings** — Split by category, promoted confirmed learnings to docs. Better organization, but still too verbose.
-3. **Pure rules + automated hooks** — Stateless actionable bullets in `.claude/rules/`, automated capture via hooks. Current state.
-
-The key insight: **rules should carry zero provenance**. Dates, confirmation counts, and session references are noise that wastes context tokens. The rule either stands on its own as useful guidance or it doesn't.
-
-## Complementary Tools
-
-| Tool | Purpose | Relationship to Learning System |
-| ---- | ------- | ------------------------------- |
-| **Auto memory** | Per-user persistent notes | Stores personal learnings and pending candidates |
-| **`/scan-history` skill** | On-demand history mining | Deeper analysis than automated hooks can provide |
-| **`learning-classifier` agent** | Classification assistant | Resolves ambiguous personal vs team classification |
+| Tool | Purpose | Relationship |
+|---|---|---|
+| **[claude-learning-loop](https://github.com/asaphe/claude-learning-loop)** | Capture, gate, codify | The maintained implementation of this guide |
 | **`.claude/rules/`** | Team-shared operational rules | Final destination for team-wide learnings |
-| **[RTK](https://github.com/rtk-ai/rtk) `learn`** | CLI correction mining | Scans session history for failed→retried command pairs, generates `.claude/rules/cli-corrections.md` |
+| **[RTK](https://github.com/rtk-ai/rtk) `learn`** | CLI correction mining | Failed→retried command pairs, a different signal source |
 
-### RTK Learn — Automated CLI Correction Capture
-
-[RTK](https://github.com/rtk-ai/rtk)'s `learn` subcommand complements the behavioral learning system by focusing specifically on CLI corrections. It scans Claude Code session history for patterns where a command failed and was retried with a different command that succeeded, then extracts reusable rules.
+RTK's `learn` subcommand scans session history for commands that failed and were retried differently, then extracts reusable rules:
 
 ```bash
 rtk learn                    # Scan current project, last 30 days
@@ -451,24 +159,22 @@ rtk learn --all --since 60   # Scan all projects, last 60 days
 rtk learn --write-rules      # Generate .claude/rules/cli-corrections.md
 ```
 
-Use `--min-confidence` and `--min-occurrences` to filter noise.
+Caveats worth respecting:
 
-**Caveats:**
+- **Review before committing.** `--write-rules` outputs raw command pairs, which may carry infrastructure IDs, account details, and internal repo names. Always read the generated file first, especially in a public repo.
+- **Signal-to-noise depends on the workflow.** It works best where command patterns recur (build/test/lint cycles). For ad-hoc infrastructure work most corrections are one-off; `--min-occurrences 2` surfaces only the recurring ones.
+- **Run it as a report first.** Confirm the corrections are genuinely reusable before generating the rules file.
 
-- **Review before committing** — `--write-rules` outputs raw command pairs, which may include infrastructure IDs, account details, internal repo names, and other sensitive data. Always review the generated file before committing, especially in shared or public repositories.
-- **Signal-to-noise depends on workflow** — RTK learn works best for repetitive workflows (build/test/lint cycles, standard deployments) where the same command patterns recur. For varied infrastructure work (ad-hoc Terraform, AWS CLI, K8s debugging), most corrections are one-off and context-dependent. Use `--min-occurrences 2` to surface only recurring patterns.
-- **Prefer `rtk learn` as a report first** — Run without `--write-rules` to review what it finds. Only generate the rules file after confirming the corrections are genuinely reusable.
+The division of responsibility: a transcript-based system captures *behavioral* corrections ("verify before asserting"); `rtk learn` captures *CLI* corrections ("pass `--ref branch` to `gh workflow run`"). Both end up in `.claude/rules/`, from different signal sources.
 
-**Division of responsibility:** The hook-based learning system (SessionEnd, PreCompact) captures *behavioral* corrections ("don't mock the DB", "verify before asserting"). RTK learn captures *CLI* corrections ("use `--output table` instead of piping through python", "pass `--ref branch` to `gh workflow run`"). Both feed into `.claude/rules/` but from different signal sources.
+## Key principles
 
-## Key Principles
-
-1. **Automate detection, not classification** — Hooks detect signals; humans approve and classify. Fully automated rule creation would introduce noise.
-2. **Zero UX impact** — SessionEnd and PreCompact hooks are async. SessionStart is sync but fast (file existence check).
-3. **Personal vs shared is a spectrum** — Use the classification table, but when in doubt, start in auto memory and promote to rules after confirming the pattern recurs.
-4. **Rules carry no metadata** — No dates, counts, or session references. Pure actionable bullets.
-5. **Rules must capture the general principle, not just one instance** — When authoring a rule, check whether it would also prevent analogous mistakes. If a rule says "don't use X" but the real principle is "only A, B, C support feature Y", teach the principle. Narrow rules get bypassed by the next variant. Both authors and reviewers should verify this.
-6. **Review date headers are for humans** — The `<!-- Last reviewed -->` comment helps humans track staleness; Claude ignores HTML comments in context.
-7. **Pipefail safety is non-negotiable** — Every `jq` and `grep` pipeline in hook scripts must end with `|| true`. A silent hook abort means lost learnings with no visible error.
-8. **Symlink plugin scripts to the canonical hooks** — Eliminates the duplicate-maintenance burden that caused bug propagation (e.g., missing `|| true` fixes needing to be applied in two places).
-9. **Organize rules into scoped subdirectories** — Use `paths:` frontmatter to conditionally load domain-specific rules. General rules (no `paths:`) always load; domain rules only load when relevant files are in scope. This keeps token usage proportional to task relevance as the rule set grows.
+1. **Automate detection, not classification.** Hooks and regexes detect signals; a model or a human approves and routes. Fully automated rule creation manufactures noise faster than you can read it.
+2. **Detection is a trigger, not a verdict.** Anything that survives to a rule file should have cleared a judgment step that a regex cannot perform.
+3. **Personal vs shared is a spectrum.** When in doubt, keep it personal and promote once the pattern recurs.
+4. **Rules carry no provenance.** No dates, confirmation counts, or session references — the rule either stands on its own as guidance or it does not. Metadata is context tokens spent on archaeology.
+5. **Capture the general principle, not the instance.** If a rule says "don't use X" but the real principle is "only A, B and C support feature Y", teach the principle. Narrow rules get bypassed by the next variant.
+6. **Zero UX impact.** Anything scanning a transcript runs async. A synchronous hook whose output becomes context must be a file-existence check, not a scan.
+7. **Pipefail safety is non-negotiable.** Every `jq` and `grep` pipeline in a hook must end with `|| true`. Under `set -eo pipefail`, a malformed transcript or a no-match `grep` aborts the script silently — lost learnings, no error.
+8. **One copy of each script.** Duplicate-maintenance is how a fix lands in one place and not the other.
+9. **Scope rules with `paths:`.** Token usage should stay proportional to task relevance as the rule set grows.

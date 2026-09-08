@@ -48,6 +48,7 @@ The strongest ideas in this repo are concentrated in a handful of files. If you 
 │   └── chatgpt/          # ChatGPT — global Custom Instructions, Project Instructions
 ├── AGENTS.md             # Per-repo instructions for AI agents editing this repo
 ├── ADOPTION.md           # How to adopt content into your own setup
+├── CONTRIBUTING.md       # How to open a PR against this repo
 ├── CONVENTIONS.md        # File naming, structure, link format
 ├── DECISIONS.md          # Why things are laid out this way
 ├── llms.txt              # Machine-readable index (llmstxt.org convention)
@@ -68,10 +69,22 @@ TL;DR:
 
 ## Built with this
 
-Real repos using patterns adopted from here:
+Patterns from this repo that grew into their own maintained artifacts. Several started as
+examples here and moved out — see [`tools/claude/examples/RETIRED.md`](tools/claude/examples/RETIRED.md)
+for the path-by-path map.
 
-- **[claude-learning-loop](https://github.com/asaphe/claude-learning-loop)** — a Claude Code plugin implementing the self-improvement feedback-loop pattern.
-- **[clickup-mcp](https://github.com/asaphe/clickup-mcp)** — an MCP server for ClickUp, built with the Claude Code agent/skill/hook conventions from `tools/claude/`.
+Claude Code plugins:
+
+- **[claude-secret-guard](https://github.com/asaphe/claude-secret-guard)** — keeps secrets out of context, transcripts, and files Claude writes. Narrow, near-zero-false-positive shape blocks plus masked cache wrappers for 1Password and Secrets Manager.
+- **[claude-reviewkit](https://github.com/asaphe/claude-reviewkit)** — portable evidence-based PR review: two-pass scan/verify, calibrated severity, a mandatory adversarial pass.
+- **[claude-learning-loop](https://github.com/asaphe/claude-learning-loop)** — the self-improvement feedback loop: capture friction at session end, gate it, codify the survivors as principles.
+- **[claude-intent-router](https://github.com/asaphe/claude-intent-router)** — a UserPromptSubmit hook that routes short free-text intents to the right skill.
+- **[claude-planning](https://github.com/asaphe/claude-planning)** — the phase-gated planning/RFC workflow: research before solving, an open-questions gate, an approval gate before execution.
+
+Standalone tools:
+
+- **[redacto](https://github.com/asaphe/redacto)** — redacts secrets and sanitizes infra identifiers from files in place, safely and repeatedly, with validity-gated writes.
+- **[clickup-mcp](https://github.com/asaphe/clickup-mcp)** — an MCP server for ClickUp, built with the agent/skill/hook conventions from `tools/claude/`.
 
 ## Conventions
 
@@ -83,7 +96,7 @@ Full conventions in [`CONVENTIONS.md`](CONVENTIONS.md).
 
 ## Contributing
 
-Edits welcome. See [`AGENTS.md`](AGENTS.md) for contribution guidelines and [`CONVENTIONS.md`](CONVENTIONS.md) for structure.
+Edits welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to open a PR, [`AGENTS.md`](AGENTS.md) for the rules AI agents editing this repo must follow, and [`CONVENTIONS.md`](CONVENTIONS.md) for structure.
 
 ## License
 

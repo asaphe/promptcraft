@@ -215,6 +215,5 @@ Skip application code. For Terraform, Dockerfiles, and general shell scripts, de
 | Post-deploy health checks, Helm issues, recovery | **deployment-expert** |
 | Pod crashes, OOM, scheduling, networking | **k8s-troubleshooter** |
 | ExternalSecret sync errors, secret format, drift | **secrets-expert** |
-| Ambiguous learning classification (team-wide vs agent-specific vs personal) | **learning-classifier** |
 
 Read `.claude/docs/agent-roster.md` for the full roster.

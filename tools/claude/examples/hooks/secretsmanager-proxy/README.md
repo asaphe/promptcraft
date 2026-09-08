@@ -1,59 +1,34 @@
-# Secretsmanager Proxy
+# Secretsmanager Proxy — retired from this repo
 
-A **PreToolUse** hook that auto-wraps secret-fetching commands with a token-optimization proxy bypass.
+This hook has been withdrawn, not just moved. If you installed it, remove it.
 
-## Why
+It rewrote `aws secretsmanager get-secret-value` and `batch-get-secret-value` to run through
+a token-optimization bypass (`rtk proxy …`) so the JSON would not be truncated. That solved a
+real formatting problem by guaranteeing the opposite of what you want from a secret
+command: the full plaintext value reaching the model's context and the session transcript
+intact, on every call.
 
-Token-optimization tools (like [RTK](https://github.com/rtk-ai/rtk)) filter and summarize CLI output to reduce token usage. This is great for `git status` or `kubectl get pods`, but destructive for commands that return JSON secret values — the filtering truncates the JSON, making it unusable.
+## What to use instead
 
-This hook detects commands that fetch secrets and automatically wraps them with the proxy bypass command, ensuring full JSON output.
+**[claude-secret-guard](https://github.com/asaphe/claude-secret-guard)** treats those two
+commands as the exposure they are — it blocks them when called directly and points at
+`scripts/sm-cache.sh`, a drop-in replacement that fetches once per session, caches the value
+at mode 600 under `/tmp/sm-cache-<session-id>/`, and prints a masked confirmation plus the
+cache path instead of the value. Reference it downstream as `$(cat <printed-path>)`; pass
+`--reveal` on the rare occasion you actually need to see it.
 
-## Behavior
-
-| Command | Action |
-|---------|--------|
-| `aws secretsmanager get-secret-value --secret-id ...` | Rewrite to `rtk proxy aws secretsmanager get-secret-value ...` |
-| `aws secretsmanager batch-get-secret-value ...` | Rewrite to `rtk proxy aws secretsmanager batch-get-secret-value ...` |
-| Already has `rtk proxy` prefix | Allow (no double-wrap) |
-| All other commands | Allow |
-
-## Setup
-
-1. Edit the script: change `PROXY_CMD` and command patterns to match your setup
-2. Register as a PreToolUse hook on `Bash`:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/path/to/secretsmanager-proxy.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
+```text
+/plugin marketplace add asaphe/claude-secret-guard
+/plugin install secret-guard@claude-secret-guard
 ```
 
-## Customization
+`scripts/aws-batch-secrets.sh` covers `batch-get-secret-value` the same way, and reports
+`Fetched N of M` so a partial batch cannot read as a complete one.
 
-**Different proxy command:** Change `PROXY_CMD="rtk proxy"` to your bypass command.
+## The general lesson
 
-**Additional patterns:** Add more `grep -qE` patterns for other commands that need full output:
-
-```bash
-# Terraform plan output
-if echo "$CMD" | grep -qE 'terraform plan'; then ...
-
-# API responses
-if echo "$CMD" | grep -qE 'curl.*api\..*/secrets'; then ...
-```
-
-## Hook Ordering
-
-If you use a token-rewriting hook (like RTK's rewrite hook), register this hook **after** it. The rewrite hook may change `aws` to `rtk aws`, and this hook needs to catch both forms.
+A hook that rewrites a command to widen its output is making a security decision on the
+model's behalf. Truncated output is a nuisance; a plaintext secret in a transcript outlives
+the session. If output filtering is mangling a command you need, fix it at the command —
+select the field you need, or route through a wrapper that masks — rather than by disabling
+the filter for the one class of command whose output is most worth withholding.

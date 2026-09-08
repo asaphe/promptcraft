@@ -6,10 +6,10 @@ Skills shipped under `tools/claude/examples/skills/`. Invoke with `/{skill-name}
 
 | Slash Command | Skill | Purpose | When NOT to Use |
 |---|---|---|---|
-| `/pr-review [#PR]` | pr-review | Two-pass evidence-based PR review with domain routing | If your project doesn't have the referenced reviewer agents installed |
 | `/pr-check [#PR]` | pr-check | CI status + comment triage | Fixing code and re-reviewing → use `/pr-resolver` |
 | `/pr-resolver [#PR]` | pr-resolver | Fix review comments, commit, re-review, resolve threads | CI status / comment triage only → use `/pr-check` |
-| `/pr-finalize [#PR]` | pr-finalize | Clean git history, update PR body, update tracker, verify docs | Fixing review comments → use `/pr-resolver` |
+
+Review and finalize moved to [claude-reviewkit](https://github.com/asaphe/claude-reviewkit) as `/reviewkit:review` and `/reviewkit:finalize`.
 
 ## Ticket & Branch
 
@@ -39,10 +39,7 @@ Skills shipped under `tools/claude/examples/skills/`. Invoke with `/{skill-name}
 
 ## Learning & Knowledge
 
-| Slash Command | Skill | Purpose | When NOT to Use |
-|---|---|---|---|
-| `/scan-history` | scan-history | Mine session history (`~/.claude/projects/*.jsonl`) for candidate learnings, retry signals, long sessions | — |
-| `/graduate-learnings` | graduate-learnings | Process pending learning candidates → classify → propose rule → write to target | Without the `learning-capture` hook family installed, this skill has no input |
+Session mining and learning codification moved to [claude-learning-loop](https://github.com/asaphe/claude-learning-loop) as `/learning-loop:learn-scan`, `/learning-loop:wrap-up`, `/learning-loop:eval` and `/learning-loop:learn`.
 
 ## Related
 

@@ -1,121 +1,30 @@
-# Learning Capture System
+# Learning Capture — retired from this repo
 
-A set of three hooks that automatically detect corrections and patterns from Claude Code sessions and queue them for review as candidate rules.
-
-## How it works
+These three hooks are no longer maintained as examples here. The pattern ships as a Claude
+Code plugin: **[claude-learning-loop](https://github.com/asaphe/claude-learning-loop)**.
 
 ```text
-SessionStart ──→ Check pending learnings → Inject into context
-                                            ↓
-                              (Claude works, user corrects)
-                                            ↓
-PreCompact ────→ Scan for corrections → Append to pending file
-                                            ↓
-SessionEnd ────→ Scan full transcript → Append to pending file
-                                            ↓
-                              (Next session starts)
-                                            ↓
-SessionStart ──→ "2 pending learnings found" → Claude proposes rules
+/plugin marketplace add asaphe/claude-learning-loop
+/plugin install learning-loop@claude-learning-loop
 ```
 
-## Components
+## What replaced it
 
-### `session-start-learnings.sh` (SessionStart, blocking, 5s timeout)
+The example's architecture was three hooks doing all the work: `SessionStart` injected
+pending candidates, `SessionEnd` and `PreCompact` regex-scanned the transcript for
+correction phrases and appended to `pending-learnings.md`. Regex alone over-captured
+(any message starting with "no") and under-captured (a silent wrong guess the user
+worked around produces no correction phrase at all).
 
-Checks for pending learning candidates from previous sessions. If found, injects a message into Claude's context prompting it to review and propose rules.
+The plugin keeps a thin passive layer — a `Stop` hook that suggests capture and a
+`PreCompact` reminder — and moves the judgment into three skills:
 
-### `session-end-learnings.sh` (SessionEnd, async, 30s timeout)
+| Skill | Phase |
+|---|---|
+| `/learning-loop:wrap-up` | Capture — model-curated scan of the conversation for friction the regex misses |
+| `/learning-loop:eval` | Quality gate — scores each candidate for destination fit, recurrence, coverage, severity |
+| `/learning-loop:learn` | Codify — writes the surviving candidates as principles, per a destinations manifest |
 
-Scans the session transcript for correction signals:
-
-- User corrections ("no", "wrong", "not that", "I said", "actually,")
-- Retry patterns (same tool called repeatedly — indicates confusion)
-- Long sessions (50+ tool calls — may indicate complexity or confusion)
-
-Writes candidates to `pending-learnings.md` with session metadata.
-
-### `precompact-preserve.sh` (PreCompact auto, async, 15s timeout)
-
-Runs before context compaction. Scans recent transcript for corrections that haven't been captured yet. Prevents correction context from being lost during compaction.
-
-### `learn-detect.lib.sh` (library, sourced — not a hook)
-
-Shared detection logic: correction/codify regexes, transcript jq helpers, and `learn_evaluate` threshold gating. Thresholds are env-tunable (`LEARN_CORRECTION_MIN`, `LEARN_TOOL_FAIL_MIN`, `LEARN_TOOL_FAIL_RATE`). See the Automated Candidate Detection section of `../../../guides/learning-system-guide.md`.
-
-## Signal detection
-
-The hooks look for these patterns in user messages:
-
-| Signal | Pattern | Threshold |
-|--------|---------|-----------|
-| User correction | Messages starting with "no", "wrong", "not that", "I said" | 2+ corrections |
-| Retry pattern | Same tool name appearing consecutively | Any duplicates |
-| Long session | Total tool call count | 50+ calls |
-| Message length | Correction messages must be 30+ chars | Filters false positives |
-
-## Output format
-
-Candidates are written to `memory/pending-learnings.md`:
-
-```markdown
-## Session abc123 (2025-03-23T19:30:00Z)
-
-- **Working directory:** /path/to/repo
-- **Tool calls:** 45
-- **Corrections detected:** 3
-- **Retry patterns:** 1
-
-### Correction signals
-
-​```
-no, that's not right — use terraform workspace list first
-actually, the profile should be prod-tf not prod
-​```
-
----
-```
-
-## Classification
-
-When Claude reads pending learnings, it classifies each as:
-
-- **Team-wide** → `.claude/rules/{subdirectory}/{rule}.md` (shared via git)
-- **Agent-specific** → `.claude/agents/{agent}.md` (shared via git)
-- **Personal** → auto memory (not shared)
-
-## Layer
-
-**Project** (`.claude/settings.json`) — Shared learning system, entire team benefits from captured patterns.
-
-## Settings configuration
-
-```json
-{
-  "hooks": {
-    "SessionStart": [{
-      "hooks": [{
-        "type": "command",
-        "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start-learnings.sh",
-        "timeout": 5
-      }]
-    }],
-    "SessionEnd": [{
-      "hooks": [{
-        "type": "command",
-        "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-end-learnings.sh",
-        "async": true,
-        "timeout": 30
-      }]
-    }],
-    "PreCompact": [{
-      "matcher": "auto",
-      "hooks": [{
-        "type": "command",
-        "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/precompact-preserve.sh",
-        "async": true,
-        "timeout": 15
-      }]
-    }]
-  }
-}
-```
+The classification step this example described (team-wide / agent-specific / personal) is
+`/learning-loop:eval`, and the target is configured per-user in
+`examples/learn-destinations.example.md` rather than hardcoded in the hook.

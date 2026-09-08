@@ -31,12 +31,6 @@ Review agents are read-only — they produce findings but never modify files. In
 | **datadog-reviewer** | Datadog config-as-code (dashboards, monitors, on-calls, indexes) | Datadog infrastructure changes |
 | **security-reviewer** | Cross-cutting (all file types) | **Always — spawn on every PR.** Cross-cutting security concerns (supply chain, GHA injection, OIDC trust, infra hardening, container security, application injection / auth gaps) |
 
-## Utility Agents
-
-| Agent | Purpose |
-|-------|---------|
-| **learning-classifier** | Classifies a proposed learning as team-wide / agent-specific / personal / project / memory |
-
 ## How to defer
 
 When a request crosses into another domain, recommend the appropriate sibling agent: *"This looks like a {domain} issue. I recommend invoking the **{agent-name}** agent for deeper investigation."*

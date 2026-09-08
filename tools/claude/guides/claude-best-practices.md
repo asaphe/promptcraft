@@ -193,7 +193,7 @@ Run validation after every meaningful change:
 - **Build validation** before commits
 - **Test execution** on changes
 
-Automate these with hooks. The most effective hook pattern is **block-at-commit** — let Claude write freely, but block `git commit` until tests pass. Don't block at write time; that interrupts flow. See: [learning-system-guide.md](learning-system-guide.md) for hook implementation patterns.
+Automate these with hooks. The most effective hook pattern is **block-at-commit** — let Claude write freely, but block `git commit` until tests pass. Don't block at write time; that interrupts flow. See: [hooks-guide.md](hooks-guide.md) for hook implementation patterns.
 
 ### Code Review
 

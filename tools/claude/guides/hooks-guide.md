@@ -458,7 +458,7 @@ Production-tested hook examples with README documentation:
 | [Destructive Guard](../examples/hooks/destructive-guard/) | PreToolUse | Two-tier blocking for irreversible operations | Hard (exit 2) + Soft (JSON) |
 | [Review Verification Guard](../examples/hooks/review-verification-guard/) | PreToolUse | Verification checklist before posting PR reviews/comments | Soft |
 | [Memory Guard](../examples/hooks/memory-guard/) | PreToolUse (Write) | Blocks project memory writes for multi-clone repos | Hard (exit 2) |
-| [1Password Read Guard](../examples/hooks/op-read-guard/) | PreToolUse | Blocks duplicate `op read` calls (prevents repeated biometric prompts) | Soft |
+| [1Password Read Guard](../examples/hooks/op-read-guard/) | PreToolUse | Blocks raw secret reads, redirects to a masked cache (ships in [claude-secret-guard](https://github.com/asaphe/claude-secret-guard)) | Hard |
 | [CI Polling Guard](../examples/hooks/ci-polling-guard/) | PreToolUse | Blocks sleep-based CI polling loops | Soft |
 
 ### Command Rewriting & Optimization
@@ -467,7 +467,6 @@ Production-tested hook examples with README documentation:
 |------|------|---------|---------|
 | [RTK Rewrite](../examples/hooks/rtk/) | PreToolUse | Token-optimized command rewriting via external binary | No (rewrites) |
 | [kubectl Context Inject](../examples/hooks/kubectl-context-inject/) | PreToolUse | Auto-injects `--context` into kubectl/helm commands | No (rewrites) |
-| [Secretsmanager Proxy](../examples/hooks/secretsmanager-proxy/) | PreToolUse | Auto-wraps secret commands with token-proxy bypass | No (rewrites) |
 
 ### Quality Gates
 
@@ -484,13 +483,13 @@ Production-tested hook examples with README documentation:
 |------|------|---------|---------|
 | [AWS Auth Check](../examples/hooks/aws-auth-check/) | UserPromptSubmit | Validates SSO sessions, injects auth status into context | No (context) |
 | [Clone ID Inject](../examples/hooks/clone-id-inject/) | UserPromptSubmit | Injects repo clone identity for multi-clone setups | No (context) |
-| [Learning Capture](../examples/hooks/learning-capture/) | SessionStart/End | Capture and inject session learnings | No |
+| [Learning Capture](../examples/hooks/learning-capture/) | Stop / PreCompact | Capture session friction for later codification (ships in [claude-learning-loop](https://github.com/asaphe/claude-learning-loop)) | No |
 | [Post-Compact Reinject](../examples/hooks/post-compact-reinject/) | SessionStart (compact) | Re-inject critical context after compaction | No (context) |
 | [Session Quality Capture](../examples/hooks/session-quality-capture/) | Stop | Record session metrics (tool calls, corrections, PR edits) | No (metrics) |
 
 ## Related Resources
 
-- [Learning System Guide](learning-system-guide.md) — Hooks for automated knowledge capture
+- [Learning System Guide](learning-system-guide.md) — What to detect, where a learning goes, and how to organize the rules it produces
 - [Settings JSON Guide](settings-json-guide.md) — Where hooks are registered and how layering works
 - [Skill Design Guide](../templates/skills/skill-design-guide.md) — Skills that hooks can auto-activate
 - [Best Practices](claude-best-practices.md) — Quality gates and hook integration patterns

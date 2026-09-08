@@ -25,10 +25,9 @@ An example of documenting a full hook set as an execution-order + cost reference
 | Hook | Matcher | Purpose | Output | Cost |
 |------|---------|---------|--------|------|
 | `rtk-rewrite.sh` | All Bash | Rewrites commands to use a token-optimizing proxy | Rewrites tool input | Per call, fast |
-| `secretsmanager-proxy.sh` | `aws secretsmanager*` | Routes secrets through a safe proxy | Modifies command | Conditional |
 | `kubectl-context-inject.sh` | All Bash | Injects `--context <your-cluster>` on kubectl/helm | Rewrites tool input | Per call, exits early if no k8s cmd |
 | `ci-polling-guard.sh` | `sleep *` | Blocks polling loops | Blocks or warns | Conditional |
-| `op-read-guard.sh` | `op *` | Guards password-manager biometric calls | Blocks or warns | Conditional |
+| `op-read-guard.sh` | `op *` | Blocks raw secret reads, redirects to a masked cache ([claude-secret-guard](https://github.com/asaphe/claude-secret-guard)) | Blocks or warns | Conditional |
 | `stateful-op-reminder.sh` | All Bash | Nudges on external state mutations | stderr reminder | Per call, pattern-match only |
 | `destructive-guard.sh` | All Bash | Blocks/soft-blocks destructive ops | Hard block (exit 2) or soft block | Per call, most calls exit early |
 | `review-verification-guard.sh` | `gh *` | Enforces review verification before posting | Blocks if missing | Conditional |
@@ -73,7 +72,7 @@ An example of documenting a full hook set as an execution-order + cost reference
 | Hook | Purpose |
 |------|---------|
 | `session-quality-capture.sh` | Records session quality metrics |
-| `op-cache-cleanup.sh` | Purges per-session password-manager cache |
+| `op-cache-cleanup.sh` | Purges the per-session secret caches ([claude-secret-guard](https://github.com/asaphe/claude-secret-guard)) |
 
 ## Notes
 
