@@ -8,22 +8,26 @@
   {
     "label": "git push origin feature-branch → allow",
     "command": "git push origin feature-branch",
-    "expected_exit": 0
+    "expected_exit": 0,
+    "expected_silent": true
   },
   {
     "label": "git push origin main-hotfix → allow (hyphenated, not main)",
     "command": "git push origin main-hotfix",
-    "expected_exit": 0
+    "expected_exit": 0,
+    "expected_silent": true
   },
   {
     "label": "git push -u origin feature-branch → allow",
     "command": "git push -u origin feature-branch",
-    "expected_exit": 0
+    "expected_exit": 0,
+    "expected_silent": true
   },
   {
     "label": "git push origin local:remote → allow (explicit refspec)",
     "command": "git push origin local-branch:remote-branch",
-    "expected_exit": 0
+    "expected_exit": 0,
+    "expected_silent": true
   },
   {
     "label": "git push origin feature:main → hard block (refspec targets main)",
@@ -52,7 +56,8 @@
   {
     "label": "cd worktree + push with refspec → allow",
     "command": "cd /tmp/worktree && git add . && git push origin dev-123:dev-123-remote",
-    "expected_exit": 0
+    "expected_exit": 0,
+    "expected_silent": true
   },
   {
     "label": "git reset --hard → soft block (recoverable via reflog)",
@@ -111,7 +116,8 @@
   {
     "label": "safe command → allow silently",
     "command": "git status",
-    "expected_exit": 0
+    "expected_exit": 0,
+    "expected_silent": true
   },
   {
     "label": "git push origin master → hard block (master variant)",
@@ -134,7 +140,8 @@
   {
     "label": "git push --set-upstream origin feature-branch → allow",
     "command": "git push --set-upstream origin feature-branch",
-    "expected_exit": 0
+    "expected_exit": 0,
+    "expected_silent": true
   },
   {
     "label": "git clean -fd → hard block",
@@ -153,5 +160,486 @@
     "command": "git stash clear",
     "expected_exit": 2,
     "expected_output": "stash"
+  },
+  {
+    "label": "push from a repo path containing 'push' → hard block (tokenised, not substring)",
+    "note": "A substring match starts inside the path and reads the wrong ref, missing a push to main.",
+    "command": "git -C /tmp/x-push-y push origin main",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "git push origin +main → hard block (leading + is the force marker, not the ref)",
+    "command": "git push origin +main",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "cd ~/repo-on-main && git push → hard block (tilde is expanded before the branch lookup)",
+    "note": "Without expansion the -C lookup fails, the branch reads empty, and empty is not 'main'.",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b main \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "cd ~/.claude-hook-eval-fixture && git push",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "git -C ~/repo-on-main push → hard block (same expansion, -C form)",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b main \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "git -C ~/.claude-hook-eval-fixture push",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "cd ~/repo-on-feature && git push → allow (negative control for the two cases above)",
+    "note": "Same fixture, non-main branch. Proves those cases block on the branch, not on the tilde.",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b feature-x \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "cd ~/.claude-hook-eval-fixture && git push",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "git clean -fdn → hard block (dry-run is NOT exempt, deliberately)",
+    "note": "An exemption is satisfiable by an earlier segment: `git clean -fdn && git clean -fd` would clear it.",
+    "command": "git clean -fdn",
+    "expected_exit": 2,
+    "expected_output": "git clean -f"
+  },
+  {
+    "label": "git branch -D a b c → hard block (bulk)",
+    "command": "git branch -D alpha beta gamma",
+    "expected_exit": 2,
+    "expected_output": "multiple branches in one command"
+  },
+  {
+    "label": "xargs git branch -D → hard block (bulk)",
+    "command": "git branch --merged | xargs git branch -D",
+    "expected_exit": 2,
+    "expected_output": "xargs git branch"
+  },
+  {
+    "label": "for-loop git branch -D → hard block (bulk)",
+    "command": "for b in alpha beta; do git branch -D $b; done",
+    "expected_exit": 2,
+    "expected_output": "for/while loop with git branch"
+  },
+  {
+    "label": "git branch -D one-branch → soft block (single delete stays approvable)",
+    "note": "Negative control for the three bulk patterns above — they must not fire on one branch.",
+    "command": "git branch -D one-branch",
+    "expected_exit": 0,
+    "expected_stdout": "force-deletes a branch"
+  },
+  {
+    "label": "gh api PUT .../pulls/N/merge → hard block (REST form of gh pr merge)",
+    "command": "gh api -X PUT repos/owner/repo/pulls/12/merge",
+    "expected_exit": 2,
+    "expected_output": "All three merge forms are blocked"
+  },
+  {
+    "label": "gh api .../pulls/N/merge-async → hard block (async variant)",
+    "command": "gh api -X PUT repos/owner/repo/pulls/12/merge-async",
+    "expected_exit": 2,
+    "expected_output": "All three merge forms are blocked"
+  },
+  {
+    "label": "gh api .../pulls/N/files → allow (negative control: reads on the same path must pass)",
+    "command": "gh api repos/owner/repo/pulls/12/files",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "gh stack merge → hard block (lands every layer beneath the target)",
+    "command": "gh stack merge",
+    "expected_exit": 2,
+    "expected_output": "EVERY unmerged layer beneath"
+  },
+  {
+    "label": "gh stack submit → soft block (creates or re-links every PR in the stack)",
+    "command": "gh stack submit",
+    "expected_exit": 0,
+    "expected_stdout": "every pull request in the stack"
+  },
+  {
+    "label": "terraform -chdir=… destroy → soft block (flag sits between binary and verb)",
+    "command": "terraform -chdir=infra/prod destroy -auto-approve",
+    "expected_exit": 0,
+    "expected_stdout": "terraform destroy — destroys all resources"
+  },
+  {
+    "label": "terraform -chdir=… plan → allow (negative control for the -chdir pattern)",
+    "command": "terraform -chdir=infra/prod plan",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "git push --delete origin branch → soft block (second spelling of a remote delete)",
+    "command": "git push --delete origin old-branch",
+    "expected_exit": 0,
+    "expected_stdout": "deletes a remote branch"
+  },
+  {
+    "label": "git push -uf origin feature → soft block (bundled short force flag)",
+    "command": "git push -uf origin feature-branch",
+    "expected_exit": 0,
+    "expected_stdout": "rewrites remote history"
+  },
+  {
+    "label": "git push origin +feature → soft block (+refspec is a force push)",
+    "command": "git push origin +feature-branch",
+    "expected_exit": 0,
+    "expected_stdout": "rewrites remote history"
+  },
+  {
+    "label": "safe push then force push → soft block (each segment is tested, not just the first)",
+    "command": "git push origin feat-a && git push --force origin feat-b",
+    "expected_exit": 0,
+    "expected_stdout": "rewrites remote history"
+  },
+  {
+    "label": "git push then unrelated rm -f → allow (force test does not cross a separator)",
+    "note": "Negative control for the case above: the -f belongs to rm, not to push.",
+    "command": "git push origin feat-a && rm -f /tmp/scratch-file",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "aws dynamodb delete-table → hard block (catastrophic list)",
+    "command": "aws dynamodb delete-table --table-name orders",
+    "expected_exit": 2,
+    "expected_output": "irreversible destruction of stored data"
+  },
+  {
+    "label": "aws kms schedule-key-deletion → hard block (catastrophic list)",
+    "command": "aws kms schedule-key-deletion --key-id abc123",
+    "expected_exit": 2,
+    "expected_output": "irreversible destruction of stored data"
+  },
+  {
+    "label": "aws cloudfront delete-distribution → soft block (destructive-verb catch-all)",
+    "note": "Not in the hard list; membership in the verb family is what triggers, so new APIs are covered.",
+    "command": "aws cloudfront delete-distribution --id E123",
+    "expected_exit": 0,
+    "expected_stdout": "aws destructive verb"
+  },
+  {
+    "label": "gh issue create → soft block (external artifact under the user's identity)",
+    "command": "gh issue create --title bug --body details",
+    "expected_exit": 0,
+    "expected_stdout": "gh issue <mutating verb>"
+  },
+  {
+    "label": "gh issue list → allow (negative control: read-only verbs pass)",
+    "command": "gh issue list --state open",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "gh api POST /issues → soft block (REST form of gh issue create)",
+    "command": "gh api -X POST repos/owner/repo/issues -f title=bug",
+    "expected_exit": 0,
+    "expected_stdout": "mutating method or field"
+  },
+  {
+    "label": "gh api GET /issues → allow (negative control: reads pass)",
+    "command": "gh api repos/owner/repo/issues",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "heredoc body naming a blocked command → allow (strip-cmd removes the body first)",
+    "note": "The heredoc marker carries a redirect, which the pre-fix regex could not match.",
+    "command": "cat <<EOF > /tmp/notes.txt\ngit push origin main\nEOF",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "quoted 'git checkout' as grep data → allow (branch-switch test runs unquoted)",
+    "note": "Needs a real repo at -C, or the branch-switch test never reaches its comparison.",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b main \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "git -C ~/.claude-hook-eval-fixture grep -rn 'git checkout main' .",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "cd into a non-repo then checkout → allow (target must be a real repo to block)",
+    "command": "cd /tmp/definitely-not-a-repo-xyz && git checkout -b scratch",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "git push origin main;echo → hard block (separator attached to the ref)",
+    "note": "`main;` is one whitespace field; dropping the field drops the ref with it.",
+    "command": "git push origin main;echo done",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "git push --force origin main; echo → hard block, not a downgrade to ask",
+    "command": "git push --force origin main; echo x",
+    "expected_exit": 2,
+    "expected_output": "git push --force to main"
+  },
+  {
+    "label": "git push origin HEAD from a repo on main → hard block (HEAD names no branch)",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b main \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "git -C ~/.claude-hook-eval-fixture push origin HEAD",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "git push origin HEAD from a repo on a feature branch → allow (negative control)",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b feature-x \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "git -C ~/.claude-hook-eval-fixture push origin HEAD",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "git push origin +src:dst → soft block (force refspec with a colon)",
+    "command": "git push origin +feature-a:feature-b",
+    "expected_exit": 0,
+    "expected_stdout": "rewrites remote history"
+  },
+  {
+    "label": "commit message naming a push to main → allow (ref extraction runs on the stripped command)",
+    "note": "A bare 'push' in message text otherwise synthesises a ref and hard-blocks a feature push.",
+    "command": "git commit -m \"fix push for main branch\" && git push origin feature-x",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "git clean --force → hard block (long form, not just -f)",
+    "command": "git clean --force -d",
+    "expected_exit": 2,
+    "expected_output": "permanently deletes untracked files"
+  },
+  {
+    "label": "git clean -n → allow (negative control: no force flag at all)",
+    "command": "git clean -n",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "terraform apply -destroy → soft block (a destroy spelled as an apply)",
+    "command": "terraform apply -destroy -auto-approve",
+    "expected_exit": 0,
+    "expected_stdout": "the same whole-workspace destroy"
+  },
+  {
+    "label": "terraform apply → allow (negative control for the -destroy pattern)",
+    "command": "terraform apply -auto-approve",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "multi-line for-loop with git branch -d → hard block (body spans lines)",
+    "note": "-d has no soft rule either, so a miss here runs with no prompt at all.",
+    "command": "for b in $(git branch --merged); do\n  git branch -d $b\ndone",
+    "expected_exit": 2,
+    "expected_output": "for/while loop with git branch"
+  },
+  {
+    "label": "loop, then an unrelated single delete after done → allow (body is extracted, not matched across)",
+    "note": "Negative control for the case above: the delete is outside the loop body.",
+    "command": "for x in a b; do echo $x; done && git branch -D one-branch",
+    "expected_exit": 0,
+    "expected_stdout": "force-deletes a branch"
+  },
+  {
+    "label": "git branch -D -- a b → hard block (end-of-options marker)",
+    "command": "git branch -D -- alpha beta",
+    "expected_exit": 2,
+    "expected_output": "multiple branches in one command"
+  },
+  {
+    "label": "gh api merge path with a shell variable → hard block (same endpoint as a literal number)",
+    "command": "gh api -X PUT repos/owner/repo/pulls/$PR/merge",
+    "expected_exit": 2,
+    "expected_output": "All three merge forms are blocked"
+  },
+  {
+    "label": "gh api --method GET on the merge path → allow (read-only merged-status check)",
+    "command": "gh api --method GET repos/owner/repo/pulls/12/merge",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "a GET in one segment must not disarm a mutating call in another",
+    "note": "A whole-command negative test is satisfiable by any segment; this asserts per-segment scoping.",
+    "command": "gh api -X GET repos/owner/repo/labels && gh api repos/owner/repo/issues -f title=x",
+    "expected_exit": 0,
+    "expected_stdout": "mutating method or field"
+  },
+  {
+    "label": "gh api /issues --input → soft block (gh defaults to POST with --input)",
+    "command": "gh api repos/owner/repo/issues --input body.json",
+    "expected_exit": 0,
+    "expected_stdout": "mutating method or field"
+  },
+  {
+    "label": "a -C on a READ must not retarget a local checkout in another segment",
+    "note": "The block took the first -C anywhere in the command, whichever invocation owned it.",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b main \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "git -C ~/.claude-hook-eval-fixture log --oneline && git checkout -b scratch",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "a -C on the CHECKOUT itself still hard blocks (control for the case above)",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b main \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "git -C ~/.claude-hook-eval-fixture checkout main",
+    "expected_exit": 2,
+    "expected_output": "Branch switch in"
+  },
+  {
+    "label": "git checkout -- must not disarm a real cross-repo checkout beside it",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b main \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "cd ~/.claude-hook-eval-fixture && git checkout -- . && git checkout main",
+    "expected_exit": 2,
+    "expected_output": "Branch switch in"
+  },
+  {
+    "label": "quoted prose naming a merge → allow (quoted text is data, not an invocation)",
+    "note": "Matching runs on a copy with quoted DATA blanked, so an echo about a command is not the command.",
+    "command": "echo \"then run gh pr merge 5\"",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "quoted binary → hard block (a closing quote must not break the adjacency a matcher needs)",
+    "command": "\"gh\" pr merge 5",
+    "expected_exit": 2,
+    "expected_output": "Never merge a PR"
+  },
+  {
+    "label": "single-quoted binary → hard block",
+    "command": "'git' push origin main",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "shell payload survives blanking → hard block (bash -c is a command, not data)",
+    "note": "Negative control for the blanking: a quoted payload handed to a shell really is re-parsed.",
+    "command": "bash -c \"git push origin main\"",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "git restore --staged must not disarm a later unstaged restore",
+    "command": "git restore --staged a && git restore b",
+    "expected_exit": 0,
+    "expected_stdout": "discards uncommitted file changes"
+  },
+  {
+    "label": "two soft triggers → both reported, not just the last",
+    "note": "Last-writer-wins dropped the graver trigger and mis-attributed the ask log.",
+    "command": "terraform destroy -auto-approve && kubectl scale deploy/x --replicas=0",
+    "expected_exit": 0,
+    "expected_stdout": "terraform destroy"
+  },
+  {
+    "label": "a command naming no guarded binary → allow (fast-path gate)",
+    "note": "check-guard-gate.py proves the gate cannot drop a command any rule would act on.",
+    "command": "python3 -m pytest -q tests/",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "quoted ref \"main\" → hard block (quotes survive extraction and compare equal to nothing)",
+    "command": "git push origin \"main\"",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "bash -c wrapped push to main → hard block",
+    "command": "bash -c \"git push origin main\"",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "an earlier bare 'push' word must not disarm a later real push to main",
+    "note": "push_args took the first `push` token anywhere; an echo or grep containing it captured the extraction.",
+    "command": "echo \"no push here\" && git push origin main",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "gh issue create followed by gh issue list → soft block (read verb must not disarm the mutation)",
+    "command": "gh issue create --title bug && gh issue list",
+    "expected_exit": 0,
+    "expected_stdout": "gh issue <mutating verb>"
+  },
+  {
+    "label": "a second loop must not disarm the bulk-delete block on the first",
+    "note": "Greedy body extraction anchored on the LAST `do`, replacing the real body with an innocent one.",
+    "command": "for b in a b; do git branch -d $b; done; for c in x; do echo $c; done",
+    "expected_exit": 2,
+    "expected_output": "for/while loop with git branch"
+  },
+  {
+    "label": "the word 'do' after a loop must not disarm it either",
+    "command": "for b in a b; do git branch -d $b; done && echo \"now do a fetch\"",
+    "expected_exit": 2,
+    "expected_output": "for/while loop with git branch"
+  },
+  {
+    "label": "heredoc marker followed by ; then a push to main → hard block (marker line must not swallow a command)",
+    "note": "The stripper deletes the marker line; if its class includes separators it deletes the next command too.",
+    "command": "cat <<EOF; git push origin main\nbody\nEOF",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "heredoc marker followed by && then a merge → hard block",
+    "command": "cat <<EOF && gh pr merge 7\nbody\nEOF",
+    "expected_exit": 2,
+    "expected_output": "Never merge a PR"
+  },
+  {
+    "label": "heredoc marker followed by | then a destructive clean → hard block",
+    "command": "cat <<EOF | tee /tmp/f; git clean -fd\nbody\nEOF",
+    "expected_exit": 2,
+    "expected_output": "permanently deletes untracked files"
+  },
+  {
+    "label": "heredoc marker with a command substitution → hard block (a ( opens a command too)",
+    "command": "cat <<EOF > $(mktemp); aws s3 rm s3://bucket/key\nbody\nEOF",
+    "expected_exit": 2,
+    "expected_output": "aws s3 rm/rb"
+  },
+  {
+    "label": "heredoc marker with a plain redirect → allow (the legitimate case the class must still strip)",
+    "note": "Negative control for the four cases above: no separator, so the body is stripped as intended.",
+    "command": "cat <<EOF > /tmp/notes.txt\ngit push origin main\nEOF",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "tab between tokens → hard block (a tab is not a space, and every pattern used ' +')",
+    "command": "gh\tpr\tmerge\t123",
+    "expected_exit": 2,
+    "expected_output": "Never merge a PR"
+  },
+  {
+    "label": "backslash-continuation between tokens → hard block",
+    "command": "aws s3 \\\n  rm s3://bucket/key",
+    "expected_exit": 2,
+    "expected_output": "aws s3 rm/rb"
+  },
+  {
+    "label": "cd on its own line then a cross-repo checkout → hard block (newline is a separator too)",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b main \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "cd ~/.claude-hook-eval-fixture\ngit checkout main",
+    "expected_exit": 2,
+    "expected_output": "Branch switch in"
   }
 ]

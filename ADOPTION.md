@@ -22,7 +22,8 @@ cp -r tools/claude/examples/hooks/pr-create-guard ~/.claude/hooks/
 # (Each hook sources `../_lib/<lib>.sh` from its own directory,
 # so the lib needs to live as a sibling to the hook subdirs.)
 mkdir -p ~/.claude/hooks/_lib
-cp tools/claude/examples/hooks/_lib/*.sh ~/.claude/hooks/_lib/
+# .pl too: strip-cmd.sh calls strip-quoted-args.pl from beside itself.
+cp tools/claude/examples/hooks/_lib/*.sh tools/claude/examples/hooks/_lib/*.pl ~/.claude/hooks/_lib/
 ```
 
 Then register each hook in `~/.claude/settings.json` per its README. You're done.
