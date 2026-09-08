@@ -120,14 +120,35 @@ Coordination protocols for multi-agent teams. Teams compose existing agents (`.c
 
 ## Team Lifecycle
 
-All teams follow this lifecycle:
+There is no manual create or delete step, and no `TeamCreate` / `TeamDelete` tool to call — older write-ups that describe one are describing a lifecycle that no longer exists. Check your own tool list before following any instruction that names them.
 
-1. **Create** — Create the team with a descriptive name
-2. **Spawn members** — Spawn agents with the team name and a member name, using the appropriate agent type
-3. **Assign work** — Tasks via the task tools, or direct messages between members
-4. **Coordinate** — Members communicate via messages, lead monitors progress
-5. **Collect results** — Members send findings/status to lead
-6. **Shutdown** — Lead sends a shutdown request to each member, then deletes the team
+1. **Spawn** — describe the task and the teammates you want in natural language, or name a specific subagent type ("spawn a teammate using the `security-reviewer` agent type to…"). The team forms implicitly when the first teammate spawns, with the current session as lead, and it is named after the session — you do not get to choose the name.
+2. **Assign work** — a shared task list via the built-in task tools, or direct messages.
+3. **Coordinate** — members communicate with each other; the lead watches the agent panel or the split panes.
+4. **Collect results** — members send findings to the lead; an idle teammate auto-notifies the lead when it stops.
+5. **Shut down** — before ending the turn, explicitly tell every named teammate to shut down. Do this even when the task looks finished, and do not assume the harness cleans up unprompted (see the gotchas below).
+
+One team per session, scoped to that session's lifetime: no cross-session or reusable named teams, and no sub-teams spawned by a teammate. Like everything else in this file, that was established by using the feature rather than read out of a spec — confirm it against your own version before designing around it.
+
+### `SendMessage` schema
+
+The schema is `additionalProperties: false`, so plausible-looking parameters — `type`, `recipient`, `content` — are *rejected* rather than silently ignored. On Claude Code 2.1.263 it accepts `to`, `message`, `summary` and `notify_when_idle`, of which only `to` and `message` are required; `summary` is a short label for your own transcript and is truncated rather than rejected if it runs long.
+
+The general point outlives the specific field list: **read a deferred tool's schema before the first call instead of guessing it from the name.** The shape drifts between versions — the required set here has already changed once — and a strict schema turns a plausible guess into a hard failure rather than a tolerated extra key.
+
+### Gotchas
+
+Each of these was observed in practice rather than read out of a changelog, and several have survived multiple releases. Re-check any one you are about to depend on — the feature is still experimental and the behavior moves.
+
+- **Permission mode is inherited from the lead at spawn and cannot be set per teammate.** If the lead runs in plan mode, every teammate starts in plan mode and must get a plan approved before touching a file. Harmless for research and review teammates; for implementation teammates, budget a plan-approval round-trip each. This is separate from the explicit "require plan approval" feature, which stacks on top of the lead's base mode.
+- **No session resumption for in-process teammates** — `/resume` and `/rewind` do not restore them. After a resume, respawn rather than messaging a stale teammate name.
+- **No nested teams and no background subagents from a teammate** — a teammate cannot spawn its own sub-team, and any subagent it launches runs in the foreground, since it cannot outlive the lead's process.
+- **Task status can lag** — teammates sometimes fail to mark a task complete, which blocks dependents. Check actual state rather than the board.
+- **An idle notification can arrive without the output ever being delivered.** This applies to plain `Agent`-tool spawns too, not just full teammates: a reviewer fan-out goes idle having delivered zero findings text. Recovery is one message re-requesting the report; if it goes idle a second time with nothing delivered, stop it and do the work inline — a third attempt is not worth the wait.
+- **A teammate spawned from a named subagent type may not have `SendMessage` in its callable tool list at all**, even though its system prompt describes messaging as the teammate-communication mechanism. The cause is upstream in your own definitions: agent files authored for plain `Agent`-tool use list only the tools needed to produce a *return value*, and the "reuse a subagent role as a teammate" mechanism carries that narrow allowlist over verbatim. The failure is intermittent — the same agent type and the same version produce both outcomes — and its signature is an idle teammate whose team inbox files are empty arrays, with the report present only as turn output. Two mitigations: add `SendMessage` to `tools:` in any definition you intend to spawn as a named teammate, and have a `PreToolUse: Agent` hook warn when a named spawn uses a type whose definition lacks it.
+- **Teammate permission prompts bubble up to the lead** — pre-approve routine operations before spawning, or the lead spends the session answering prompts.
+- **Auto-cleanup on session end is unreliable.** `~/.claude/teams/session-*/` directories have been observed surviving long after their session ended, including cases where teammates kept writing to team state hours after the lead's transcript went idle. Shut teammates down explicitly, and audit `~/.claude/teams/` by hand: cross-check each `config.json` against whether its lead session's transcript is still being written to, and delete the directory if that transcript is dead.
+- **Every session pays a scaffold cost whether or not you use teams.** With the feature flag on, a `session-<id>/config.json` holding a solitary `team-lead` entry is created per session even when no teammate is ever spawned — so a team-lead-only directory is not evidence that a team was used.
 
 ## Design Principles
 
@@ -141,4 +162,4 @@ All teams follow this lifecycle:
 
 Agent teams spawn full peer agent instances and can cost several times the tokens of a single session (especially when teammates run a planning model). Keep them disabled by default and reach for subagent fan-out or a decision-panel skill instead.
 
-Only enable teams when the task genuinely needs inter-agent dialogue with no lead bottleneck (e.g. adversarial multi-hypothesis debate). If enabled: set the **default teammate model to a cheaper tier** (teammates do NOT inherit the lead's plan-tier model — they default to the strongest tier otherwise), keep teams to 3-5 members, and clean up via the lead when done. The role/protocol playbooks above apply only once teams are explicitly enabled.
+Only enable teams when the task genuinely needs inter-agent dialogue with no lead bottleneck (e.g. adversarial multi-hypothesis debate). If enabled: **set the default teammate model explicitly** rather than assuming a teammate inherits the lead's — check what a spawned teammate actually resolves to before sizing the cost, since the default has not always been the cheap one. Keep teams to 3-5 members, and clean up via the lead when done. The role/protocol playbooks above apply only once teams are explicitly enabled.
