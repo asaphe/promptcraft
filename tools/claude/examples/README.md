@@ -8,7 +8,7 @@ Several examples that used to live here now ship as maintained Claude Code plugi
 
 ### `agents/`
 
-Specialist agent definitions — operational agents (deployment, Terraform, K8s troubleshooting, Karpenter) and review agents (security, DevOps, bash, Python, Datadog, ClickHouse, agent-config, general code). Each agent has a focused domain, clear boundaries, and explicit deferral rules. See `docs/agent-roster.md` for the routing table, kept in sync with disk by hand (the generator script targets an adopter's `.claude/` layout, not this repo's).
+Specialist agent definitions — design agents (architecture, implementation planning), operational agents (deployment, Terraform, K8s troubleshooting, Karpenter, cheap-tier read-only batching) and review agents (security, DevOps, bash, Python, Datadog, ClickHouse, agent-config, general code). Each agent has a focused domain, clear boundaries, and explicit deferral rules. See `docs/agent-roster.md` for the routing table, kept in sync with disk by hand (the generator script targets an adopter's `.claude/` layout, not this repo's).
 
 ### `config/`
 
@@ -49,6 +49,7 @@ Supporting documentation referenced by agents and skills:
 - **`pr-edit-counter/`** — Warns after 2+ body edits on the same PR.
 - **`pre-push-quality/`** — Pre-push lint enforcement; blocks the push on lint failures.
 - **`review-verification-guard/`** — Emits verification checklists before posting PR reviews / comments.
+- **`session-log/`** — Stop hook plus a reader: appends what each turn did to a per-session markdown log, so "where did that session stop" is a `grep` rather than a transcript reconstruction. Backs the `/recap` and `/sessions` skills.
 - **`stateful-op-reminder/`** — Nudges on mutations to external systems — identity providers, IAM, databases, Kubernetes, Helm, Terraform apply — and appends a team heads-up template (draft a chat message for user approval — never auto-send; gates further mutations in the same change window).
 - **`post-apply-state-check/`** — PostToolUse nudge after a successful `terraform apply` / `kubectl apply`: exit 0 proves syntax, not correctness — verify the resource live.
 - **`rtk/`** — PreToolUse hook that rewrites Bash commands through RTK (Rust Token Killer) for token savings.
@@ -73,6 +74,7 @@ Operational rules captured from real incidents. Organized by scope:
 User-invocable slash-command skills:
 
 - **PR lifecycle** — `pr-check`, `pr-resolver` (review and finalize moved to [claude-reviewkit](https://github.com/asaphe/claude-reviewkit))
+- **Session state** — `recap` (render the work in front of you and stop), `sessions` (query the session-log corpus written by the `session-log` hook)
 - **Ticket / branch** — `open-ticket`
 - **DevOps** — `eks-check`, `check-secret`, `new-gh-action`
 - **Frontend** — `sentry-react`

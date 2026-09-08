@@ -37,6 +37,15 @@ Review and finalize moved to [claude-reviewkit](https://github.com/asaphe/claude
 |---|---|---|
 | `/eval-tool [tool-name-or-url]` | eval-tool | Security evaluation framework for adopting a new dev tool / extension / MCP server / dependency |
 
+## Session State
+
+| Slash Command | Skill | Purpose | When NOT to Use |
+|---|---|---|---|
+| `/recap [handoff-file]` | recap | Render the work in front of you as goal / where-we-are / done / open / next, then end the turn | Asking what a *different* session did → use `/sessions` |
+| `/sessions [list\|show\|grep]` | sessions | Query the session-log corpus for what past or other sessions did and where they stopped | Looking for the *wording* of a past prompt → use `/history-search` |
+
+`/sessions` requires the [session-log](../hooks/session-log/) Stop hook, which writes the corpus it reads. `/recap` works without it and falls back to `/sessions` only when the current thread has no state to render.
+
 ## Learning & Knowledge
 
 Session mining and learning codification moved to [claude-learning-loop](https://github.com/asaphe/claude-learning-loop) as `/learning-loop:learn-scan`, `/learning-loop:wrap-up`, `/learning-loop:eval` and `/learning-loop:learn`.
