@@ -18,6 +18,8 @@ Design guides and reference docs for Claude Code.
 | `multi-repo-kernel-sync.md` | Distributing shared rule kernels across repos via CI fan-out and local overlays. |
 | `session-analytics-guide.md` | Analyzing `~/.claude/projects/*.jsonl` for token waste. |
 | `pr-review-protocol.md` | Structured PR review routing and posting via `gh api`. |
+| `stacked-prs-guide.md` | Native stacked pull requests — when to stack, per-layer approval cost, ruleset interactions, guard coverage. |
+| `unattended-mode-guide.md` | Autonomous sessions with an absolute capability ceiling: the policy table, default-deny, and how to test it. |
 | `github-actions-integration.md` | Using Claude Code in GitHub Actions workflows. |
 | `issue-writing-guide.md` | Writing effective issues (proposals, bugs, design discussions). |
 | `doc-quality-guide.md` | Documentation quality standards. |

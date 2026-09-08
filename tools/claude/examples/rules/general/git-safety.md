@@ -1,5 +1,7 @@
 # Git Safety Rules
 
+Mechanics and reasoning behind these rules — worktree pre-flight, restacking after a squash-merge, the squash protocol, force-push auto-allow — are in [`../../docs/git-worktree-and-squash-safety.md`](../../docs/git-worktree-and-squash-safety.md).
+
 - **Don't push to branches after their PR is merged** — Once a PR is merged, its branch is done. If follow-up work is needed (state moves, fixes), create a new branch from `main`. Pushing commits to a merged branch creates orphans and confusion.
 
 - **In worktrees and parallel sessions, verify git branch before every commit** — When working in a worktree (`/tmp/wt-*` or non-standard path) or when parallel Claude sessions may be running, always run `git branch --show-current` immediately before `git commit`. A commit to the wrong branch in a parallel session creates orphaned commits and requires cherry-pick + hard reset to fix.
