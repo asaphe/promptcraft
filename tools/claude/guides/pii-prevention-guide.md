@@ -61,12 +61,43 @@ Scan at every boundary where content crosses from private to public:
 
 ## How to Scan
 
+### Prefer a scanner over hand-built greps
+
+Hand-rolled patterns are fine for names and internal strings you invented, which no general tool can know about. They are a poor primary defense for credentials, which have known shapes. Use a dedicated scanner for those and keep your grep for the rest — [redacto](https://github.com/asaphe/redacto) is one such tool:
+
+```bash
+redacto --patterns all --live-window-secs 0 <paths…>
+```
+
+Two behaviors will silently defeat you if you don't know them, and they generalize to most scanners of this kind:
+
+- **It exits 0 even when it finds matches.** Never chain on its exit code — `redacto … && git commit` commits the secret. Read the report, or grep the report for a match count. Verified: a file containing a known-matching identifier returns exit `0`.
+- **A freshness window can skip just-modified files.** That default exists to avoid rescanning a whole tree, and it excludes exactly the files a commit flow cares about. `--live-window-secs 0` disables it. Re-scanning a file you did *not* just modify needs a fresh `--state-dir` too, or a stored watermark answers instead of the file.
+
+**Append a known-positive control to the same invocation.** A clean report and a scan that never ran look identical. Put a throwaway file containing a string the scanner must match at the end of the file list; if the control does not appear in the output, the run proved nothing about your real files:
+
+```bash
+printf 'vpc-0a1b2c3d4e5f67890\n' > /tmp/control.md
+redacto --patterns all --live-window-secs 0 <your paths…> /tmp/control.md
+# The control MUST appear in the output. If it doesn't, the scan didn't run as written.
+```
+
+Match the control to the pattern class you are testing — a credential-shaped probe proves nothing about a scan restricted to infrastructure identifiers, and vice versa.
+
 ### Git diff scan
 
 Use the pattern you built in step 1:
 
 ```bash
 git diff | grep -iE '<your-pattern>' || echo "clean"
+```
+
+**That `|| echo "clean"` is lying to you if the diff was empty.** `grep` exits non-zero both when the input contained no match and when there was no input at all — wrong directory, everything already committed, or a wrapper that filtered the diff before `grep` saw it. All three print `clean`. Check that the input is non-empty before believing the result:
+
+```bash
+git diff > /tmp/scan.txt
+[ -s /tmp/scan.txt ] || echo "WARNING: empty diff — this scan proves nothing"
+grep -icE '<your-pattern>' /tmp/scan.txt
 ```
 
 ### Staged files scan
@@ -138,18 +169,20 @@ When building tools that generate output files (reports, rules, logs), sanitize 
 
 ## Recovery
 
-If sensitive data is pushed to a public repo:
+**Rotate first, and treat the credential as compromised from the moment it was pushed.** Everything below is damage limitation; only rotation actually ends the exposure. Do not let a history rewrite delay it, and do not let a successful rewrite convince you rotation is now optional.
 
-1. **Don't just add a cleanup commit** — The data remains in git history
-2. **Rewrite history immediately:**
+1. **Rotate every exposed credential.** Assume it was scraped. Public-repo secret scanners are fast, and the window between push and rotation is the whole risk.
+2. **Don't just add a cleanup commit** — the data remains in git history.
+3. **Rewrite history**, understanding that this is incomplete:
 
    ```bash
    git filter-repo --replace-text <(echo 'sensitive-string==>REDACTED')
    git push --force-with-lease
    ```
 
-3. **Rotate any exposed credentials** — Assume they're compromised
-4. **Check CI artifacts** — Build logs, test outputs may also contain the data
+4. **Know what the rewrite does not reach.** A force-push rewrites the branch. It does not purge the forge's hidden pull-request refs (`refs/pull/N/head`), and it does not remove orphaned commits that remain fetchable by SHA. Anyone who knows or guesses the SHA — and anyone who forked, or whose CI cached the object — can still retrieve the content. A green `filter-repo` run and a clean `git log` are not evidence the data is gone.
+5. **Pick the remedy that matches the repo's age.** For a young repo with no forks and no external contributors, delete-and-recreate is the only certain remedy and is usually cheaper than it sounds. For anything with history worth keeping, you need the forge provider's support team to garbage-collect the unreachable objects — open that request rather than assuming the push settled it.
+6. **Check CI artifacts** — build logs, test outputs, and cached workspaces may hold the value independently of git history, and they have their own retention.
 
 ## PR Description Hygiene
 

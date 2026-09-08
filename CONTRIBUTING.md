@@ -12,7 +12,7 @@ Thank you for considering a contribution. This repository is a living collection
 ### Submitting Changes
 
 1. Fork the repository
-2. Create a branch: `feature/short-description` or `fix/short-description`
+2. Create a branch: `feat/short-description`, `fix/short-description`, or `docs/short-description`
 3. Make your changes
 4. Run `markdownlint .` to check formatting (see `.markdownlint.yaml` for config)
 5. Submit a pull request using the [PR template](.github/PULL_REQUEST_TEMPLATE.md)

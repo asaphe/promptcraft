@@ -2,9 +2,21 @@
 
 Structured protocol for AI-assisted PR reviews — routing, posting, severity classification, and finding verification.
 
+## Authorship Gate — resolve this first
+
+**Before routing by file type, establish whether you authored the PR.** It decides what the review is allowed to do, and getting it wrong in either direction wastes the review:
+
+| You authored it | Someone else authored it |
+|---|---|
+| Fix findings directly in the branch | Report only — never push to their branch |
+| No review state to submit; you cannot approve your own PR | A review state is required, and it is a merge authorization |
+| Self-review is a quality gate before asking for eyes | Author pushback gets re-verified, not deferred to |
+
+Resolve it from the PR's author field, not from memory of who started the work — a branch you created can carry someone else's commits, and a PR opened on your behalf is still theirs to merge.
+
 ## Review Routing by File Scope
 
-Before starting a review, determine what changed and route to the appropriate reviewer:
+Once authorship is settled, determine what changed and route to the appropriate reviewer:
 
 | Changed Files | Reviewer Type |
 | ------------- | ------------- |
@@ -35,21 +47,38 @@ Never let review agents post directly to a PR without human review.
 
 ## Posting Protocol
 
-### Use the Reviews API for Inline Comments
+### Post inline comments per-comment, then submit the review
 
-Post findings as inline file comments via the GitHub Reviews API, not as PR-level conversation comments:
+Findings belong on the diff line they refer to, not in a PR-level conversation comment. **Post them one at a time**, then submit a separate review carrying the summary and the state:
 
 ```bash
-gh api POST /repos/{owner}/{repo}/pulls/{number}/reviews \
-  --field body="Review summary: 2 blocking, 4 suggestions" \
-  --field event="COMMENT" \
-  --field 'comments=[
-    {"path":"path/to/file.tf","line":42,"body":"Finding description here"},
-    {"path":"path/to/other.py","line":15,"body":"Another finding here"}
-  ]'
+# 1. One call per finding
+gh api POST /repos/{owner}/{repo}/pulls/{number}/comments \
+  --field commit_id="$HEAD_SHA" \
+  --field path="path/to/file.tf" \
+  --field line=42 \
+  --field side="RIGHT" \
+  --field body="Finding description here"
+
+# 2. Then one review that sets the state and summarizes
+gh pr review {number} --request-changes --body "2 blocking, 4 suggestions"
 ```
 
-This places each finding on the exact line it refers to. Put the review summary (e.g., "2 blocking, 4 suggestions") in the review `body` field.
+**Do not use `POST /pulls/{n}/reviews` with a `comments[]` array for interactive review.** That bulk path is known to silently drop inline comments — the API returns 201 and the comments never appear on the PR, which reads as a successful post. It remains reasonable in CI, where a single atomic call is worth the risk, or when posting a summary with no inline comments at all. Details and the full per-comment field set: [`../examples/docs/pr-review-posting.md`](../examples/docs/pr-review-posting.md).
+
+The review submitted in step 2 is what groups the inline comments under a review event and sets the state visible on the PR page; without it they sit as loose comments.
+
+**The review state is a merge authorization, not a tone — pick it from your findings.** The example above uses `--request-changes` for illustration; it is not a default. Choose from what you want to happen, never by looking up the highest severity present:
+
+| Your findings | `event` |
+|---|---|
+| Anything you want changed before merge | `REQUEST_CHANGES` |
+| Informational only, but you don't want to authorize merge | `COMMENT` |
+| You would accept it merging exactly as-is | `APPROVE` |
+
+**"Approve with comments" is not a GitHub state.** Submitting `APPROVE` with a body full of things you want fixed says merge and don't-merge in the same breath, and the author acts on the state. Before submitting, re-read your own draft for that shape: a sentence like "I'd like this fixed first" inside an `APPROVE` is the tell.
+
+Three rationalizations each produce a wrong `APPROVE`, and all three are rejected: *another reviewer already blocks it so mine is costless* (their block can be dismissed without your finding ever being revisited); *blocking is disproportionate for a small or docs-only change* (proportionality governs how much you write, never which state you pick); *that file is another team's surface* (approval is repo-wide, not per-file — not owning the file argues for `COMMENT`).
 
 **Avoid:** `gh pr review --comment --body` for large markdown — it can fail silently or double-post. The API gives reliable control.
 
@@ -137,11 +166,13 @@ For bot inline threads: use **both** `resolveReviewThread` (hides the thread) **
 
 **Issue vs Suggestion:** If you'd file a bug for it, it's at least an Issue. Suggestions are "nice to have" — Issues are real problems that won't prevent merge but deserve attention.
 
+**These three are what you post.** Grading a finding before posting it — including the `GAP` category for work the change implies but did not do, which otherwise gets miscategorised as cosmetic and skipped — is covered in [`../examples/rules/general/review-verdicts.md`](../examples/rules/general/review-verdicts.md), along with the map from those grades onto the three severities above.
+
 ### Finding Type Classification
 
 Every finding title should include both severity and finding type:
 
-```
+```text
 ISSUE-1: Wrong value — image tag doesn't match deployed version
 BLOCKING-1: Missing port — service unreachable on health check endpoint
 SUGGESTION-1: Pattern violation — naming inconsistent with sibling modules

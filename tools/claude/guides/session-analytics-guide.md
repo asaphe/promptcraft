@@ -141,13 +141,13 @@ From an analysis of 716 sessions / 86,693 tool calls:
 | 1Password re-reads | 700 | 0.8% | [claude-secret-guard](https://github.com/asaphe/claude-secret-guard)'s masked cache |
 | **Total addressable** | **~17,100** | **~20%** | |
 
-## Hook Ordering Matters
+## Hook Ordering — consolidate, don't sequence
 
-When multiple PreToolUse hooks fire on the same command, they run sequentially in registration order. If one hook rewrites the command (via `updatedInput`), the next hook sees the rewritten version. Plan your hook order:
+When multiple PreToolUse hooks fire on the same command they run sequentially in registration order, and a hook that rewrites the command via `updatedInput` changes what later hooks see. It is tempting to solve this by ordering the registrations — rewriters first, proxies second, guards last.
 
-1. **Rewrite hooks** first (RTK rewrite, context inject)
-2. **Proxy/bypass hooks** second (secretsmanager proxy — needs to see post-rewrite command)
-3. **Guard hooks** last (destructive guard, polling guard — final gate before execution)
+**Don't.** Ordering separate registrations is exactly the arrangement in which a rewriting hook's response can silently override an earlier guard's block, and it fails open on the commands the guard exists for. Put every check that can decide the fate of one tool call into a **single authority script** with explicit internal precedence — `block > ask > rewrite > allow` — and make the sub-checks functions inside it rather than separate registrations.
+
+The token savings in the table above are unaffected by this: the rewrite still happens, it just happens inside the one script that also owns the guards, after they have had their say. See [hooks-guide.md](hooks-guide.md) § Multiple hooks on one event for the full argument.
 
 ## POSIX Compatibility
 

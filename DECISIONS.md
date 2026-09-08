@@ -134,11 +134,13 @@ A `.claude/README.md` disambiguates the two for anyone who lands there by accide
 
 ## D9 — `docs/index.html` stays untouched
 
-**Decision:** The `docs/index.html` file is GitHub Pages' social-preview landing page, not documentation. It remains at `docs/index.html` untouched by the restructure.
+**Decision:** The `docs/index.html` file is a GitHub Pages landing page prepared for this repo, not documentation. It remains at `docs/index.html` untouched by the restructure.
+
+**Status:** GitHub Pages is **not enabled** on this repository, and enabling it is not planned. The file is a prepared asset, not a live site — nothing is currently served from `docs/`.
 
 **Alternatives considered:**
 
 1. Move to `.github/` or delete — assumed it was stale documentation.
 2. Repurpose `docs/` for new restructure docs.
 
-**Why this one:** Inspecting the file revealed it's a full GitHub Pages landing page (hero, branding, styling) — served at `<user>.github.io/promptcraft/` when Pages is enabled from the `docs/` folder. Moving or deleting it would break the published Pages site. Fresh documentation goes to the repo root where it's easier to find.
+**Why this one:** Inspecting the file revealed it's a complete landing page (hero, branding, styling) that would be served at `<user>.github.io/promptcraft/` *if* Pages were enabled from the `docs/` folder. Keeping it costs nothing and preserves that option; moving or repurposing `docs/` would throw the work away and would silently decide the question. Fresh documentation goes to the repo root where it's easier to find.

@@ -1,6 +1,23 @@
 # Claude Code Auto Memory Guide
 
-How to design effective persistent memory entries that improve Claude Code's performance across sessions.
+How the automatic memory system works, why this setup turns it off, and what replaced it.
+
+## Read this first: we run with it disabled
+
+The config this repo documents sets `"autoMemoryEnabled": false` in `settings.json`, and pairs it with a PreToolUse guard that blocks writes to the memory path outright. The rest of this guide still describes the feature accurately — keep reading if you want to use it — but the recommendation here is not to.
+
+**Why.** Auto memory files are scoped per project path, so a memory written while working in one clone of a repo is invisible from a second clone of the same repo, and invisible from every other project. For anyone who works across several clones or several repos, that scoping produces the worst outcome available: knowledge that was captured, feels captured, and does not load when it is needed. It also accumulates without review — nothing prompts you to reread a memory entry and decide whether it is still true.
+
+**What replaced it.** An explicit two-tier arrangement, both under version control:
+
+| Tier | Location | Loads |
+|------|----------|-------|
+| Always-loaded rules | `~/.claude/rules/<topic>.md` (no `paths:` frontmatter) | every session, every project |
+| On-demand reference | `~/.claude/docs/<topic>.md` | only when something reads it |
+
+The trade is deliberate: you give up automatic capture and get placement you control, loading you can predict, and a diff when something changes. Routing content between those tiers is covered in [global-claude-md-guide.md](global-claude-md-guide.md), and the always-loaded tier is demonstrated by the rule files in [`../examples/rules/general/`](../examples/rules/general/).
+
+If you do enable auto memory, the design guidance below is what makes entries worth keeping — and the multi-clone section near the end is the constraint that most often decides against it.
 
 ## What Auto Memory Is
 

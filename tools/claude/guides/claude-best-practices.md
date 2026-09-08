@@ -147,7 +147,7 @@ See [prompting-examples.md](../../../shared/principles/prompting-examples.md) fo
 
 For features spanning multiple sessions, maintain a working document set:
 
-```
+```text
 project-docs/
 ├── feature-plan.md      # The accepted plan (update as you go)
 ├── feature-context.md   # Key files, decisions, constraints
@@ -242,10 +242,20 @@ Two approaches to delegation:
 
 | Approach | When to Use |
 |----------|-------------|
-| **Custom specialized subagents** | Highly specific, narrow tasks (PR review, build error resolution) with clear domain boundaries |
-| **Clone pattern** (Task spawning) | Most other delegation; preserves full context, more flexible |
+| **Custom specialized subagents** | The default once you have a roster — domain boundaries, strict tool scoping, and a model tier pinned per agent |
+| **Clone pattern** (fork of the current context) | When the task genuinely needs the conversation so far, and no roster agent fits |
 
-Default to the clone pattern. Custom subagents make sense when you need strict tool scoping or domain-specific system prompts. See: [../templates/agents/agent-design-guide.md](../templates/agents/agent-design-guide.md)
+**Route to a named agent by default, and match the model tier to the task:**
+
+| Tier | Use for |
+|------|---------|
+| Cheapest | Batched read-only diagnostics — 3+ independent lookups (git state, file reads, grep, cloud `describe`). Never for mutations. Returns a compact summary so raw output stays out of the main context. |
+| Mid | Research, multi-file analysis, judgment calls short of deep review |
+| Top | PR review, security analysis, complex architecture, cross-repo audit |
+
+An agent's own frontmatter `model` wins over the session model — a subagent that pins nothing inherits the session's tier, which is how a fan-out of ten "cheap" lookups quietly runs on the expensive one. Check before fanning out.
+
+The clone pattern's advantage is context, and that is also its cost: it re-pays the full conversation. Reach for it when the task depends on what has already happened, not as the default. See: [../templates/agents/agent-design-guide.md](../templates/agents/agent-design-guide.md)
 
 ### Simple Control Loops
 
@@ -292,6 +302,7 @@ cd ../project-feature-b && claude
 ```
 
 Best practices:
+
 - One terminal tab per worktree
 - Consistent naming conventions
 - Separate IDE windows per worktree
@@ -302,12 +313,14 @@ Best practices:
 For automation and CI/CD integration, Claude Code runs headless:
 
 **Fan-out pattern** (large migrations):
+
 ```bash
 claude -p "migrate foo.py from React to Vue. Return OK or FAIL" \
   --allowedTools Edit "Bash(git commit:*)"
 ```
 
 **Pipeline pattern**:
+
 ```bash
 claude -p "<prompt>" --json | your_command
 ```
@@ -525,6 +538,7 @@ Audit with `claude mcp list`. If you see servers you never use, remove them or d
 ## Sources
 
 This guide synthesizes:
+
 - Community best practices from [rosmur.github.io/claudecode-best-practices](https://rosmur.github.io/claudecode-best-practices/) (12-source synthesis)
 - Production experience on a multi-service codebase with specialized agents, automated learning hooks, and conditional rule loading
 - Patterns documented throughout this repository

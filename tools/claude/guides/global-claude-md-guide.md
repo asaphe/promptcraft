@@ -188,59 +188,12 @@ Control where generated docs go:
 
 ## Template
 
-```markdown
-# Claude Code Global Rules
+Don't copy a template from this guide — use the maintained one. The flagship example lives at [`../examples/config/global-CLAUDE.md`](../examples/config/global-CLAUDE.md), and it is the file the rest of this guide describes.
 
-## General
+It carries two things worth lifting even if you write your own from scratch:
 
-1. Follow 12-Factor App design principles where applicable.
-2. **Verify before asserting** — When unsure about CLI flags, API behavior, or library features, search online or check official docs. Do not guess.
-
-## Multiple Repository Clones
-
-- Always identify which clone at the start of work
-- Be explicit about paths when referencing files across clones
-
-## Authentication
-
-- Profiles: `dev`, `prod`. Default when unclear: **prod**
-- If expired/wrong account, automatically run the appropriate login command and continue. Do NOT stop and ask.
-
-## Commit Message Policy
-
-- Conventional commit format: `type(scope): description`
-- Concise — focus on what changed
-
-## Dangerous Commands
-
-NEVER run destructive/irreversible commands without explicit user approval. This includes:
-`delete`, `destroy`, `remove`, `rm`, `prune`, `force`, `hard`, `terminate`, or anything
-that modifies state files/history, affects production resources, or cannot be easily undone.
-STOP and ask first.
-
-## Testing & Validation
-
-- NEVER dismiss unexpected diffs as "not our change" or "pre-existing."
-- When comparing against running infrastructure, actually extract and compare real values.
-- Report ALL findings, not just the ones related to the current task.
-
-## Correctness & Least Privilege
-
-- "Harmless" is not acceptable. Unnecessary secrets, env vars, or permissions are undesirable.
-- Every secret, env var, and permission must be justified.
-- Accuracy over convenience.
-
-## Agent Behavioral Constraints
-
-- **Decision checkpoints** — Stop at decision points and present a plan before executing multi-step operations.
-- **Scope discipline** — Only modify files explicitly requested. Before touching adjacent files, state which file and why.
-- **Image tag discipline** — Never default to `main` or `latest` without first resolving available tags.
-
-## Documentation Output
-
-- Investigation reports and ad-hoc docs go to `~/path/to/docs/`.
-- Only READMEs and code-adjacent docs belong in the repo.
-```
+- **A scope marker on every `##` section** — `universal` / `opinionated` / `author-specific` — so an adopter can tell at a glance which sections to keep, which to adapt, and which to delete.
+- **A leading always-on checklist** of the eight rules most often violated, each one a single-line restatement of a rule detailed further down. The repetition is deliberate: a rule stated once, twelve sections in, does not fire.
 
 ## Anti-Patterns
 
@@ -260,7 +213,21 @@ If both global and project CLAUDE.md say the same thing, the global one is redun
 
 ### Making global CLAUDE.md too long
 
-The global file loads into every conversation. Every line costs context tokens. Keep it under 100 lines. If a section grows beyond a few bullets, consider whether it's truly global or should be project-specific.
+The global file loads into every conversation. Every line costs context tokens. If a section grows beyond a few bullets, the answer is usually to move it — but "move it to a project file" is only one of the options, and it is the wrong one for a rule that genuinely applies everywhere.
+
+**There is an always-loaded personal rules tier, and it is the missing option most setups never discover.** A file at `~/.claude/rules/<topic>.md` with **no `paths:` frontmatter** loads on every session, in every project, exactly like the global `CLAUDE.md` itself. Splitting a long section into one costs nothing in coverage; it only makes both files readable, and it gives the topic a place to grow.
+
+| Where | Loads |
+|---|---|
+| `~/.claude/CLAUDE.md` | every session |
+| `~/.claude/rules/<topic>.md`, **no** `paths:` | every session — same as above |
+| `~/.claude/rules/<topic>.md`, **with** `paths:` | only once a matching file is read |
+| `~/.claude/docs/<topic>.md` | only when something reads it |
+| project `.claude/` | with that project |
+
+**The `paths:` gotcha.** Adding `paths:` frontmatter to scope a rule to `**/*.tf` looks like a pure optimization, and it silently changes *when* the rule exists. A `paths:`-scoped rule has not loaded when the session starts, so it cannot inform anything that happens before the first matching file is opened — and it is unsafe for any content a hook depends on. If the rule must be true from the first turn, it must not carry `paths:`.
+
+The three files in [`../examples/rules/general/`](../examples/rules/general/) are the worked example of this tier: each is a body of rules too long to sit in the global file, loading identically to it.
 
 ### Omitting the "why"
 

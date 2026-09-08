@@ -130,7 +130,7 @@ ENDOFPAYLOAD
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `event` | Yes | `COMMENT` (advisory) or `REQUEST_CHANGES` (blocking findings exist) |
+| `event` | Yes | `REQUEST_CHANGES`, `COMMENT`, or `APPROVE` — chosen per § Event Selection below, not from a per-severity lookup |
 | `body` | Yes | Brief summary + any findings that don't map to a diff line |
 | `comments` | Yes* | Array of inline comments on specific files/lines (*omit only if zero findings map to diff lines) |
 | `comments[].path` | Yes | File path relative to repo root — must appear in `gh pr diff --name-only` |
@@ -174,8 +174,19 @@ When a finding doesn't match the seed list, invent a kebab-case id that names th
 
 ### Event Selection
 
-- Use `COMMENT` when all findings are SUGGESTIONS or ISSUES (no BLOCKING)
-- Use `REQUEST_CHANGES` when any finding is BLOCKING
+**The review state is a merge authorization, not a tone.** Choose it from what you want to happen, not by looking up the highest severity present:
+
+| Your findings | `event` |
+|---|---|
+| Anything you want changed before merge — at any severity, including a single ISSUE | `REQUEST_CHANGES` |
+| Informational only, but you still don't want to authorize merge | `COMMENT` |
+| You would accept it merging exactly as-is; every comment is FYI or the author's discretion | `APPROVE` |
+
+`APPROVE` is a real option and omitting it from the choice is its own defect — a review with nothing to fix should say so plainly rather than defaulting to `COMMENT`.
+
+**"Approve with comments" is not a GitHub state.** Submitting `APPROVE` with a body full of things you want fixed says merge and don't-merge in the same breath, and the author acts on the state. Re-read your own draft for that shape before submitting: "I'd like this fixed first" inside an `APPROVE` is the tell.
+
+Severity classification and the event are different axes — see [`pr-review-rules.md`](pr-review-rules.md) § Severity Classification, and [`../rules/general/review-verdicts.md`](../rules/general/review-verdicts.md) for the finding grades that feed it.
 
 ## Post the Review
 
