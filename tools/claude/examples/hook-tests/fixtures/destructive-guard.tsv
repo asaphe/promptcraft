@@ -51,12 +51,28 @@ allow	git commit -m "chore: remove the gh pr merge step from the runbook"
 allow	cat <<EOF > runbook.md\ngit push origin main\nEOF
 hard	bash <<EOF\ngit push origin main\nEOF
 
-# --- KNOWN GAP, pinned rather than described. A command substitution now survives
-# stripping (it is code, and `strip_quoted_args` preserves it by design), but the push
-# rule still does not match an invocation NESTED inside one, so this reaches no verdict.
-# Recorded as `allow` because that is what the hook does today, not because it is right:
-# when the matcher learns to descend into a substitution this line goes red on purpose.
-allow	git commit -m "$(git push origin main)"
+# --- Command substitutions execute; single-quoted and escaped spellings remain data.
+hard	git commit -m "$(git push origin main)"
+hard	git commit -m "prefix $(git push origin main) suffix"
+hard	git commit -m "$(git status; git push origin main)"
+hard	git commit -m "$(printf '%s' "$(git push origin main)")"
+hard	git commit -m "`git push origin main`"
+hard	git commit -m "$(( $(git push origin main) + 1 ))"
+hard	git commit -m "it's $(git push origin main)"
+hard	git commit -m 'literal \\'"$(git push origin main)"
+allow	git commit -m '$(git push origin main)'
+allow	git commit -m "\$(git push origin main)"
+allow	git commit -m "\`git push origin main\`"
+
+# --- read flags must only exempt their own nested command, not a mutation beside it.
+allow	git commit -m "$(gh api -X GET repos/o/r/pulls/42/merge)"
+hard	git commit -m "$(gh api -X GET repos/o/r/pulls/42/merge; gh api -X PUT repos/o/r/pulls/42/merge)"
+
+# --- Intentional conservative overmatch: a comment is inspected as shell-like text.
+hard	printf x # $(git push origin main)
+
+# --- A substitution-local cd cannot change the outer checkout directory.
+allow	printf "$(cd /)" && git checkout main
 
 # --- input unavailable: the extraction returns nothing, which is indistinguishable from
 # "no command to guard". Pinned so a later edit cannot flip it silently.

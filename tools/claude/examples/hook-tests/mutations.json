@@ -56,5 +56,22 @@
         "to": "  if true; then"
       }
     }
+  ],
+  "_lib/split-cmd-segments.pl": [
+    {
+      "why": "a completed dollar-parenthesis substitution is discarded, hiding a nested destructive command",
+      "suite": "destructive-guard",
+      "delete_matching": "collect_segments\\(substr\\(\\$text, \\$i \\+ 2"
+    },
+    {
+      "why": "a completed backtick substitution is discarded, hiding a nested destructive command",
+      "suite": "destructive-guard",
+      "delete_matching": "collect_segments\\(substr\\(\\$text, \\$i \\+ 1"
+    },
+    {
+      "why": "a substitution scope opener is omitted, so checkout directory state cannot be restored safely",
+      "suite": "destructive-guard",
+      "delete_matching": "emit_scope\\(\\$out, 'E'\\)"
+    }
   ]
 }

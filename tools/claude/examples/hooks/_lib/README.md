@@ -9,7 +9,7 @@ This directory holds shell utilities that other hooks source. The leading unders
 | [`strip-cmd.sh`](strip-cmd.sh) | `strip_cmd "$CMD"` blanks heredoc bodies and `-m`/`--message` contents; `strip_quoted_args "$CMD"` blanks quoted literals. Both keep pattern matching on the command surface rather than on text a command carries. |
 | [`hook-diag.sh`](hook-diag.sh) | Diagnostic wrapper. Sourced AFTER reading stdin into `$INPUT`. Logs hook name, exit code, command and stderr tail to a rotating log, re-emits captured stderr on exit 1 and exit 2 so the reason reaches the model, and records a hook that wrote to stderr on exit 0 — where the harness discards it. |
 | [`strip-quoted-args.pl`](strip-quoted-args.pl) | Character-walk backend for `strip_quoted_args`. Reads a command on stdin, writes it back with quoted data blanked and quoted *code* preserved. |
-| [`split-cmd-segments.pl`](split-cmd-segments.pl) | Splits a command line into NUL-delimited segments on unquoted separators, so a flag test runs against the segment that owns the flag. |
+| [`split-cmd-segments.pl`](split-cmd-segments.pl) | Splits executable shell segments and recognised command substitutions into NUL-delimited records. |
 | [`resolve-workdir.sh`](resolve-workdir.sh) | `resolve_workdir "$CMD"` returns the repository a git command acts on — via `git -C <dir>` or a leading `cd <dir> &&` — or nothing. |
 | [`pr-author.sh`](pr-author.sh) | Cached predicates for PR authorship and repository visibility, for gates that treat a self- or bot-authored PR differently from someone else's. |
 
@@ -37,7 +37,11 @@ Use it only for detectors matching an invocation. A detector matching *content* 
 
 A flag test written against the whole command line answers for the wrong command. `gh pr list --json url | jq -r 'select(.state)'` carries a `select` belonging to `jq`; an allowlist keyed on `gh` flags cannot tell. Splitting first lets each detector run against the segment that owns what it is testing.
 
-Segments are NUL-delimited because a segment may itself contain newlines — a quoted multi-line body — so a newline-delimited stream cannot be read back into whole segments.
+Segments are NUL-delimited because a segment may itself contain newlines — a quoted multi-line body — so a newline-delimited stream cannot be read back into whole segments. The splitter recursively emits tested `$()` nesting and simple backtick substitutions without their delimiters. Single-quoted and escaped spellings remain data, while substitutions in double quotes remain executable.
+
+This is a targeted command-surface parser, not a Bash interpreter. Its tested scope is separators, single and double quotes, escaping, `$()` nesting, simple backticks, and arithmetic expansions containing substitutions. The default stream is flat; `--scoped` adds typed enter/exit records so the checkout detector can restore its directory after a substitution. It does not resolve commands built dynamically through variables or `eval`, or cover escaped nested backticks or interpolated heredocs. The guard deliberately inspects comment text conservatively.
+
+The scoped stream is a guard/helper protocol: update both together. A missing, malformed, or older helper stream intentionally hard-blocks a branch-switch check rather than skipping it.
 
 The sharpest use is a **negative** test. `! grep` over a whole command line is satisfiable by any segment, so `gh api -X GET .../labels && gh api .../issues -f title=x` lets its own read disarm the gate for the mutation beside it. `destructive-guard`'s `seg_matches` uses this splitter to require the positives *and* the absence of the negative within one segment; read it for the pattern.
 
