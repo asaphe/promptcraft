@@ -101,6 +101,45 @@ load_segments() {
   fi
 }
 
+_SCOPED_LOADED=""
+_SCOPED_OK=""
+_SCOPED_TYPES=()
+_SCOPED_VALUES=()
+load_scoped_segments() {
+  if [ -n "$_SCOPED_LOADED" ]; then
+    [ "$_SCOPED_OK" = 1 ]
+    return
+  fi
+  _SCOPED_LOADED=1
+  [ -r "$SPLIT_SEGMENTS" ] || return 1
+  local type value ended="" invalid="" depth=0
+  while IFS= read -r -d '' type; do
+    [ -z "$ended" ] || { invalid=1; break; }
+    case "$type" in
+      S)
+        IFS= read -r -d '' value || { invalid=1; break; }
+        _SCOPED_TYPES[${#_SCOPED_TYPES[@]}]="S"
+        _SCOPED_VALUES[${#_SCOPED_VALUES[@]}]="$value"
+        ;;
+      E)
+        depth=$((depth + 1))
+        _SCOPED_TYPES[${#_SCOPED_TYPES[@]}]="E"
+        _SCOPED_VALUES[${#_SCOPED_VALUES[@]}]=""
+        ;;
+      X)
+        [ "$depth" -gt 0 ] || { invalid=1; break; }
+        depth=$((depth - 1))
+        _SCOPED_TYPES[${#_SCOPED_TYPES[@]}]="X"
+        _SCOPED_VALUES[${#_SCOPED_VALUES[@]}]=""
+        ;;
+      Z) ended=1 ;;
+      *) invalid=1; break ;;
+    esac
+  done < <(printf '%s' "$CMD_MATCH" | perl "$SPLIT_SEGMENTS" --scoped)
+  [ -n "$ended" ] && [ -z "$invalid" ] && [ "$depth" -eq 0 ] || return 1
+  _SCOPED_OK=1
+}
+
 # seg_matches <negative> <required>... — true when ONE segment matches every <required> and not <negative>.
 # see: tools/claude/examples/hooks/destructive-guard/README.md § Parser hardening — why a whole-command negative test is disarmable
 seg_matches() {
@@ -327,10 +366,23 @@ fi
 # Branch switching outside session directory — disrupts other sessions.
 # Any git checkout/switch that changes branches in a repo other than the
 # session's working directory must use worktrees instead.
-# see: README.md § Parser hardening — the effective directory is whatever the LAST cd set, per segment
+# see: README.md § Parser hardening — nested substitutions restore their parent's directory scope
+if echo "$CMD_MATCH" | grep -qE 'git[[:space:]]([^|;&]* )?(checkout|switch)([[:space:]]|$)'; then
+if ! load_scoped_segments; then
+  HARD_REASON="destructive-guard: scoped command parser failed while checking a branch switch."
+else
 CHECKOUT_CWD=""
-load_segments
-for CO_SEG in "${_SEGS[@]}"; do
+CHECKOUT_CWD_STACK=()
+for ((CO_INDEX=0; CO_INDEX<${#_SCOPED_TYPES[@]}; CO_INDEX++)); do
+  case "${_SCOPED_TYPES[$CO_INDEX]}" in
+    E) CHECKOUT_CWD_STACK[${#CHECKOUT_CWD_STACK[@]}]="$CHECKOUT_CWD"; continue ;;
+    X)
+      CHECKOUT_CWD="${CHECKOUT_CWD_STACK[${#CHECKOUT_CWD_STACK[@]}-1]}"
+      unset 'CHECKOUT_CWD_STACK[${#CHECKOUT_CWD_STACK[@]}-1]'
+      continue
+      ;;
+  esac
+  CO_SEG="${_SCOPED_VALUES[$CO_INDEX]}"
   # A `cd` moves the effective directory for every segment after it, exactly as the shell does.
   case "$CO_SEG" in
     cd\ *) CHECKOUT_CWD=$(printf '%s' "$CO_SEG" | sed -E 's/^cd +([^ ;]+).*/\1/') ;;
@@ -363,6 +415,8 @@ for CO_SEG in "${_SEGS[@]}"; do
     fi
   fi
 done
+fi
+fi
 
 # =====================================================================
 # SOFT BLOCKS — risky but approvable, JSON permissionDecision ask + exit 0

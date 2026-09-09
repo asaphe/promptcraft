@@ -635,6 +635,86 @@
     "expected_output": "aws s3 rm/rb"
   },
   {
+    "label": "comment text is intentionally inspected conservatively",
+    "command": "printf x # $(git push origin main)",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "apostrophe inside double quotes does not hide a substitution",
+    "command": "git commit -m \"it's $(git push origin main)\"",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "backslash inside single quotes does not hide a following substitution",
+    "command": "git commit -m 'literal \\'\"$(git push origin main)\"",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "push to main in a double-quoted command substitution → hard block",
+    "command": "git commit -m \"$(git push origin main)\"",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "push to main in nested substitutions → hard block",
+    "command": "git commit -m \"$(printf '%s' \"$(git push origin main)\")\"",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "push to main in a backtick substitution → hard block",
+    "command": "git commit -m \"`git push origin main`\"",
+    "expected_exit": 2,
+    "expected_output": "git push on main"
+  },
+  {
+    "label": "literal or escaped substitutions → allow",
+    "command": "git commit -m '\u0024(git push origin main)' && git commit -m \"\\\u0024(git push origin main)\"",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "nested GET does not exempt a nested merge mutation beside it",
+    "command": "git commit -m \"$(gh api -X GET repos/o/r/pulls/42/merge; gh api -X PUT repos/o/r/pulls/42/merge)\"",
+    "expected_exit": 2,
+    "expected_output": "REST form"
+  },
+  {
+    "label": "nested cd does not replace an outer checkout directory",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b main \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "cd ~/.claude-hook-eval-fixture && printf \"$(printf x; cd /)\" && git checkout main",
+    "expected_exit": 2,
+    "expected_output": "Branch switch in"
+  },
+  {
+    "label": "nested cd restores the session directory for an outer checkout",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b main \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "printf \"$(printf x; cd ~/.claude-hook-eval-fixture)\" && git checkout main",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "sibling substitutions each restore the same outer checkout directory",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b main \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "cd ~/.claude-hook-eval-fixture && printf \"$(cd /) $(cd /)\" && git checkout main",
+    "expected_exit": 2,
+    "expected_output": "Branch switch in"
+  },
+  {
+    "label": "nested substitution scopes restore before an outer checkout",
+    "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b main \"$HOME/.claude-hook-eval-fixture\"",
+    "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",
+    "command": "cd ~/.claude-hook-eval-fixture && printf \"$(printf $(cd /))\" && git checkout main",
+    "expected_exit": 2,
+    "expected_output": "Branch switch in"
+  },
+  {
     "label": "cd on its own line then a cross-repo checkout → hard block (newline is a separator too)",
     "setup": "rm -rf \"$HOME/.claude-hook-eval-fixture\" && git init -q -b main \"$HOME/.claude-hook-eval-fixture\"",
     "cleanup": "rm -rf \"$HOME/.claude-hook-eval-fixture\"",

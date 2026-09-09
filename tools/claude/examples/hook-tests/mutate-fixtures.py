@@ -59,6 +59,14 @@ def resolve_hook(hooks_dir, name):
     sys.exit("no hook %r under %s" % (name, hooks_dir))
 
 
+def resolve_target(hooks_dir, name):
+    if name.startswith("_lib/"):
+        target = hooks_dir / name
+        if target.is_file():
+            return target
+    return resolve_hook(hooks_dir, name)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("hooks", nargs="*")
@@ -66,7 +74,7 @@ def main():
     args = ap.parse_args()
 
     manifest = {k: v for k, v in json.loads(MANIFEST.read_text()).items()
-                if not k.startswith("_")}
+                if k != "_README"}
     wanted = args.hooks or sorted(manifest)
     unknown = [h for h in wanted if h not in manifest]
     if unknown:
@@ -79,7 +87,7 @@ def main():
 
     failures, total = [], 0
     for hook in wanted:
-        target = resolve_hook(tree, hook)
+        target = resolve_target(tree, hook)
         pristine = target.read_text()
         for mutation in manifest[hook]:
             total += 1
