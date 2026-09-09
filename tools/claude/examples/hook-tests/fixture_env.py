@@ -102,6 +102,15 @@ def pr_create(tmp):
     }}
 
 
+def destructive_guard(tmp):
+    feature = _init(os.path.join(tmp, "push-feature"), branch="feature")
+    return {"cwd": feature, "tokens": {
+        "push_feature": feature,
+        "push_main": _init(os.path.join(tmp, "push-main")),
+        "push_master": _init(os.path.join(tmp, "push-master"), branch="master"),
+    }}
+
+
 def staged_workflow(tmp):
     """One repo with a broken staged workflow, one valid, one with no workflow at all."""
     bad = "on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run:\n"
@@ -126,6 +135,7 @@ def gh_shim(tmp):
 
 
 SETUPS = {
+    "destructive-guard": destructive_guard,
     "pr-create": pr_create,
     "staged-workflow": staged_workflow,
     "gh-shim": gh_shim,

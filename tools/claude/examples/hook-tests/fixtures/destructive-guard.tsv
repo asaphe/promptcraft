@@ -8,6 +8,8 @@
 # pins one class, plus the false-positive defence for that class — the half that actually
 # regresses, because widening a matcher is easy and re-checking its blast radius is not.
 
+#!setup destructive-guard
+
 # --- hard: pushes to the default branch, every spelling ---
 hard	git push origin main
 hard	git push --force origin main
@@ -27,6 +29,12 @@ hard	$'\x67it' push origin main
 # --- allow: the same verb aimed somewhere it is allowed ---
 allow	git push origin feature/my-branch
 allow	git push
+allow	git -C {push_feature} push
+hard	git -C {push_main} push
+hard	git -C {push_master} push
+allow	cd {push_feature} && git push
+hard	cd {push_main} && git push
+hard	cd {push_master} && git push
 
 # --- hard: merges. The maintainer merges; there is no approval path here. ---
 hard	gh pr merge 42 --squash
