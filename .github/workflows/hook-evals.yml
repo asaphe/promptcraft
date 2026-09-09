@@ -28,3 +28,11 @@ jobs:
 
       - name: Run hook evals
         run: python3 .claude/evals/runner.py
+
+      - name: Check Bash expansion semantics and published guard fixtures
+        run: |
+          python3 tools/claude/examples/hook-tests/run-fixtures.py destructive-guard --hooks-dir tools/claude/examples/hooks
+          python3 tools/claude/examples/hook-tests/test-expansion-semantics.py
+
+      - name: Verify expansion regression mutations are detected
+        run: python3 tools/claude/examples/hook-tests/mutate-fixtures.py --hooks-dir tools/claude/examples/hooks _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl _lib/strip-cmd

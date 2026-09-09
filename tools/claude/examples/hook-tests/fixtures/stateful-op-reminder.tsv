@@ -30,5 +30,11 @@ allow	ls -la
 allow	git commit -m "chore: stop running kubectl apply by hand"
 allow	git commit -m "docs: explain when terraform apply is safe"
 
+# WHY: literal heredoc content must not trigger a reminder.
+#!escapes
+allow	cat <<EOF > runbook.md\nkubectl apply -f deploy.yaml\nEOF
+# WHY: an interpreter executes its heredoc body before the reminder can return.
+ctx	bash <<EOF\nkubectl apply -f deploy.yaml\nEOF
+
 # --- input unavailable ---
 allow	<absent>
