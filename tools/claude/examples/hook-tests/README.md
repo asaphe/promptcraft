@@ -30,9 +30,16 @@ python3 probe-hooks.py --selftest
 
 # Break each hook on purpose; every mutation must be caught
 python3 mutate-fixtures.py --hooks-dir ../hooks
+
+# Compare selected expansion fixtures with Bash using inert command stubs
+python3 test-expansion-semantics.py
 ```
 
 `--hooks-dir` resolves both layouts: flat `<dir>/<name>.sh`, which is how hooks sit in an installed `~/.claude/hooks/`, and nested `<dir>/<name>/<name>.sh`, which is how they sit in this repo. Installed alongside your own hooks as `~/.claude/hooks/tests/`, the default is already right and the flag can be dropped.
+
+`test-expansion-semantics.py` checks selected destructive-guard fixtures against `/bin/bash` and, when present, Homebrew Bash. It first asserts the ordered calls to inert command stubs, then checks the guard verdict. Payloads execute from reviewed fixture files with a temporary-only `PATH`, controlled startup files, and temporary working directories. This is a test harness, not a sandbox for untrusted shell input.
+
+An `#!oracle` line selects the following TSV case. Its tab-separated fields are the case name, expected stub trace (`-` for no calls), optional setup name, and optional setup-specific verdict. The ordinary fixture runner ignores these lines; a cross-repository checkout case needs the oracle's two-repository setup to exercise the hard block. Missing or invalid quote helpers are tested separately against temporary hook copies. Decoded payloads pass tripwires for absolute paths, destructive filesystem commands, and environment overrides before execution.
 
 ## Fixture format
 

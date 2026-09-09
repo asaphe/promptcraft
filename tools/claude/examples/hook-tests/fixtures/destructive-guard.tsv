@@ -13,6 +13,16 @@ hard	git push origin main
 hard	git push --force origin main
 hard	git push -f origin main
 hard	git push origin HEAD:main
+hard	"git" push origin "main"
+hard	g"it" push origin ma'in'
+#!oracle	empty-quoted-git	git:push,origin,main
+hard	g''it push origin main
+#!oracle	escaped-git	git:push,origin,main
+hard	g\it push origin main
+#!oracle	ansi-git	git:push,origin,main
+hard	g$'it' push origin main
+#!oracle	ansi-hex-git	git:push,origin,main
+hard	$'\x67it' push origin main
 
 # --- allow: the same verb aimed somewhere it is allowed ---
 allow	git push origin feature/my-branch
@@ -38,35 +48,171 @@ ask	git push --force origin feature/my-branch
 allow	terraform plan
 allow	git reset --soft HEAD~1
 allow	kubectl get pods
+#!oracle	helper-failure-control	git:status
+allow	git status
 
 # --- allow: the trigger as message text rather than as an invocation. The commit that
 # documents a rule must not be blocked by the rule it documents.
 allow	git commit -m "docs: never git push origin main directly"
 allow	git commit -m "chore: remove the gh pr merge step from the runbook"
 
-# --- a heredoc body is data when written to a file, and CODE when fed to an interpreter.
-# strip-cmd.sh blanks the first and preserves the second; blanking both would hide a real
-# invocation behind three lines of shell.
-#!escapes
-allow	cat <<EOF > runbook.md\ngit push origin main\nEOF
-hard	bash <<EOF\ngit push origin main\nEOF
-
 # --- Command substitutions execute; single-quoted and escaped spellings remain data.
+#!escapes
+# WHY: a literal heredoc body remains data for a file-writing command.
+allow	cat <<EOF > runbook.md\ngit push origin main\nEOF
+# WHY: an interpreter executes the same heredoc body.
+hard	bash <<EOF\ngit push origin main\nEOF
+# WHY: shell wrappers preserve the interpreter ownership of standard input.
+#!oracle	exec-bash-heredoc	bash:|git:push,origin,main
+hard	exec bash <<'EOF'\ngit push origin main\nEOF
+#!oracle	time-bash-heredoc	bash:|git:push,origin,main
+hard	time bash <<'EOF'\ngit push origin main\nEOF
+# WHY: negation changes status but not whether Bash executes its input.
+#!oracle	not-bash-heredoc	bash:|git:push,origin,main
+hard	! bash <<'EOF'\ngit push origin main\nEOF\n:
+#!oracle	subshell-bash-heredoc	bash:|git:push,origin,main
+hard	(bash <<'EOF'\ngit push origin main\nEOF\n)
+#!oracle	brace-bash-heredoc	bash:|git:push,origin,main
+hard	{ bash <<'EOF'\ngit push origin main\nEOF\n}
+#!oracle	if-bash-heredoc	bash:|git:push,origin,main
+hard	if true; then bash <<'EOF'\ngit push origin main\nEOF\nfi
+# WHY: a quoted heredoc is executable when its command owns standard input.
+#!oracle	mode-bash-heredoc	bash:|git:push,origin,main
+hard	MODE=x bash <<'EOF'\ngit push origin main\nEOF
+#!oracle	command-bash-heredoc	bash:|git:push,origin,main
+hard	command bash <<'EOF'\ngit push origin main\nEOF
+#!oracle	env-bash-heredoc	env:bash|bash:|git:push,origin,main
+hard	env bash <<'EOF'\ngit push origin main\nEOF
+# WHY: a non-interpreter command leaves its quoted heredoc body literal.
+#!oracle	bash-version-literal	bash:--version|cat:
+allow	bash --version; cat <<'EOF'\ngit push origin main\nEOF
+#!oracle	bash-c-literal	bash:-c,true|cat:
+allow	bash -c true; cat <<'EOF'\ngit push origin main\nEOF
+#!oracle	bash-script-literal	bash:inert-script	inert-script
+allow	bash inert-script <<'EOF'\ngit push origin main\nEOF
+#!oracle	bash-stdin-heredoc	bash:-s|git:push,origin,main
+hard	bash -s <<'EOF'\ngit push origin main\nEOF
+# WHY: arguments after the delimiter still choose whether Bash reads standard input.
+#!oracle	bash-script-after-delimiter	bash:inert-script	inert-script
+allow	bash <<'EOF' inert-script\ngit push origin main\nEOF
+#!oracle	bash-stdin-after-delimiter	bash:-s|git:push,origin,main
+hard	bash <<'EOF' -s\ngit push origin main\nEOF
+#!oracle	python-c-literal	python:-c,pass
+allow	python -c 'pass' <<'EOF'\ngit push origin main\nEOF
+#!oracle	python-script-literal	python:inert-python-script	inert-python-script
+allow	python inert-python-script <<'EOF'\ngit push origin main\nEOF
+#!oracle	eval-literal	-
+allow	eval <<'EOF'\ngit push origin main\nEOF
+# WHY: wrappers pass a static -c payload to Bash for execution.
+#!oracle	env-bash-c	env:bash,-c,git push origin main|bash:-c,git push origin main|git:push,origin,main
+hard	env bash -c 'git push origin main'
+#!oracle	command-bash-c	bash:-c,git push origin main|git:push,origin,main
+hard	command bash -c 'git push origin main'
+#!oracle	mode-bash-c	bash:-c,git push origin main|git:push,origin,main
+hard	MODE=x bash -c 'git push origin main'
+#!oracle	exec-bash-c	bash:-c,git push origin main|git:push,origin,main
+hard	exec bash -c 'git push origin main'
+#!oracle	combined-bash-c	bash:-ec,git push origin main|git:push,origin,main
+hard	bash -ec 'git push origin main'
+# WHY: login-shell startup can change PATH, so this fixture is intentionally not an oracle probe.
+hard	bash -lc 'git push origin main'
+allow	printf x; git commit -m 'bash -c git push origin main'
 hard	git commit -m "$(git push origin main)"
 hard	git commit -m "prefix $(git push origin main) suffix"
 hard	git commit -m "$(git status; git push origin main)"
 hard	git commit -m "$(printf '%s' "$(git push origin main)")"
+#!oracle	legacy-backtick-double-quoted	git:push,origin,main|git:commit,-m,0
 hard	git commit -m "`git push origin main`"
+#!oracle	legacy-backtick-unquoted	git:push,origin,main|git:commit,-m,0
+hard	git commit -m `git push origin main`
+#!oracle	arithmetic-nesting	git:push,origin,main|git:commit,-m,1
 hard	git commit -m "$(( $(git push origin main) + 1 ))"
 hard	git commit -m "it's $(git push origin main)"
 hard	git commit -m 'literal \\'"$(git push origin main)"
+#!oracle	literal-command-substitution	git:commit,-m,$(git push origin main)
 allow	git commit -m '$(git push origin main)'
+#!oracle	escaped-command-substitution	git:commit,-m,$(git push origin main)
 allow	git commit -m "\$(git push origin main)"
+#!oracle	escaped-legacy-backtick	git:commit,-m,`git push origin main`
 allow	git commit -m "\`git push origin main\`"
+
+# WHY: an escaped inner legacy delimiter is syntax for a nested command substitution.
+#!oracle	nested-legacy-backtick	git:push,origin,main|git:commit,-m,0
+hard	git commit -m "`printf \`git push origin main\``"
+# WHY: nested legacy substitutions execute without double-quote context too.
+#!oracle	nested-legacy-backtick-unquoted	git:push,origin,main|git:commit,-m,0
+hard	git commit -m `printf \`git push origin main\``
+
+# WHY: quoted data does not make a nested mutation an outer read.
+#!oracle	nested-quoted-read-put	gh:api,-X,PUT,repos/o/r/pulls/42/merge|gh:api,-X,GET,0
+hard	gh api -X GET "$(gh api -X PUT repos/o/r/pulls/42/merge)"
+
+# WHY: a nested quote must not hide the checkout after the substitution restores its directory.
+#!oracle	nested-quoted-checkout-scope	git:checkout,main	target-repos	hard
+allow	cd target && printf "$(printf "$(cd /)")" && git checkout main
+
+# WHY: a quoted nested substitution must not swallow the later outer mutation.
+#!oracle	quoted-nesting-later-put	gh:api,-X,GET,repos/o/r/path|gh:api,-X,PUT,repos/o/r/pulls/42/merge
+hard	gh api -X GET "repos/o/r/$(printf "$(printf path)")" && gh api -X PUT repos/o/r/pulls/42/merge
 
 # --- read flags must only exempt their own nested command, not a mutation beside it.
 allow	git commit -m "$(gh api -X GET repos/o/r/pulls/42/merge)"
 hard	git commit -m "$(gh api -X GET repos/o/r/pulls/42/merge; gh api -X PUT repos/o/r/pulls/42/merge)"
+
+# WHY: an unquoted heredoc expands substitutions before a non-interpreter receives data.
+#!oracle	heredoc-unquoted	git:push,origin,main|cat:
+hard	cat <<EOF\n$(git push origin main)\nEOF
+# WHY: legacy substitutions expand in the same unquoted body.
+#!oracle	heredoc-legacy-backtick	git:push,origin,main|cat:
+hard	cat <<EOF\n`git push origin main`\nEOF
+# WHY: quotes in an unquoted body do not suppress substitution.
+#!oracle	heredoc-body-quotes	git:push,origin,main|cat:
+hard	cat <<EOF\n'$(git push origin main)'\nEOF
+# WHY: a quoted delimiter leaves its body literal.
+#!oracle	heredoc-quoted	cat:
+allow	cat <<'EOF'\n$(git push origin main)\nEOF
+# WHY: any quoted part of a delimiter leaves its body literal.
+#!oracle	heredoc-mixed-quoted	cat:
+allow	cat <<E"OF"\n$(git push origin main)\nEOF
+# WHY: an escaped delimiter also leaves its body literal.
+#!oracle	heredoc-escaped-delimiter	cat:
+allow	cat <<E\OF\n$(git push origin main)\nEOF
+# WHY: an escaped dollar stays literal in an unquoted body.
+#!oracle	heredoc-escaped-dollar	cat:
+allow	cat <<EOF\n\$(git push origin main)\nEOF
+# WHY: tab-stripped heredocs still expand an unquoted body.
+#!oracle	heredoc-tabs	git:push,origin,main|cat:
+hard	cat <<-EOF\n\t$(git push origin main)\n\tEOF
+# WHY: every heredoc body expands before the command starts.
+#!oracle	heredoc-multiple	git:push,origin,main|git:push,origin,main|cat:
+hard	cat <<FIRST <<SECOND\n$(git push origin main)\nFIRST\n$(git push origin main)\nSECOND
+# WHY: here-strings perform command substitution before invocation.
+#!oracle	here-string	git:push,origin,main|cat:
+hard	cat <<< "$(git push origin main)"
+# WHY: commands after a heredoc are separate executable commands.
+#!oracle	heredoc-following-command	cat:|git:push,origin,main
+hard	cat <<EOF\nplain data\nEOF\ngit push origin main
+# WHY: an ANSI-C quoted delimiter still terminates at its decoded word.
+#!oracle	heredoc-ansi-delimiter	cat:|git:push,origin,main
+hard	cat <<$'EOF'\nplain data\nEOF\ngit push origin main
+# WHY: a hex-escaped ANSI-C delimiter still terminates at its decoded word.
+#!oracle	heredoc-ansi-hex-delimiter	cat:|git:push,origin,main
+hard	cat <<$'E\\x4fF'\nplain data\nEOF\ngit push origin main
+# WHY: a locale-translated delimiter still terminates at its decoded word.
+#!oracle	heredoc-locale-delimiter	cat:|git:push,origin,main
+hard	cat <<$"EOF"\nplain data\nEOF\ngit push origin main
+# WHY: adjacent quoted fragments compose one delimiter word.
+#!oracle	heredoc-adjacent-quoted-delimiter	cat:|git:push,origin,main
+hard	cat <<'E'"OF"\nplain data\nEOF\ngit push origin main
+# WHY: an escaped body newline does not stop the next delimiter from terminating the heredoc.
+#!oracle	heredoc-continued-delimiter	cat:|git:push,origin,main
+hard	cat <<EOF\n\\\nEOF\ngit push origin main
+
+# WHY: arithmetic shifts are not heredoc openers.
+#!oracle	arithmetic-shift-word	git:commit,-m,4
+allow	git commit -m "$((1 << 2))"
+#!oracle	arithmetic-shift-bare	git:status
+allow	((1 << 2)); git status
 
 # --- Intentional conservative overmatch: a comment is inspected as shell-like text.
 hard	printf x # $(git push origin main)

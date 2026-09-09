@@ -15,7 +15,7 @@
 # Install: add to settings.json under hooks.PreToolUse[].hooks[]
 #   { "type": "command", "command": "/path/to/destructive-guard.sh" }
 #
-# Requires: jq, perl (for strip-cmd)
+# Requires: jq, perl
 
 INPUT=$(cat)
 # shellcheck disable=SC2034  # read by the sourced hook-diag.sh
@@ -34,17 +34,13 @@ if [ -z "$CMD" ]; then
   exit 0
 fi
 
-# Strip heredoc bodies and -m args before pattern matching (shared util).
-source "$(dirname "$0")/../_lib/strip-cmd.sh"
-CMD_STRIPPED=$(strip_cmd "$CMD")
-# A tab or a backslash-continuation between tokens defeats every ` +` here; builtins, not another perl fork.
-CMD_STRIPPED="${CMD_STRIPPED//\\$'\n'/ }"
-CMD_STRIPPED="${CMD_STRIPPED//$'\t'/ }"
-# see: README.md § Parser hardening — a quoted whitespace-free token IS that token, so `"gh" pr merge` is a merge
-CMD_STRIPPED=$(printf '%s' "$CMD_STRIPPED" | sed -E 's/"([^"'"'"'[:space:]]+)"/\1/g; s/'"'"'([^"'"'"'[:space:]]+)'"'"'/\1/g')
-
-# see: README.md § Parser hardening — matching runs on a copy with quoted DATA blanked; extraction keeps real values
-CMD_MATCH=$(strip_quoted_args "$CMD_STRIPPED")
+# Both views must start from the original syntax so data stripping cannot hide nested code.
+QUOTE_PARSER="$(dirname "$0")/../_lib/strip-quoted-args.pl"
+if ! CMD_STRIPPED=$(printf '%s' "$CMD" | perl "$QUOTE_PARSER" --values) \
+   || ! CMD_MATCH=$(printf '%s' "$CMD" | perl "$QUOTE_PARSER"); then
+  echo "destructive-guard: command preprocessing failed; refusing to run unchecked." >&2
+  exit 2
+fi
 
 # Extraction patterns exclude spaces and separators, not quotes, so `cd "path" &&` keeps its quotes.
 unquote() {

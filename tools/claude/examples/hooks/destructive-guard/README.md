@@ -72,10 +72,13 @@ Every rule here is a regex over command *text*, so the parser is where this hook
 - **Resolve the working directory per segment, tracking `cd` as the shell does.** The branch-switch check took the first `-C` anywhere in the command, so `git -C <other-repo> log && git checkout main` resolved against the repo the *read* named. It now walks segments, letting a `cd` move the effective directory for everything after it and letting a `-C` bind only to its own invocation — which also stops one `git checkout -- .` from disarming a real cross-repo checkout beside it.
 - **Scope a negative test to one segment.** A `! grep` over the whole command line is satisfiable by *any* segment, so `gh api -X GET …/labels && gh api …/issues -f title=x` had its own read disarm the gate for the mutation beside it. `seg_matches` splits on unquoted separators first (via `_lib/split-cmd-segments.pl`) and requires the positives and the absence of the negative to hold within one segment. If the splitter is unreadable it falls back to whole-command matching — the behaviour it replaced, rather than silence.
 - **Confine a flag test to the segment that owns it.** Scanning the whole command line for a force flag fires on an unrelated `rm -f` after the push; scanning only the first `push` misses `git push origin a && git push --force origin b`. The `PUSH_SEG` prefix (`push[^|;&]*`) does neither: `grep` still finds a later push, and no match can cross `|`, `;` or `&`.
-- **Normalise whitespace once, not per pattern.** Nearly every rule here spells an inter-token gap as `space-plus`, which matches spaces and nothing else — so a tab (`gh<TAB>pr<TAB>merge`) or a backslash-continuation across lines walked past all of them. Both are collapsed into `CMD_STRIPPED` at the top, which fixes the whole family at once instead of auditing thirty regexes.
-- **Fail closed on a missing dependency.** Without `perl`, `strip_cmd` returned an empty string, every `grep` then matched nothing, and the guard passed everything silently — the worst possible failure for a control with no override path. The hook now checks `jq` and `perl` at entry and exits 2 with a named reason, and `strip_cmd` returns its input unchanged rather than empty.
-- **Separate the corpus you MATCH on from the one you EXTRACT from.** Quotes cut both ways, and a single copy cannot serve both. `echo "then run gh pr merge 5"` is prose that hard-blocked, while `"gh" pr merge 5` is a merge that passed — a closing quote breaks the `gh[[:space:]]` adjacency every matcher needs. So there are two derived copies. `CMD_STRIPPED` unquotes any *whitespace-free* quoted token, because `"gh"` is just `gh`, and keeps real values so paths and refs can be extracted from it. `CMD_MATCH` additionally blanks multi-word quoted spans via `_lib/strip-quoted-args.pl`, and every rule matches on that. A quoted payload handed to a shell survives the blanking, because `bash -c "git push origin main"` really is a push — that carve-out is the splitter's, not an exception bolted on here.
-- **Descend into command substitutions.** `$()` and backticks execute before their surrounding command, including inside double quotes and arithmetic expansion. For tested `$()` nesting and simple backticks, the segment splitter emits inner commands separately without closing delimiters, so a push to `main)` is identified as a push to `main`. Single-quoted and escaped spellings stay literal. Checkout uses a second, typed scoped pass to restore its directory after a substitution. This is not full Bash grammar: commands assembled through variables or `eval`, escaped nested backticks, and interpolated heredocs are outside the splitter's scope.
+- **Normalize whitespace with its quote context.** Inter-token tabs become spaces and escaped newlines are removed by the quote helper. Quoted data keeps its original characters in the extraction view.
+- **Fail closed on preprocessing errors.** The hook checks `jq` and `perl` at entry and exits 2 with a named reason if either is absent. A missing quote helper or detected parse error also blocks, before an empty result can reach the fast-path gate.
+- **Derive matching and extraction views from the original syntax.** `_lib/strip-quoted-args.pl --values` retains argument values in `CMD_STRIPPED`; the default mode blanks multi-word quoted data in `CMD_MATCH`. Both unquote parsed simple tokens such as `"gh"`, so quoted executables still match. Each nested substitution has its own quote context: the quotes inside `"$(printf "$(printf path)")"` cannot consume a later command. Static payloads handed to recognized shells remain visible.
+- **Descend into command substitutions.** `$()` and backticks execute before their surrounding command, including inside double quotes and arithmetic expansion. The quote helper decodes legacy backticks one level at a time and renders them as `$()`. The splitter emits inner commands separately without closing delimiters, so a push to `main)` is identified as a push to `main`. Single-quoted and escaped spellings stay literal. Checkout uses a typed scoped pass to restore its directory after a substitution.
+- **Keep executable heredoc expansions.** An ordinary unquoted heredoc can execute `$()` and backticks even when its body looks like quoted prose. The helper preserves these expansions while discarding literal body text, consumes multiple bodies in order, and resumes at the command after each terminator. Quoting any part of the delimiter disables expansion. Interpreter classification belongs to the command receiving that body: an earlier shell command cannot turn a later `cat` body into code, and tested shell wrappers still preserve executable stdin. Script and inline-command modes retain stdin as data. Tests cover mixed quoting, `<<-`, continuations, and here-strings.
+
+This remains a targeted command-surface detector, not full Bash grammar or an execution sandbox. Commands assembled dynamically through variables or arbitrary `eval` payloads are not resolved. Comment text is inspected conservatively in an isolated segment. Detected parse errors can therefore block unsupported syntax as well as malformed commands.
 
 Two related defaults: a target that is not a git repository never counts as a cross-repo branch switch (without that test, every `cd <non-repo> && git checkout` blocked), and a `PUSH_DIR` that does not resolve falls back to the session's own branch rather than to an empty string.
 
@@ -106,18 +109,18 @@ The catch-all keys on `<lowercase token> <destructive verb>-…` inside one segm
 
 This is a `PreToolUse` hook: it runs before **every** Bash tool call, so its own latency is a tax on everything else.
 
-The rule cascade is ~60 `echo | grep` fork pairs plus a `perl` fork for the segment split. Rather than pay that for commands no rule could match, a fast-path gate exits early when the command names none of `git`, `gh`, `aws`, `kubectl`, `helm`, `terraform`, `xargs`.
+Preprocessing invokes the quote parser twice, once for matching and once for extraction. These invocations avoid adding another multi-record output protocol between the parser and Bash, at the cost of two syntax walks and Perl startups. The rule cascade adds roughly 60 `echo | grep` fork pairs and a Perl segment split; checkout also requests scoped records. A fast-path gate skips that cascade when the parsed command names none of `git`, `gh`, `aws`, `kubectl`, `helm`, `terraform`, `xargs`.
 
 That gate is a fail-**open** if it is ever wrong: a rule keyed on a binary the gate omits silently stops firing, and no eval case would notice unless one happened to cover it. So the token list is not trusted as written. `.claude/scripts/check-guard-gate.py` re-derives every rule's leading binary from the hook source, fails if the gate omits one, and separately asserts that every case the suite expects to act on survives the gate. It is itself mutation-tested — dropping a token from `GUARD_TOOLS` must make it fail.
 
-Measured median over 12 runs, before this change and after:
+Measured median over 12 local runs with the expansion parser, using macOS Bash 3.2:
 
-| Command | Before | After |
-|---|--:|--:|
-| `ls -la /tmp` (names no guarded binary) | 237 ms | **133 ms** |
-| `git status` (gate passes, cascade runs) | 224 ms | 341 ms |
+| Command | Median |
+|---|--:|
+| `ls -la` (names no guarded binary) | 189 ms |
+| `git status` (gate passes, cascade runs) | 513 ms |
 
-Commands naming nothing the guard cares about are now faster than before this change; commands that do name one pay for the analysis. The segment split is computed once per invocation and cached, rather than re-forked per caller.
+These timings depend on host load and are not a performance guarantee. Both paths pay for preprocessing; commands naming a guarded tool also pay for the rule cascade. Each segment format is cached within the invocation.
 
 ## Reporting every trigger
 
@@ -147,13 +150,15 @@ This hook ships twice: `tools/claude/examples/hooks/destructive-guard/` is what 
 }
 ```
 
-Requires `jq` and `perl` on PATH, plus `../_lib/hook-diag.sh` and `../_lib/strip-cmd.sh` installed under the same parent directory as the hook. `strip-cmd.sh` in turn looks for `strip-quoted-args.pl` beside itself.
+Requires `jq` and `perl` on PATH, plus `../_lib/hook-diag.sh`, `../_lib/strip-quoted-args.pl`, and `../_lib/split-cmd-segments.pl` installed under the same parent directory as the hook. Update the guard and helpers together.
 
 ## Testing
 
 The repo's own copy of this hook is covered by `.claude/evals/destructive-guard/cases.json`, run by `.claude/evals/runner.py`. Cases assert an exit code and a substring, on the combined output (`expected_output`) or on one channel (`expected_stdout` / `expected_stderr`) when the channel is the behaviour under test.
 
 Cases whose behaviour depends on real git state carry `setup`/`cleanup` shell snippets — branch detection cannot be exercised without a repository to detect a branch in. A failing `setup` fails the case rather than letting it pass against a fixture that was never created.
+
+The published [hook tests](../../hook-tests/) also exercise expansion syntax against Bash with inert command stubs, then check the guard verdict. Run `python3 tools/claude/examples/hook-tests/test-expansion-semantics.py` from the repository root. Its selected fixture scripts execute with a temporary-only `PATH`, controlled startup files, and temporary working directories; the corpus must still be reviewed before execution.
 
 When you add a rule, add the case *and* mutation-test it: revert the rule, confirm the new case goes red, restore, and check the file is byte-identical again. A case that stays green with the rule removed is testing nothing.
 

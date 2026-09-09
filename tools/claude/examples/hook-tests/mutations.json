@@ -50,7 +50,7 @@
   "_lib/strip-cmd": [
     {
       "why": "an executed heredoc is blanked again, hiding a real invocation behind three lines of shell",
-      "suite": "destructive-guard",
+      "suite": "stateful-op-reminder",
       "replace": {
         "from": "  if ! _heredoc_is_executed \"$cmd\"; then",
         "to": "  if true; then"
@@ -64,14 +64,59 @@
       "delete_matching": "collect_segments\\(substr\\(\\$text, \\$i \\+ 2"
     },
     {
-      "why": "a completed backtick substitution is discarded, hiding a nested destructive command",
-      "suite": "destructive-guard",
-      "delete_matching": "collect_segments\\(substr\\(\\$text, \\$i \\+ 1"
-    },
-    {
       "why": "a substitution scope opener is omitted, so checkout directory state cannot be restored safely",
       "suite": "destructive-guard",
       "delete_matching": "emit_scope\\(\\$out, 'E'\\)"
+    }
+  ],
+  "_lib/strip-quoted-args.pl": [
+    {
+      "why": "empty quote fragments stop composing executable tokens",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "if (!$expanded && $data =~ /\\A[^\\s\"'\\\\`;|&<>()]*\\z/)",
+        "to": "if (!$expanded && $data =~ /\\A[^\\s\"'\\\\`;|&<>()]+\\z/)"
+      }
+    },
+    {
+      "why": "exec-wrapped shells lose their executable heredoc bodies",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "if ($words[0] =~ /^(?:exec|time)$/)",
+        "to": "if ($words[0] =~ /^(?:time)$/)"
+      }
+    },
+    {
+      "why": "backtick escape decoding corrupts a nested executable token",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "$body .= $next;",
+        "to": "$body .= 'x';"
+      }
+    },
+    {
+      "why": "quoted substitutions are treated as data, hiding nested mutations",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "$rendered .= $code;",
+        "to": "$rendered .= 'QUOTED_ARG';"
+      }
+    },
+    {
+      "why": "an ordinary heredoc loses its executable expansions",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "$out .= interpolations($body) . \"\\n\";",
+        "to": "$out .= \"\\n\";"
+      }
+    },
+    {
+      "why": "quoted heredoc delimiters stop suppressing literal body text",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "} elsif (!$doc->{quoted}) {",
+        "to": "} else {"
+      }
     }
   ]
 }

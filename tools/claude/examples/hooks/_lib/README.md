@@ -8,7 +8,7 @@ This directory holds shell utilities that other hooks source. The leading unders
 |------|---------|
 | [`strip-cmd.sh`](strip-cmd.sh) | `strip_cmd "$CMD"` blanks heredoc bodies and `-m`/`--message` contents; `strip_quoted_args "$CMD"` blanks quoted literals. Both keep pattern matching on the command surface rather than on text a command carries. |
 | [`hook-diag.sh`](hook-diag.sh) | Diagnostic wrapper. Sourced AFTER reading stdin into `$INPUT`. Logs hook name, exit code, command and stderr tail to a rotating log, re-emits captured stderr on exit 1 and exit 2 so the reason reaches the model, and records a hook that wrote to stderr on exit 0 — where the harness discards it. |
-| [`strip-quoted-args.pl`](strip-quoted-args.pl) | Character-walk backend for `strip_quoted_args`. Reads a command on stdin, writes it back with quoted data blanked and quoted *code* preserved. |
+| [`strip-quoted-args.pl`](strip-quoted-args.pl) | Reads raw shell text on stdin and preserves executable expansions while blanking quoted data; `--values` retains argument values for extraction. |
 | [`split-cmd-segments.pl`](split-cmd-segments.pl) | Splits executable shell segments and recognised command substitutions into NUL-delimited records. |
 | [`resolve-workdir.sh`](resolve-workdir.sh) | `resolve_workdir "$CMD"` returns the repository a git command acts on — via `git -C <dir>` or a leading `cd <dir> &&` — or nothing. |
 | [`pr-author.sh`](pr-author.sh) | Cached predicates for PR authorship and repository visibility, for gates that treat a self- or bot-authored PR differently from someone else's. |
@@ -27,9 +27,13 @@ The heredoc pattern deliberately allows text between the delimiter word and the 
 
 ### `strip-quoted-args.pl`
 
-`strip_cmd` handles heredocs and message flags. Quoted arguments are the same problem one level down: `git grep -rn 'git checkout main' .` is a search, and a detector looking for a *command invocation* must not fire on it.
+`git grep -rn 'git checkout main' .` is a search, and a detector looking for a *command invocation* must not fire on it. The destructive guard passes the original command directly to this helper in two modes: default matching blanks multi-word quoted data, while `--values` retains it for path extraction. Both modes unquote parsed simple tokens such as `"git"` and preserve nested expansions. Applying a quote regex or `strip_cmd` first loses syntax this helper needs.
 
-Two kinds of quoted span survive blanking, because in both the text really is code: a command substitution at any depth, and a payload handed to a shell (`bash -c "…"`, `eval "…"`, `ssh host "…"`). It is a character walk rather than a regex because quote pairing by regex mis-associates quotes on a busy command line, and cannot tell that `"$(terraform apply)"` inside double quotes is code rather than text.
+Two kinds of quoted span survive blanking: command substitutions and payloads handed to a shell (`bash -c "…"`, `eval "…"`, `ssh host "…"`). Each substitution has its own quote context, so nested quotes cannot consume a later command. Empty quote fragments, escaped ordinary letters, and supported ANSI-C escapes are normalized before token matching. Legacy backticks are decoded one level at a time and rendered as `$()` before segment splitting.
+
+Heredoc bodies are consumed in redirection order. For ordinary commands, quoted delimiters suppress expansion; unquoted delimiters retain command substitutions, including those inside arithmetic expressions. Mixed delimiter quoting, `<<-` tab stripping, backslash-newline joining, and commands after the terminator are covered by Bash-oracle fixtures. Interpreter classification uses the command owning each redirection, including its later arguments and tested assignment, `command`, `env`, `exec`, `time`, and `!` prefixes. Shell stdin mode preserves code; script and `-c` modes leave stdin as data. Common language-interpreter file/inline modes also leave stdin as data, while SSH input is inspected conservatively. Here-strings are ordinary arguments, not heredoc bodies. These rules follow the Bash manual's [command substitution](https://www.gnu.org/software/bash/manual/html_node/Command-Substitution.html) and [redirection](https://www.gnu.org/software/bash/manual/html_node/Redirections.html) semantics for the tested forms.
+
+Missing helpers and detected parse errors make the destructive guard exit 2. Unsupported ANSI-C escapes and substitution-shaped heredoc delimiters also block. This is a targeted detector, not full Bash grammar or an execution sandbox: dynamic command construction and arbitrary interpreter payloads are not resolved. Comment text is inspected conservatively in a separate segment, so a comment's quoting or flags cannot hide the next executable command.
 
 Use it only for detectors matching an invocation. A detector matching *content* — a URL, a SQL statement — must run on the unstripped command, since that content is legitimately quoted.
 
@@ -39,7 +43,7 @@ A flag test written against the whole command line answers for the wrong command
 
 Segments are NUL-delimited because a segment may itself contain newlines — a quoted multi-line body — so a newline-delimited stream cannot be read back into whole segments. The splitter recursively emits tested `$()` nesting and simple backtick substitutions without their delimiters. Single-quoted and escaped spellings remain data, while substitutions in double quotes remain executable.
 
-This is a targeted command-surface parser, not a Bash interpreter. Its tested scope is separators, single and double quotes, escaping, `$()` nesting, simple backticks, and arithmetic expansions containing substitutions. The default stream is flat; `--scoped` adds typed enter/exit records so the checkout detector can restore its directory after a substitution. It does not resolve commands built dynamically through variables or `eval`, or cover escaped nested backticks or interpolated heredocs. The guard deliberately inspects comment text conservatively.
+This is a targeted command-surface parser, not a Bash interpreter. Its tested scope is separators, single and double quotes, escaping, `$()` nesting, simple backticks, and arithmetic expansions containing substitutions. The guard's quote helper handles escaped nested backticks and interpolated heredocs before this splitter runs. The default stream is flat; `--scoped` adds typed enter/exit records so the checkout detector can restore its directory after a substitution. It does not resolve commands built dynamically through variables or `eval`.
 
 The scoped stream is a guard/helper protocol: update both together. A missing, malformed, or older helper stream intentionally hard-blocks a branch-switch check rather than skipping it.
 
