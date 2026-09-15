@@ -6,6 +6,10 @@ This is a knowledge base — accuracy is the product. Getting a pattern wrong te
 
 - **Cross-reference before adding** — Before creating a new file, check if the content already exists elsewhere in the repo. Before referencing another file, verify the path exists. Before claiming a hook does X, read the hook.
 
+- **Match sibling style** — Before adding a file, read its siblings in the target directory and match their format and depth.
+
+- **Check claims against current official docs** — Before publishing anything about Claude Code behavior, confirm it against the current official documentation.
+
 - **Examples must be self-contained** — Each hook, agent, skill, or rule example must work if copied verbatim. No implicit dependencies on other files unless documented in the README.
 
 - **Distinguish "works in practice" from "documented behavior"** — If a hook pattern works but isn't in the official docs, note it. Users need to know what they can rely on vs. what might change.
