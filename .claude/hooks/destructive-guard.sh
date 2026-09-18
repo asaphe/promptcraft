@@ -384,9 +384,9 @@ if seg_matches '(-X|--method)[[:space:]]+GET([[:space:]]|$)' \
   merge_gate "gh api .../pulls/N/merge" "The REST form of gh pr merge, async variant included."
 fi
 
-# The GraphQL route reaches the same merge; its mutation sits in quoted data, so it is read from the values view.
+# The GraphQL route reaches the same merge; its mutation is quoted data or a heredoc body, so it is read from the raw command.
 if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?api[^|;&]*[[:space:]]graphql([[:space:]]|$)' \
-   && printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[^[:alnum:]])(mergePullRequest|enablePullRequestAutoMerge)([^[:alnum:]]|$)'; then
+   && printf '%s' "$CMD" | grep -qE '(^|[^[:alnum:]])(mergePullRequest|enablePullRequestAutoMerge)([^[:alnum:]]|$)'; then
   merge_gate "gh api graphql mergePullRequest" "The GraphQL form of gh pr merge, auto-merge included."
 fi
 

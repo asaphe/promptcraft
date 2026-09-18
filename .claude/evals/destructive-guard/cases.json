@@ -103,7 +103,7 @@
   },
   {
     "label": "gh api graphql mergePullRequest → hard block (the GraphQL form of gh pr merge)",
-    "note": "The mutation sits in quoted data, so the rule reads it from the values view, not the matching view.",
+    "note": "The mutation sits in quoted data or a heredoc body, both dropped by the parsed views, so the rule reads it from the raw command.",
     "command": "gh api graphql -f query='mutation{mergePullRequest(input:{pullRequestId:\"PR_x\"}){clientMutationId}}'",
     "expected_exit": 2,
     "expected_output": "All four merge forms share one gate"

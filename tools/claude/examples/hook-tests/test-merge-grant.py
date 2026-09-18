@@ -25,8 +25,10 @@ SESSION = "session-a"
 MERGE = "gh pr " + "merge 17 --squash"
 REST_MERGE = "gh api -X PUT repos/o/r/pulls/17/" + "merge"
 GRAPHQL_MERGE = "gh api graphql -f query='mutation{" + "mergePullRequest(input:{pullRequestId:\"PR_x\"}){clientMutationId}}'"
+GRAPHQL_HEREDOC_MERGE = ("gh api graphql -f query=\"$(cat <<'EOF'\nmutation {\n  " + "mergePullRequest"
+                         "(input: {pullRequestId: \"PR_x\"}) { clientMutationId }\n}\nEOF\n)\"")
 STACK_MERGE = "gh stack " + "merge"
-FORMS = (MERGE, REST_MERGE, GRAPHQL_MERGE, STACK_MERGE)
+FORMS = (MERGE, REST_MERGE, GRAPHQL_MERGE, GRAPHQL_HEREDOC_MERGE, STACK_MERGE)
 NOTIFICATION = "<task-notification>\n<task-id>x</task-id>\n<summary>ready to " + "merge</summary>\n</task-notification>"
 
 

@@ -99,7 +99,7 @@ The loop form **extracts the body between `do` and `done`** rather than matching
 
 ## Merges
 
-The four merge forms share one gate, and each hard-block message names all four, because a reader who trips one retries with another. On its own this hook hard-blocks all of them. The GraphQL form carries its mutation in quoted data, so that rule reads `mergePullRequest` and `enablePullRequestAutoMerge` from the values view rather than the matching view; a mutation in a `--input` or `-F query=@file` payload never reaches the hook as text.
+The four merge forms share one gate, and each hard-block message names all four, because a reader who trips one retries with another. On its own this hook hard-blocks all of them. The GraphQL form carries its mutation in quoted data or a heredoc body, both of which the parsed views drop, so that rule reads `mergePullRequest` and `enablePullRequestAutoMerge` from the raw command; a mutation in a `--input` or `-F query=@file` payload never reaches the hook as text.
 
 Installed with [`merge-grant`](../merge-grant/), a merge becomes a permission prompt in exactly one case: the user's latest prompt asked for it. The prompt quotes that request so the approver can check the PR is one it names. The grant lasts until the user's next prompt, is scoped to its session, and every unusable state — no session id, an expired or unparseable grant, one written for another session — falls back to the hard block. `gh stack merge` says in its prompt that every layer beneath the target must be one the user named, since it lands all of them.
 
