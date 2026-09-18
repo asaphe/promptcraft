@@ -33,6 +33,9 @@ python3 mutate-fixtures.py --hooks-dir ../hooks
 
 # Compare selected expansion fixtures with Bash using inert command stubs
 python3 test-expansion-semantics.py
+
+# merge-grant and destructive-guard together: the grant file is a contract between two hooks
+python3 test-merge-grant.py
 ```
 
 `--hooks-dir` resolves both layouts: flat `<dir>/<name>.sh`, which is how hooks sit in an installed `~/.claude/hooks/`, and nested `<dir>/<name>/<name>.sh`, which is how they sit in this repo. Installed alongside your own hooks as `~/.claude/hooks/tests/`, the default is already right and the flag can be dropped.

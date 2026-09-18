@@ -47,7 +47,7 @@ Adding a user to a ruleset's bypass list grants merge rights on ordinary PRs and
 | `gh pr merge --admin` | refused — *"must be merged using the asynchronous merge REST API"* |
 | GraphQL `mergePullRequest` | refused outright |
 | `PUT /repos/{owner}/{repo}/pulls/{n}/merge-async` | accepted, returns `status: pending`, then never lands while an unbypassable rule stands |
-| `gh stack merge` | see the guard note below — and it is the user's action regardless |
+| `gh stack merge` | see the guard note below — it runs only when the user's current message asks for it |
 
 GitHub has this filed as an open bug: <https://github.com/orgs/community/discussions/204119>.
 
@@ -99,14 +99,15 @@ The stack subcommands are separate verbs, so a guard keyed on `gh pr …` does n
 
 | Command | Guard | Decision |
 |---|---|---|
-| `gh stack merge` | `destructive-guard` | **hard block, no approval path** |
+| `gh stack merge` | `destructive-guard` | **hard block**; ask only in a turn whose prompt asked to merge ([`merge-grant`](../examples/hooks/merge-grant/)) |
 | `gh stack submit` | `destructive-guard` | ask |
 | `gh stack link` | `destructive-guard` | ask |
 | `gh stack unstack` | `destructive-guard` | ask |
 | `gh stack view/up/down/switch/checkout/sync` | — | silent, local-only |
-| `gh api .../pulls/N/merge`, `.../merge-async` | `destructive-guard` | **hard block, no approval path** |
+| `gh api .../pulls/N/merge`, `.../merge-async` | `destructive-guard` | **hard block**; ask only in a turn whose prompt asked to merge |
 | `gh api .../pulls/N/merge-async/<id>` | — | allowed — read-only status poll, not a merge |
+| `gh api graphql` with `mergePullRequest` / `enablePullRequestAutoMerge` | `destructive-guard` | **hard block**; ask only in a turn whose prompt asked to merge |
 
 **[`pr-create-guard`](../examples/hooks/pr-create-guard/) covers `gh stack submit`.** It hard-blocks a submit from a dirty tree — where the layers would be missing the work you meant to include — and otherwise emits a stack-specific checklist, since a submit creates or updates every pull request in the stack rather than one. Verified by [`hook-tests/fixtures/pr-create-guard.tsv`](../examples/hook-tests/fixtures/pr-create-guard.tsv), whose two stack cases fail against the pre-coverage hook.
 
-**`gh stack merge` is blocked harder than `gh pr merge`, not softer.** It lands the target layer *and every unmerged layer beneath it* in one operation, so the blast radius of a single mistaken call is the whole stack. There are three forbidden forms — `gh pr merge`, `gh api .../pulls/N/merge`, `gh stack merge` — and a guard message should name all three, or the reader who trips one retries with another.
+**`gh stack merge` is never gated softer than `gh pr merge`.** It lands the target layer *and every unmerged layer beneath it* in one operation, so the blast radius of a single mistaken call is the whole stack. The four merge forms — `gh pr merge`, `gh api .../pulls/N/merge`, `gh api graphql` with `mergePullRequest`, `gh stack merge` — share one gate, the user's own words, and a block message should name all four, or the reader who trips one retries with another. Under a grant, the stack form's prompt says every layer beneath the target must be one the user named.

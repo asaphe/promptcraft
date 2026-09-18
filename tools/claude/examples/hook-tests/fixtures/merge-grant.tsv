@@ -1,0 +1,43 @@
+# merge-grant — which prompts arm a one-turn merge grant. `ctx` means the grant was armed and
+# the hook told the model so; `allow` means no grant, and destructive-guard keeps every merge a
+# hard block for the turn. Over-arming costs one permission prompt the user can refuse;
+# under-arming costs a re-phrase. Both directions are pinned here.
+
+#!event UserPromptSubmit
+#!setup merge-grant
+
+# --- ctx: a request to merge, in the shapes people actually type ---
+ctx	merge 1-8, 18. fix 19.
+ctx	Merge the three PRs shown here
+ctx	please do merge it
+ctx	no, merge it
+ctx	Merge PR 17, but don't merge 19 until I look
+ctx	don't close 19 but merge 17
+ctx	there are no blockers so merge 17
+
+# --- allow: the word appears, but nobody asked for a merge ---
+allow	the merged PR looks fine, what's the mergeable state?
+allow	why is merging blocked on this one?
+allow	don't merge yet
+allow	do not merge this
+allow	never merge without green CI
+allow	don’t merge yet
+allow	don't yet merge it
+allow	DON'T MERGE
+allow	no merge today
+
+# --- allow: a negation reaches every later word in its clause, not just the next one ---
+allow	I asked you not to merge
+allow	I don't want you to merge yet
+allow	please don't go ahead and merge
+allow	don't ever merge without me
+allow	don't auto-merge this
+allow	don't squash-merge 17
+allow	do not *merge*
+allow	don't `merge` it
+
+# --- a notification is not the user speaking; text around a pasted one is ---
+allow	<task-notification>agent finished: ready to merge</task-notification>
+ctx	<task-notification>x</task-notification> looks good, merge 17
+allow	<task-notification>ready to merge</task-notification> actually, do NOT merge anything
+allow	<absent>

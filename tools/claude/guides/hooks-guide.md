@@ -507,6 +507,7 @@ Production-tested hook examples with README documentation:
 | Hook | Type | Purpose | Blocks? |
 |------|------|---------|---------|
 | [Destructive Guard](../examples/hooks/destructive-guard/) | PreToolUse | Two-tier blocking for irreversible operations | Hard (exit 2) + Soft (JSON) |
+| [Merge Grant](../examples/hooks/merge-grant/) | UserPromptSubmit | Arms a one-turn merge grant from the user's own prompt, read by Destructive Guard | No (context) |
 | [Review Verification Guard](../examples/hooks/review-verification-guard/) | PreToolUse | Verification checklist before posting PR reviews/comments | Soft |
 | [Memory Guard](../examples/hooks/memory-guard/) | PreToolUse (Write) | Blocks project memory writes for multi-clone repos | Hard (exit 2) |
 | [1Password Read Guard](../examples/hooks/op-read-guard/) | PreToolUse | Blocks raw secret reads, redirects to a masked cache (ships in [claude-secret-guard](https://github.com/asaphe/claude-secret-guard)) | Hard |

@@ -90,10 +90,35 @@
     "expected_output": "Cannot close PRs without explicit user instruction"
   },
   {
-    "label": "gh pr merge → hard block",
+    "label": "gh pr merge → hard block (no session id in the payload, so no merge grant can apply)",
     "command": "gh pr merge 123",
     "expected_exit": 2,
-    "expected_output": "Never merge a PR without explicit user instruction"
+    "expected_output": "A merge needs the user's own words in their current message"
+  },
+  {
+    "label": "gh pr merge --admin → hard block (a merge grant never covers a bypass of branch protection)",
+    "command": "gh pr merge 123 --squash --admin",
+    "expected_exit": 2,
+    "expected_output": "bypasses branch protection"
+  },
+  {
+    "label": "gh api graphql mergePullRequest → hard block (the GraphQL form of gh pr merge)",
+    "note": "The mutation sits in quoted data or a heredoc body, both dropped by the parsed views, so the rule reads it from the raw command.",
+    "command": "gh api graphql -f query='mutation{mergePullRequest(input:{pullRequestId:\"PR_x\"}){clientMutationId}}'",
+    "expected_exit": 2,
+    "expected_output": "All four merge forms share one gate"
+  },
+  {
+    "label": "gh api graphql read of merge state → allow (negative control: a query is not the mutation)",
+    "command": "gh api graphql -f query='query{repository(owner:\"o\",name:\"r\"){pullRequest(number:1){merged mergeable}}}'",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "--admin through a variable → hard block (the values view sees the assignment)",
+    "command": "F=--admin; gh pr merge 123 $F",
+    "expected_exit": 2,
+    "expected_output": "bypasses branch protection"
   },
   {
     "label": "terraform destroy → soft block",
@@ -236,13 +261,13 @@
     "label": "gh api PUT .../pulls/N/merge → hard block (REST form of gh pr merge)",
     "command": "gh api -X PUT repos/owner/repo/pulls/12/merge",
     "expected_exit": 2,
-    "expected_output": "All three merge forms are blocked"
+    "expected_output": "All four merge forms share one gate"
   },
   {
     "label": "gh api .../pulls/N/merge-async → hard block (async variant)",
     "command": "gh api -X PUT repos/owner/repo/pulls/12/merge-async",
     "expected_exit": 2,
-    "expected_output": "All three merge forms are blocked"
+    "expected_output": "All four merge forms share one gate"
   },
   {
     "label": "gh api .../pulls/N/files → allow (negative control: reads on the same path must pass)",
@@ -460,7 +485,7 @@
     "label": "gh api merge path with a shell variable → hard block (same endpoint as a literal number)",
     "command": "gh api -X PUT repos/owner/repo/pulls/$PR/merge",
     "expected_exit": 2,
-    "expected_output": "All three merge forms are blocked"
+    "expected_output": "All four merge forms share one gate"
   },
   {
     "label": "gh api --method GET on the merge path → allow (read-only merged-status check)",
@@ -517,7 +542,7 @@
     "label": "quoted binary → hard block (a closing quote must not break the adjacency a matcher needs)",
     "command": "\"gh\" pr merge 5",
     "expected_exit": 2,
-    "expected_output": "Never merge a PR"
+    "expected_output": "A merge needs the user's own words"
   },
   {
     "label": "single-quoted binary → hard block",
@@ -601,7 +626,7 @@
     "label": "heredoc marker followed by && then a merge → hard block",
     "command": "cat <<EOF && gh pr merge 7\nbody\nEOF",
     "expected_exit": 2,
-    "expected_output": "Never merge a PR"
+    "expected_output": "A merge needs the user's own words"
   },
   {
     "label": "heredoc marker followed by | then a destructive clean → hard block",
@@ -626,7 +651,7 @@
     "label": "tab between tokens → hard block (a tab is not a space, and every pattern used ' +')",
     "command": "gh\tpr\tmerge\t123",
     "expected_exit": 2,
-    "expected_output": "Never merge a PR"
+    "expected_output": "A merge needs the user's own words"
   },
   {
     "label": "backslash-continuation between tokens → hard block",
