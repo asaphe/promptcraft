@@ -4,13 +4,20 @@
     {
       "why": "a negated request arms the grant, so \"don't merge yet\" makes a merge approvable",
       "replace": {
-        "from": "$0 == \"merge\" && !(prev in neg) { found = 1 }",
+        "from": "$0 == \"merge\" && !negated && prev != \"no\" { found = 1 }",
         "to": "$0 == \"merge\" { found = 1 }"
       }
     },
     {
-      "why": "a background-task notification arms the grant, so an agent's own output authorises a merge",
-      "delete_matching": "<task-notification>"
+      "why": "a clause break stops ending a negation, so \"don't close 19 but merge 17\" no longer arms",
+      "delete_matching": "\\$0 == \"\\.\" \\|\\| \\$0 == \"but\""
+    },
+    {
+      "why": "notification text counts as the user's words, so an agent's own \"ready to merge\" arms the grant",
+      "replace": {
+        "from": "<\\/task-notification>//gs'",
+        "to": "<\\/task-notification>/$&/gs'"
+      }
     },
     {
       "why": "a typographic apostrophe stops normalising, so a typed “don’t merge” arms the grant",

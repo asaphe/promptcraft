@@ -102,6 +102,25 @@
     "expected_output": "bypasses branch protection"
   },
   {
+    "label": "gh api graphql mergePullRequest → hard block (the GraphQL form of gh pr merge)",
+    "note": "The mutation sits in quoted data, so the rule reads it from the values view, not the matching view.",
+    "command": "gh api graphql -f query='mutation{mergePullRequest(input:{pullRequestId:\"PR_x\"}){clientMutationId}}'",
+    "expected_exit": 2,
+    "expected_output": "All four merge forms share one gate"
+  },
+  {
+    "label": "gh api graphql read of merge state → allow (negative control: a query is not the mutation)",
+    "command": "gh api graphql -f query='query{repository(owner:\"o\",name:\"r\"){pullRequest(number:1){merged mergeable}}}'",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
+    "label": "--admin through a variable → hard block (the values view sees the assignment)",
+    "command": "F=--admin; gh pr merge 123 $F",
+    "expected_exit": 2,
+    "expected_output": "bypasses branch protection"
+  },
+  {
     "label": "terraform destroy → soft block",
     "command": "terraform destroy -auto-approve",
     "expected_exit": 0,
@@ -242,13 +261,13 @@
     "label": "gh api PUT .../pulls/N/merge → hard block (REST form of gh pr merge)",
     "command": "gh api -X PUT repos/owner/repo/pulls/12/merge",
     "expected_exit": 2,
-    "expected_output": "All three merge forms share one gate"
+    "expected_output": "All four merge forms share one gate"
   },
   {
     "label": "gh api .../pulls/N/merge-async → hard block (async variant)",
     "command": "gh api -X PUT repos/owner/repo/pulls/12/merge-async",
     "expected_exit": 2,
-    "expected_output": "All three merge forms share one gate"
+    "expected_output": "All four merge forms share one gate"
   },
   {
     "label": "gh api .../pulls/N/files → allow (negative control: reads on the same path must pass)",
@@ -466,7 +485,7 @@
     "label": "gh api merge path with a shell variable → hard block (same endpoint as a literal number)",
     "command": "gh api -X PUT repos/owner/repo/pulls/$PR/merge",
     "expected_exit": 2,
-    "expected_output": "All three merge forms share one gate"
+    "expected_output": "All four merge forms share one gate"
   },
   {
     "label": "gh api --method GET on the merge path → allow (read-only merged-status check)",

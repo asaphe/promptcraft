@@ -41,7 +41,10 @@ hard	cd {push_master} && git push
 hard	gh pr merge 42 --squash
 hard	gh api -X PUT repos/o/r/pulls/42/merge
 hard	gh stack merge
+hard	gh api graphql -f query='mutation{mergePullRequest(input:{pullRequestId:"PR_x"}){clientMutationId}}'
 hard	gh pr merge 42 --squash --admin
+hard	F=--admin; gh pr merge 42 $F
+allow	gh api graphql -f query='query{repository(owner:"o",name:"r"){pullRequest(number:1){merged mergeable}}}'
 
 # --- allow: reading a PR is not merging one ---
 allow	gh pr view 42

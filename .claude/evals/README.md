@@ -56,7 +56,7 @@ python .claude/evals/runner.py --hook <modified-hook-name>
 
 | Hook | Cases | Tests |
 |------|:-----:|-------|
-| destructive-guard | 113 | push-to-main variants, refspec, hyphenated branches, force-push, bulk branch deletion, nested substitutions and checkout directory scopes, conservative comment text, AWS two-tier, GH CLI incl. all three merge forms with no grant armed and `merge --admin`, terraform, kubectl, helm, and an adversarial-formatting axis (heredoc marker lines, tabs, line continuations) |
+| destructive-guard | 116 | push-to-main variants, refspec, hyphenated branches, force-push, bulk branch deletion, nested substitutions and checkout directory scopes, conservative comment text, AWS two-tier, GH CLI incl. all four merge forms (GraphQL included) with no grant armed and `merge --admin` direct or through a variable, terraform, kubectl, helm, and an adversarial-formatting axis (heredoc marker lines, tabs, line continuations) |
 | stateful-op-reminder | 13 | kubectl apply/get, terraform apply/plan, helm upgrade/dry-run, IAM attach/list, safe command |
 | pr-create-guard | 2 | pass-through, block on zero diff/missing prerequisites |
 

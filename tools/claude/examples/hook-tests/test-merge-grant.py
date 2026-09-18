@@ -24,7 +24,10 @@ GUARD = HOOKS / "destructive-guard" / "destructive-guard.sh"
 SESSION = "session-a"
 MERGE = "gh pr " + "merge 17 --squash"
 REST_MERGE = "gh api -X PUT repos/o/r/pulls/17/" + "merge"
+GRAPHQL_MERGE = "gh api graphql -f query='mutation{" + "mergePullRequest(input:{pullRequestId:\"PR_x\"}){clientMutationId}}'"
 STACK_MERGE = "gh stack " + "merge"
+FORMS = (MERGE, REST_MERGE, GRAPHQL_MERGE, STACK_MERGE)
+NOTIFICATION = "<task-notification>\n<task-id>x</task-id>\n<summary>ready to " + "merge</summary>\n</task-notification>"
 
 
 def load_runner():
@@ -88,16 +91,26 @@ class MergeGrantTest(unittest.TestCase):
             self.assertIn(reason_part, reason)
 
     def test_without_a_grant_every_merge_form_hard_blocks(self):
-        for command in (MERGE, REST_MERGE, STACK_MERGE):
+        for command in FORMS:
             self.assert_verdict(command, "hard", "no approval path")
 
-    def test_a_request_arms_every_form_for_one_turn(self):
+    def test_a_request_arms_every_form_until_the_next_prompt(self):
         self.assertEqual(self.prompt("merge 17 please"), "ctx")
+        for command in FORMS:
+            self.assert_verdict(command, "ask")
         self.assert_verdict(MERGE, "ask", "merge 17 please")
         self.assert_verdict(MERGE + " --auto", "ask")
-        self.assert_verdict(REST_MERGE, "ask")
         self.assert_verdict(STACK_MERGE, "ask", "each of those must be one the user named")
         self.assertEqual(self.prompt("thanks"), "allow")
+        self.assert_verdict(MERGE, "hard")
+
+    def test_a_notification_keeps_the_grant_but_text_around_a_pasted_one_is_the_user(self):
+        self.prompt("merge 17 when CI is green")
+        self.assertEqual(self.prompt(NOTIFICATION), "allow")
+        self.assert_verdict(MERGE, "ask")
+        self.assertEqual(self.prompt(NOTIFICATION + " actually do NOT merge anything"), "allow")
+        self.assert_verdict(MERGE, "hard")
+        self.assertEqual(self.prompt(NOTIFICATION), "allow")
         self.assert_verdict(MERGE, "hard")
 
     def test_the_merge_leads_an_ask_that_carries_other_triggers(self):
@@ -110,6 +123,7 @@ class MergeGrantTest(unittest.TestCase):
     def test_a_grant_never_lifts_a_hard_block(self):
         self.prompt("merge 17")
         self.assert_verdict(MERGE + " --admin", "hard", "--admin")
+        self.assert_verdict("F=--admin; " + MERGE + " $F", "hard", "--admin")
         self.assert_verdict(MERGE + " && git clean -fd", "hard", "git clean")
 
     def test_a_grant_is_scoped_to_its_session(self):

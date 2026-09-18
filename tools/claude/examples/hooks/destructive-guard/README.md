@@ -22,8 +22,8 @@ Soft blocks emit `permissionDecision: ask` JSON on stdout and exit 0. Claude Cod
 | `git push` to main/master | Must go through PRs |
 | `git push --force` to main/master | Rewrites shared history on default branch |
 | `gh pr close` | Loses PR context — never without explicit user instruction |
-| `gh pr merge`, `gh api .../pulls/N/merge`, `gh stack merge` | One gate for all three forms: no approval path unless the user's prompt this turn asked for a merge — see [Merges](#merges) |
-| `gh pr merge --admin` | Bypasses branch protection and required checks — hard whether or not a merge was asked for |
+| `gh pr merge`, `gh api .../pulls/N/merge`, `gh api graphql` `mergePullRequest`, `gh stack merge` | One gate for all four forms: no approval path unless the user's latest prompt asked for a merge — see [Merges](#merges) |
+| `gh pr merge --admin`, also through a variable | Bypasses branch protection and required checks — hard whether or not a merge was asked for |
 | `git clean -f` | Permanently deletes untracked files |
 | `git stash drop/clear` | Permanently discards stashed changes |
 | Bulk `git branch -d/-D` (xargs, loop, or several names) | One bad glob wipes hundreds of refs |
@@ -99,11 +99,11 @@ The loop form **extracts the body between `do` and `done`** rather than matching
 
 ## Merges
 
-The three merge forms share one gate, and each hard-block message names all three, because a reader who trips one retries with another. On its own this hook hard-blocks all of them.
+The four merge forms share one gate, and each hard-block message names all four, because a reader who trips one retries with another. On its own this hook hard-blocks all of them. The GraphQL form carries its mutation in quoted data, so that rule reads `mergePullRequest` and `enablePullRequestAutoMerge` from the values view rather than the matching view; a mutation in a `--input` or `-F query=@file` payload never reaches the hook as text.
 
-Installed with [`merge-grant`](../merge-grant/), a merge becomes a permission prompt in exactly one case: the user's prompt this turn asked for it. The prompt quotes that request so the approver can check the PR is one it names. The grant lives for one turn, is scoped to its session, and every unusable state — no session id, an expired or unparseable grant, one written for another session — falls back to the hard block. `gh stack merge` says in its prompt that every layer beneath the target must be one the user named, since it lands all of them.
+Installed with [`merge-grant`](../merge-grant/), a merge becomes a permission prompt in exactly one case: the user's latest prompt asked for it. The prompt quotes that request so the approver can check the PR is one it names. The grant lasts until the user's next prompt, is scoped to its session, and every unusable state — no session id, an expired or unparseable grant, one written for another session — falls back to the hard block. `gh stack merge` says in its prompt that every layer beneath the target must be one the user named, since it lands all of them.
 
-A grant never lifts a hard block raised by anything else in the same command: `gh pr merge --admin`, or a merge chained with `git clean -f`, still exits 2.
+A grant never lifts a hard block raised by anything else in the same command: `gh pr merge --admin` — checked on the values view, so `F=--admin; gh pr merge 17 $F` counts — or a merge chained with `git clean -f` still exits 2.
 
 ## AWS coverage
 

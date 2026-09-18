@@ -344,7 +344,7 @@ if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +close([[:space:]]|$
 fi
 
 # see: tools/claude/examples/hooks/merge-grant/README.md — the user's own words this turn are the only approval path
-MERGE_FORMS="All three merge forms share one gate: 'gh pr merge', 'gh api .../pulls/N/merge', 'gh stack merge'."
+MERGE_FORMS="All four merge forms share one gate: 'gh pr merge', 'gh api .../pulls/N/merge', 'gh api graphql' mergePullRequest, 'gh stack merge'."
 
 # Prints the prompt that armed this session's merge grant; fails on anything short of a live grant.
 merge_grant_prompt() {
@@ -372,8 +372,9 @@ if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +merge([[:space:]]|$
   merge_gate "gh pr merge" "This lands one PR."
 fi
 
-# A grant covers the merge the user asked for, never one past branch protection.
-if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +merge[^|;&]*[[:space:]]--admin([[:space:]]|=|$)'; then
+# A grant never covers a merge past branch protection; the values view also sees `F=--admin; gh pr merge 1 $F`.
+if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +merge([[:space:]]|$)' \
+   && printf '%s' "$CMD_FLAT" | grep -qE '(^|[^[:alnum:]_-])--admin([^[:alnum:]_-]|$)'; then
   HARD_REASON="gh pr merge --admin — bypasses branch protection and required checks. No approval path, grant or not: fix what blocks the merge, or the user merges it themselves."
 fi
 
@@ -381,6 +382,12 @@ fi
 if seg_matches '(-X|--method)[[:space:]]+GET([[:space:]]|$)' \
    'gh[[:space:]]([^|;&]* )?api[^|;&]*/pulls/[^/[:space:]]+/merge(-async)?/?([^[:alnum:]/-]|$)'; then
   merge_gate "gh api .../pulls/N/merge" "The REST form of gh pr merge, async variant included."
+fi
+
+# The GraphQL route reaches the same merge; its mutation sits in quoted data, so it is read from the values view.
+if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?api[^|;&]*[[:space:]]graphql([[:space:]]|$)' \
+   && printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[^[:alnum:]])(mergePullRequest|enablePullRequestAutoMerge)([^[:alnum:]]|$)'; then
+  merge_gate "gh api graphql mergePullRequest" "The GraphQL form of gh pr merge, auto-merge included."
 fi
 
 # Wider than the other two: it lands the target layer plus every unmerged layer beneath it.
