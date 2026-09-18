@@ -43,3 +43,10 @@ jobs:
 
       - name: Verify expansion regression mutations are detected
         run: python3 tools/claude/examples/hook-tests/mutate-fixtures.py --hooks-dir tools/claude/examples/hooks _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl _lib/strip-cmd
+
+      # The grant is a contract between two hooks, so neither hook's own suite can see it break.
+      - name: Check the merge grant and the guard together
+        run: |
+          python3 tools/claude/examples/hook-tests/run-fixtures.py merge-grant --hooks-dir tools/claude/examples/hooks
+          python3 tools/claude/examples/hook-tests/mutate-fixtures.py --hooks-dir tools/claude/examples/hooks merge-grant
+          python3 tools/claude/examples/hook-tests/test-merge-grant.py

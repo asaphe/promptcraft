@@ -1,5 +1,25 @@
 {
   "_README": "Each mutation breaks ONE behaviour the fixture claims to cover. Aim them at distinct branches \u2014 a mutation that neuters the whole hook only proves the suite notices a corpse. `why` is printed in the run output, so write it as the thing that would be silently broken. A key names the file to mutate, resolved the same way run-fixtures resolves a hook. Add \"suite\": \"<hook>\" when the mutated file is a shared library, so the run exercises a suite that actually consumes it.",
+  "merge-grant": [
+    {
+      "why": "a negated request arms the grant, so \"don't merge yet\" makes a merge approvable",
+      "replace": {
+        "from": "$0 == \"merge\" && !(prev in neg) { found = 1 }",
+        "to": "$0 == \"merge\" { found = 1 }"
+      }
+    },
+    {
+      "why": "a background-task notification arms the grant, so an agent's own output authorises a merge",
+      "delete_matching": "<task-notification>"
+    },
+    {
+      "why": "a typographic apostrophe stops normalising, so a typed “don’t merge” arms the grant",
+      "replace": {
+        "from": "sed -e \"s/’/'/g\"",
+        "to": "sed -e \"s/x/x/g\""
+      }
+    }
+  ],
   "pr-create-guard": [
     {
       "why": "the stack form stops being recognised, so a stack submit skips every check",

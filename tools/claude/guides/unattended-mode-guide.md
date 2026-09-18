@@ -16,7 +16,7 @@ A ceiling asks a different question: "is this act recoverable after the fact?" T
 
 | Class | Unattended behaviour | Members |
 |---|---|---|
-| **Never** | Hard block, no approval path — stop and report | merge in every spelling, `terraform apply` / `destroy` / `state rm`, `helm uninstall` / `rollback`, `kubectl apply` / `delete` / `patch` / `scale` / `drain`, every destructive cloud verb, push to the default branch, PR close, **remote branch deletion in either spelling** (`push origin :branch`, `push --delete`), a review verdict, posting a new inline finding, deleting a comment |
+| **Never** | Hard block, no approval path — stop and report | merge in every spelling (a [merge grant](../examples/hooks/merge-grant/) does not lift it), `terraform apply` / `destroy` / `state rm`, `helm uninstall` / `rollback`, `kubectl apply` / `delete` / `patch` / `scale` / `drain`, every destructive cloud verb, push to the default branch, PR close, **remote branch deletion in either spelling** (`push origin :branch`, `push --delete`), a review verdict, posting a new inline finding, deleting a comment |
 | **Allowed** | Runs with no prompt | read-only research and diagnostics, ticket creation, **git on a branch this session owns** — commit, push, force-push, `reset --hard`, `rebase`, `cherry-pick`, `revert`, branch switch, `restore` — reading CI and review-bot comments, posting a PR comment, editing code, PR creation and PR body edits. Every one of their own gates still runs |
 | **Everything else** | Hard block — **default deny** | anything not classified above |
 

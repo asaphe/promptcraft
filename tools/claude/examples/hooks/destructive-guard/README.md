@@ -6,7 +6,7 @@ PreToolUse hook with two-tier blocking for destructive operations.
 
 | Tier | Mechanism | Override by `Bash(*)`? | Use for |
 |------|-----------|------------------------|---------|
-| **Hard block** | `exit 2` + stderr | No — always blocks | Irreversible data loss and forbidden PR ops (AWS deletions, push/force-push to main, PR close/merge) |
+| **Hard block** | `exit 2` + stderr | No — always blocks | Irreversible data loss and forbidden PR ops (AWS deletions, push/force-push to main, PR close, a merge nobody asked for) |
 | **Soft block** | JSON `permissionDecision: ask` + `exit 0` | Yes — user can approve | Risky but approvable (PR create, force-push to a branch, terraform destroy) |
 
 Hard blocks stop the tool call unconditionally — no override is possible. The user must run the command themselves in their terminal.
@@ -22,7 +22,8 @@ Soft blocks emit `permissionDecision: ask` JSON on stdout and exit 0. Claude Cod
 | `git push` to main/master | Must go through PRs |
 | `git push --force` to main/master | Rewrites shared history on default branch |
 | `gh pr close` | Loses PR context — never without explicit user instruction |
-| `gh pr merge`, `gh api .../pulls/N/merge`, `gh stack merge` | The user merges PRs themselves — all three forms, no approval path |
+| `gh pr merge`, `gh api .../pulls/N/merge`, `gh stack merge` | One gate for all three forms: no approval path unless the user's prompt this turn asked for a merge — see [Merges](#merges) |
+| `gh pr merge --admin` | Bypasses branch protection and required checks — hard whether or not a merge was asked for |
 | `git clean -f` | Permanently deletes untracked files |
 | `git stash drop/clear` | Permanently discards stashed changes |
 | Bulk `git branch -d/-D` (xargs, loop, or several names) | One bad glob wipes hundreds of refs |
@@ -96,6 +97,14 @@ Bulk deletion is a hard block in three shapes — `xargs`, a `for`/`while` loop,
 
 The loop form **extracts the body between `do` and `done`** rather than matching across it. Matching across fails in both directions: a multi-line body puts arbitrarily many separators between the loop header and the delete, so a real bulk delete written over three lines matched nothing, while `for x in a b; do echo $x; done && git branch -D one` matched and hard-blocked a single delete that was never in the loop.
 
+## Merges
+
+The three merge forms share one gate, and each hard-block message names all three, because a reader who trips one retries with another. On its own this hook hard-blocks all of them.
+
+Installed with [`merge-grant`](../merge-grant/), a merge becomes a permission prompt in exactly one case: the user's prompt this turn asked for it. The prompt quotes that request so the approver can check the PR is one it names. The grant lives for one turn, is scoped to its session, and every unusable state — no session id, an expired or unparseable grant, one written for another session — falls back to the hard block. `gh stack merge` says in its prompt that every layer beneath the target must be one the user named, since it lands all of them.
+
+A grant never lifts a hard block raised by anything else in the same command: `gh pr merge --admin`, or a merge chained with `git clean -f`, still exits 2.
+
 ## AWS coverage
 
 Two layers, because a per-service denylist always trails the API:
@@ -150,7 +159,7 @@ This hook ships twice: `tools/claude/examples/hooks/destructive-guard/` is what 
 }
 ```
 
-Requires `jq` and `perl` on PATH, plus `../_lib/hook-diag.sh`, `../_lib/strip-quoted-args.pl`, and `../_lib/split-cmd-segments.pl` installed under the same parent directory as the hook. Update the guard and helpers together.
+Requires `jq` and `perl` on PATH, plus `../_lib/hook-diag.sh`, `../_lib/strip-quoted-args.pl`, and `../_lib/split-cmd-segments.pl` installed under the same parent directory as the hook. Update the guard and helpers together. To let the agent merge when the user asks, also register [`merge-grant`](../merge-grant/); the guard reads its store from `$CLAUDE_MERGE_GRANT_DIR` (default `~/.claude/merge-grants`).
 
 ## Testing
 
@@ -200,3 +209,4 @@ The two-tier approach gives you both: unconditional safety for irreversible oper
 
 - **[`stateful-op-reminder`](../stateful-op-reminder/)** — Nudges (does not block) when detecting mutations to external systems. Catches plausible-looking API calls that destructive-guard can't pattern-match.
 - **[`pr-create-guard`](../pr-create-guard/)** — Verifies pre-creation conditions before allowing `gh pr create`.
+- **[`merge-grant`](../merge-grant/)** — Turns a merge into a permission prompt for the one turn whose prompt asked for it.

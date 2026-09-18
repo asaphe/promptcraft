@@ -102,13 +102,24 @@ def pr_create(tmp):
     }}
 
 
+def _grant_dir(tmp):
+    """An empty merge-grant store, so no verdict depends on a grant left in the real HOME."""
+    path = os.path.join(tmp, "merge-grants")
+    os.makedirs(path, exist_ok=True)
+    return {"CLAUDE_MERGE_GRANT_DIR": path}
+
+
 def destructive_guard(tmp):
     feature = _init(os.path.join(tmp, "push-feature"), branch="feature")
-    return {"cwd": feature, "tokens": {
+    return {"cwd": feature, "env": _grant_dir(tmp), "tokens": {
         "push_feature": feature,
         "push_main": _init(os.path.join(tmp, "push-main")),
         "push_master": _init(os.path.join(tmp, "push-master"), branch="master"),
     }}
+
+
+def merge_grant(tmp):
+    return {"env": _grant_dir(tmp)}
 
 
 def staged_workflow(tmp):
@@ -136,6 +147,7 @@ def gh_shim(tmp):
 
 SETUPS = {
     "destructive-guard": destructive_guard,
+    "merge-grant": merge_grant,
     "pr-create": pr_create,
     "staged-workflow": staged_workflow,
     "gh-shim": gh_shim,

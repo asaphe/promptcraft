@@ -4,7 +4,8 @@
 # HARD BLOCK (stderr + exit 2): Irreversible data loss or forbidden shared-state
 #   actions. Cannot be overridden by Bash(*) permissions. User must run the
 #   command themselves.
-#   Examples: AWS resource deletion, push/force-push to main, gh pr close/merge.
+#   Examples: AWS resource deletion, push/force-push to main, gh pr close, and a
+#   merge the user did not ask for this turn (see ../merge-grant/).
 #
 # SOFT BLOCK (JSON permissionDecision "ask" + exit 0): Visible/risky actions
 #   that need confirmation. Emits hookSpecificOutput JSON on stdout so Claude
@@ -342,21 +343,49 @@ if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +close([[:space:]]|$
   HARD_REASON="gh pr close — STOP. Cannot close PRs without explicit user instruction. Verify: (1) Read the PR fully, (2) Check for open review threads, (3) Confirm reason with user, (4) Verify no unmerged work will be lost."
 fi
 
-MERGE_FORMS="All three merge forms are blocked with no approval path: 'gh pr merge', 'gh api .../pulls/N/merge', 'gh stack merge'."
+# see: tools/claude/examples/hooks/merge-grant/README.md — the user's own words this turn are the only approval path
+MERGE_FORMS="All three merge forms share one gate: 'gh pr merge', 'gh api .../pulls/N/merge', 'gh stack merge'."
+
+# Prints the prompt that armed this session's merge grant; fails on anything short of a live grant.
+merge_grant_prompt() {
+  local session file expires
+  session=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null)
+  case "$session" in ''|*[!A-Za-z0-9_-]*) return 1 ;; esac
+  file="${CLAUDE_MERGE_GRANT_DIR:-$HOME/.claude/merge-grants}/${session}.json"
+  [ -f "$file" ] || return 1
+  expires=$(jq -r '.expires_at // 0' "$file" 2>/dev/null) || return 1
+  case "$expires" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$(date +%s)" -lt "$expires" ] || return 1
+  jq -r '.prompt // ""' "$file" 2>/dev/null
+}
+
+merge_gate() { # trigger, what this form lands
+  local asked
+  if asked=$(merge_grant_prompt); then
+    add_soft "$1 — the user asked for a merge this turn (\"${asked}\"). $2 Approve only if it is a PR that message names."
+  else
+    HARD_REASON="$1 — STOP. A merge needs the user's own words in their current message, and this turn has none, so there is no approval path. $2 Hand over the PR link instead. ${MERGE_FORMS}"
+  fi
+}
 
 if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +merge([[:space:]]|$)'; then
-  HARD_REASON="gh pr merge — STOP. Never merge a PR without explicit user instruction. The user merges PRs themselves. ${MERGE_FORMS}"
+  merge_gate "gh pr merge" "This lands one PR."
+fi
+
+# A grant covers the merge the user asked for, never one past branch protection.
+if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +merge[^|;&]*[[:space:]]--admin([[:space:]]|=|$)'; then
+  HARD_REASON="gh pr merge --admin — bypasses branch protection and required checks. No approval path, grant or not: fix what blocks the merge, or the user merges it themselves."
 fi
 
 # The REST route reaches the same merge; an explicit GET is the read-only merged-status check, and the ref segment accepts a variable.
 if seg_matches '(-X|--method)[[:space:]]+GET([[:space:]]|$)' \
    'gh[[:space:]]([^|;&]* )?api[^|;&]*/pulls/[^/[:space:]]+/merge(-async)?/?([^[:alnum:]/-]|$)'; then
-  HARD_REASON="gh api .../pulls/N/merge — STOP. This is the REST form of the same forbidden action, covering the async variant too; there is no approval path. The user merges PRs themselves. ${MERGE_FORMS}"
+  merge_gate "gh api .../pulls/N/merge" "The REST form of gh pr merge, async variant included."
 fi
 
 # Wider than the other two: it lands the target layer plus every unmerged layer beneath it.
 if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?stack +merge([[:space:]]|$)'; then
-  HARD_REASON="gh stack merge — STOP. This is the stacked-PR form of the same forbidden action, and it lands EVERY unmerged layer beneath the target in one operation. There is no approval path. ${MERGE_FORMS}"
+  merge_gate "gh stack merge" "It lands the target layer plus EVERY unmerged layer beneath it in one operation, so each of those must be one the user named."
 fi
 
 # Branch switching outside session directory — disrupts other sessions.
