@@ -1,0 +1,29 @@
+title = "gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "repo-specific allow list additions"
+regexTarget = "line"
+
+paths = [
+  '''(?i)\.example$''',
+  '''(?i)\.example\.md$''',
+  # Ignore previous Gitleaks reports to avoid self-referential detections
+  '''.*gitleaks.*\.json$''',
+  '''.*gitleaks.*\.sarif$''',
+  '''.*results\.sarif$''',
+]
+
+stopwords = [
+  "1234567890",
+  "abcdefghijklmnopqrstuvwxyz",
+  'example',
+  'placeholder',
+  'mock',
+  'localhost',
+  '127.0.0.1',
+  'REDACTED',
+  'your-secret-here',
+]

@@ -1,0 +1,38 @@
+name: Gitleaks
+
+# No base-branch filter: a PR stacked on another branch would otherwise get no CI at all and read as verified.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Full history: gitleaks scans past commits, not just the diff.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # No GITLEAKS_LICENSE: v3 requires one only for organization-owned repos.
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Defaults to true; commenting needs pull-requests: write, so findings go to the summary instead.
+          GITLEAKS_ENABLE_COMMENTS: false
+          GITLEAKS_ENABLE_SUMMARY: true
+          # Bumped by hand: Dependabot tracks the action, not the binary it downloads.
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_CONFIG: .gitleaks.toml
