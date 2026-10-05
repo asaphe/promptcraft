@@ -6,7 +6,7 @@ An example of documenting a full hook set as an execution-order + cost reference
 
 **Each heading states its entry count, and that is the technique worth copying.** A count is the cheapest drift check available: if a heading disagrees with your `settings.json`, the doc is stale, and you find that out by counting rather than by reading. Keep the counts accurate or don't write them — a stale count is worse than none, because it asserts a check that isn't happening. The numbers below describe *this example*, not any real installation, so they are the pattern to imitate rather than figures to compare your own config against. Plugin-wired hooks are registered separately and are **not** included; see the last section.
 
-## SessionStart — 4 entries
+## SessionStart — 5 entries
 
 | Hook | Matcher | Purpose | Output | Cost |
 |------|---------|---------|--------|------|
@@ -14,8 +14,9 @@ An example of documenting a full hook set as an execution-order + cost reference
 | `org-context-inject.sh` | — | Injects org operating context (worktree, cloud profile, repos) — cwd-gated | ~200 chars stdout → context (silent outside org cwd) | Once per session (~5ms) |
 | `post-compact-reinject.sh` | `compact` | Re-injects behavioral rules + git state + active PRs after compaction | Plain-text stdout → context | Per compaction |
 | `model-effort-pin-guard.sh` | — | Re-pins `model` / `effortLevel` in user settings when a persisted `/model` or `/effort` pick has drifted; silent when nothing drifted | ~300 chars additionalContext (on drift only) | Once per session (one `jq` read) |
+| `settings-link-check.sh` | — | Warns when the live `settings.json` is no longer a symlink to the tracked copy | `systemMessage` + `additionalContext` (silent when linked) | Once per session (two `stat`s) |
 
-Note the matcher on the third row. Re-injecting context after compaction is a **`SessionStart` entry with `matcher: "compact"`**, not a `PostCompact` hook — `PostCompact` is side-effects-only and cannot add anything to the context window. See [`hooks/post-compact-reinject/`](../hooks/post-compact-reinject/) for the full reasoning.
+Note the matcher on the `post-compact-reinject.sh` row. Re-injecting context after compaction is a **`SessionStart` entry with `matcher: "compact"`**, not a `PostCompact` hook — `PostCompact` is side-effects-only and cannot add anything to the context window. See [`hooks/post-compact-reinject/`](../hooks/post-compact-reinject/) for the full reasoning.
 
 ## PreCompact — 1 entry
 
@@ -57,13 +58,14 @@ Compaction is the one boundary where in-session reasoning is destroyed while any
 | `session-log.sh` | Stop | Appends the turn to a per-session log; nudges when its newest `state` line is stale | `systemMessage` to the user | Conditional |
 | `pr-edit-counter.sh` | `gh pr edit*` | Tracks PR edit count | Advisory | Conditional |
 
-## PreToolUse: Edit / MultiEdit / Write — 3 entries
+## PreToolUse: Edit / MultiEdit / Write — 4 entries
 
 | Hook | Purpose | Output |
 |------|---------|--------|
 | `memory-guard.sh` | Blocks writes to per-project memory paths for specific clones | Hard block (exit 2) |
 | `comment-discipline-guard.sh` | Blocks multi-line code-comment blocks before the edit lands. Code files only (markdown excluded), with carve-outs for suppression directives, shebangs and doc-pointers | Hard block (exit 2) |
 | `worktree-preflight.sh` | Blocks edits on a repo root when the root is not on main | Hard block (exit 2) |
+| `skill-arg-substitution-guard.sh` | Blocks a `$<digits>` token written into `SKILL.md` or `commands/*.md`, which the skill loader would replace with an argument | Hard block (exit 2) |
 
 `comment-discipline-guard.sh` is worth calling out as a *design* example: comment discipline is already stated as a rule, in context every session, and it still gets violated. That makes it an application gap rather than a knowledge gap — which is the case where a hook earns its keep over another line of prose.
 
@@ -83,7 +85,7 @@ Compaction is the one boundary where in-session reasoning is destroyed while any
 
 An MCP tool is matched by its full tool name. One script registered against several tool names counts as one entry per registration — keep that in mind when reconciling the count against `settings.json`.
 
-## PostToolUse: Bash — 4 entries (in order)
+## PostToolUse: Bash — 5 entries (in order)
 
 Read this section before writing any `PostToolUse` hook — the payload shape has two traps that both fail silently.
 
@@ -99,6 +101,7 @@ Read this section before writing any `PostToolUse` hook — the payload shape ha
 | `post-push-hygiene.sh` | `git push*` | Invalidates PR cache; post-push checklist (detects `.tf` changes, nudges PR body/tracker update) |
 | `tf-apply-reminder.sh` | `terraform plan*` | Reminds to apply after reviewing plan |
 | `pr-state-cache-invalidate.sh` | `gh pr *` | Invalidates PR cache on ready/close/reopen to prevent stale statusline badge |
+| `null-result-probe.sh` | All Bash | Nudges for a control probe when empty or zero-findings output comes from a command with a silently-collapsing construct |
 
 ## Stop — 2 entries
 

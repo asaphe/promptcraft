@@ -102,7 +102,7 @@ Edit it — every section has `<TODO>` markers and inline comments. Replace comp
 
 ### 2. Extend with hooks
 
-The `tools/claude/examples/hooks/` directory has 27 production-tested hook directories, each with a script (most with a README), plus 5 pointer stubs for hooks that moved into maintained plugins ([RETIRED.md](tools/claude/examples/RETIRED.md) maps those).
+The `tools/claude/examples/hooks/` directory has 30 production-tested hook directories, each with a script (most with a README), plus 5 pointer stubs for hooks that moved into maintained plugins ([RETIRED.md](tools/claude/examples/RETIRED.md) maps those).
 
 ```bash
 # Copy a hook:
