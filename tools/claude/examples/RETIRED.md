@@ -35,6 +35,7 @@ hook directory.
 |---|---|
 | `hooks/secretsmanager-proxy/` | It rewrote `aws secretsmanager get-secret-value` to bypass output filtering, which put the full plaintext secret in the transcript on every call. Use `sm-cache.sh` from [claude-secret-guard](https://github.com/asaphe/claude-secret-guard), which caches at mode 600 and prints a masked confirmation. Remove this hook if you installed it. |
 | `hooks/pre-claim-guard/` | Dropped from the config it was distilled from, and it never worked as shipped: it wrote its checklist to stderr on exit 0, which Claude Code discards. The rule it was reaching for — verify a cloud-state claim against the live API before asserting it in a review — belongs in a rules file, not a hook. |
+| `hooks/model-recommendation/` | A UserPromptSubmit nudge toward a cheaper model for lookup-style prompts. Replayed over several weeks of prompts from sessions already on the stronger model, only a small fraction of its fires were standalone lookups; the rest were follow-ups on the session's own work, or shell commands and URLs that happened to contain a trigger word. It also read background-task notification text as the user's prompt. Prompt text alone cannot tell a follow-up from a lookup, so no regex retune fixes it. Pin the default instead, and pick per task: see [`hooks/model-effort-pin-guard/`](hooks/model-effort-pin-guard/) and the role table in [`docs/multi-model-orchestration.md`](docs/multi-model-orchestration.md). Remove this hook if you installed it. |
 
 ## Why the stub READMEs stay
 

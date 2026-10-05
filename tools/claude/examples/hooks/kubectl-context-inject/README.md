@@ -34,7 +34,7 @@ Uses `updatedInput` to rewrite the command — the agent sees the rewritten vers
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/kubectl-context-inject.sh"
+            "command": "$HOME/.claude/hooks/kubectl-context-inject/kubectl-context-inject.sh"
           }
         ]
       }

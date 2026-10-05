@@ -38,7 +38,7 @@ Everything except the git/kubeconfig/file-walk segments comes from the harness J
 {
   "statusLine": {
     "type": "command",
-    "command": "/absolute/path/to/statusline-command.sh"
+    "command": "$HOME/.claude/hooks/statusline/statusline-command.sh"
   }
 }
 ```

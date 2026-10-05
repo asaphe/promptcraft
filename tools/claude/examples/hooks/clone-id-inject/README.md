@@ -30,7 +30,7 @@ The hook checks `$PWD` against a pattern of known clone directories. If it match
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/clone-id-inject.sh"
+            "command": "$HOME/.claude/hooks/clone-id-inject/clone-id-inject.sh"
           }
         ]
       }

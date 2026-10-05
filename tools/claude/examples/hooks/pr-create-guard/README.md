@@ -41,7 +41,7 @@ The channel matters. On exit 0 the harness discards stderr, so a checklist writt
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/pr-create-guard.sh"
+            "command": "$HOME/.claude/hooks/pr-create-guard/pr-create-guard.sh"
           }
         ]
       }

@@ -54,7 +54,7 @@ Permissions control which tools Claude can use without asking. There are **three
 
 `ask` is what makes the wildcard strategy below workable: it lets you keep a broad `allow` for velocity while forcing a decision on the specific commands whose blast radius you want to see first. Without it, the only way to gate one command inside a broad allow is `deny`, which removes it entirely.
 
-`permissions` also takes `defaultMode` and `additionalDirectories` (extra paths the session may read and write outside the project root).
+`permissions` also takes `defaultMode` and `additionalDirectories` (extra paths the session may read and write outside the project root). The `~/` form is documented for `Edit(...)`/`Read(...)` rules (e.g. `Edit(~/scratch/**)`) and `sandbox.filesystem.allowWrite`; in `permissions.additionalDirectories` it works in practice but is not documented. Writes under `~/.claude/` are a protected path: allow rules never pre-approve them, so they prompt in `default` and `acceptEdits` mode (`auto` routes them to the classifier, `bypassPermissions` allows them).
 
 ### Permission Patterns
 
@@ -107,7 +107,7 @@ Claude Code exposes 100+ `CLAUDE_CODE_*` environment variables. Most are niche, 
 
 | Variable | Recommended | What It Does |
 |----------|-------------|-------------|
-| `CLAUDE_CODE_EFFORT_LEVEL` | `auto` | Adaptive reasoning depth. `auto` lets Claude self-calibrate per request — conserves tokens on simple reads, goes deep on architecture. Options: `low`, `medium` (default), `high`, `max`, `auto`. Also settable per-session with `/effort`. |
+| `CLAUDE_CODE_EFFORT_LEVEL` | unset | Environment form of the reasoning-depth setting. Options: `low`, `medium`, `high`, `xhigh`, `max`, or `auto` for the model's default. Takes precedence over `--effort`, `/effort` and the settings keys, so leave it unset unless you want to lock the level. For a persistent default, set the `effortLevel` / `modelSettings` settings keys instead (see [Persistent model and effort defaults](#persistent-model-and-effort-defaults)). |
 | `CLAUDE_CODE_UNDERCOVER` | `1` | Suppresses AI attribution (model versions, "Co-Authored-By" lines) in commits and PRs. Use when contributing to repos where AI authorship hints are unwanted. |
 | `CLAUDE_AUTO_BACKGROUND_TASKS` | `1` | Auto-moves long-running tasks to background execution. Prevents blocking the conversation on slow operations. |
 | `CLAUDE_CODE_NO_FLICKER` | `0` or `1` | Experimental fullscreen rendering (~85% less flicker). Trade-offs: no native cmd-f search, limited native copy-paste. Research preview. |
@@ -124,12 +124,30 @@ Claude Code exposes 100+ `CLAUDE_CODE_*` environment variables. Most are niche, 
 ```json
 {
   "env": {
-    "CLAUDE_CODE_EFFORT_LEVEL": "auto",
     "CLAUDE_CODE_UNDERCOVER": "1",
     "CLAUDE_AUTO_BACKGROUND_TASKS": "1"
   }
 }
 ```
+
+### Persistent model and effort defaults
+
+Set the persistent default with the `effortLevel` key in `settings.json`, with optional per-model overrides under `modelSettings`:
+
+```json
+{
+  "effortLevel": "medium",
+  "modelSettings": {
+    "claude-opus-5-5": { "effortLevel": "medium" },
+    "claude-fable-5-1": { "effortLevel": "high" }
+  }
+}
+```
+
+- `/effort` persists its pick under `modelSettings.<model>.effortLevel`, and a `/model` pick saves itself as the new default model, so one experimental switch becomes the standing default.
+- Effort resolves in this order: an explicit choice (`CLAUDE_CODE_EFFORT_LEVEL`, `--effort`, `/effort`), then settings, then the model's default (`medium` on Opus 5.5 and Sonnet 5.5, `high` on most others). Skill or subagent `effort:` frontmatter overrides the session level while it runs, but not the environment variable.
+- A top-level `effortLevel` in user settings does not apply to Opus 5.5 and later models; give those a `modelSettings` entry.
+- [`model-effort-pin-guard`](../examples/hooks/model-effort-pin-guard/) re-pins `model`, `effortLevel` and the per-model levels at each session start. Per-role values: the table in [`multi-model-orchestration.md`](../examples/docs/multi-model-orchestration.md).
 
 ## Hooks
 
@@ -173,7 +191,7 @@ Hooks are available on more events than most configs use. A mature setup registe
 
 ## Plugins and Marketplaces
 
-Installed plugins and the marketplaces they came from are recorded in `settings.json`, so they travel with a dotfiles-managed config the same way permissions do:
+Installed plugins and the marketplaces they came from are recorded in `settings.json`:
 
 ```json
 {
@@ -190,6 +208,15 @@ Installed plugins and the marketplaces they came from are recorded in `settings.
 
 `/plugin marketplace add` and `/plugin install` write these keys for you — edit them by hand only to disable a plugin (`false`) or to prune an entry whose marketplace is gone.
 
+**These keys record intent; they install nothing on a fresh machine.** Copying `settings.json` over does not fetch any plugin, and until the first interactive session no marketplace is registered, not even `anthropics/claude-plugins-official`. Install from a setup script, which runs without starting a session:
+
+```bash
+claude plugin marketplace add <owner/repo>
+claude plugin install <plugin>@<marketplace> --scope user -y
+```
+
+`marketplace add` writes the marketplace into user `settings.json`, and `plugin install` rewrites `settings.json` with reordered keys. When `settings.json` is a symlink into a dotfiles repo, expect diff noise. A setup script can snapshot the file before installing and restore its bytes when `jq -S` shows the content unchanged.
+
 ## Other Top-Level Keys
 
 Beyond `permissions`, `env`, `hooks`, and `model`, the keys most worth knowing:
@@ -202,7 +229,7 @@ Beyond `permissions`, `env`, `hooks`, and `model`, the keys most worth knowing:
 | `attribution` | Controls AI-attribution trailers in commits and PRs |
 | `cleanupPeriodDays` | How long transcripts are retained |
 | `statusLine` | Command that renders the status line |
-| `additionalDirectories` (under `permissions`) | Paths outside the project root the session may read and write |
+| `additionalDirectories` (under `permissions`) | Paths outside the project root the session may read and write; `~/scratch` works in practice (undocumented), and writes under `~/.claude/` stay protected |
 
 ## MCP Servers — not in this file
 

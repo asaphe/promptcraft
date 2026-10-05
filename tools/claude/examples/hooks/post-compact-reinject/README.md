@@ -42,7 +42,7 @@ When the working tree is clean with no worktrees or stashes, the hook outputs **
       "matcher": "compact",
       "hooks": [{
         "type": "command",
-        "command": "/path/to/post-compact-reinject.sh"
+        "command": "$HOME/.claude/hooks/post-compact-reinject/post-compact-reinject.sh"
       }]
     }]
   }
@@ -51,7 +51,7 @@ When the working tree is clean with no worktrees or stashes, the hook outputs **
 
 ## Example output
 
-```
+```text
 Post-compaction state:
 - Branch: dev-1234-feature
 - Uncommitted changes:

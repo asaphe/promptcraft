@@ -42,11 +42,11 @@ Place **before** `destructive-guard.sh` in the hook chain so the reminder fires 
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/stateful-op-reminder.sh"
+            "command": "$HOME/.claude/hooks/stateful-op-reminder/stateful-op-reminder.sh"
           },
           {
             "type": "command",
-            "command": "/path/to/destructive-guard.sh"
+            "command": "$HOME/.claude/hooks/destructive-guard/destructive-guard.sh"
           }
         ]
       }

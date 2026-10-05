@@ -73,7 +73,7 @@ Register the Stop hook in `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/session-log.sh"
+            "command": "$HOME/.claude/hooks/session-log/session-log.sh"
           }
         ]
       }

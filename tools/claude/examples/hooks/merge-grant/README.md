@@ -70,7 +70,7 @@ Register it alongside `destructive-guard.sh`:
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "/path/to/merge-grant.sh" }
+          { "type": "command", "command": "$HOME/.claude/hooks/merge-grant/merge-grant.sh" }
         ]
       }
     ],
@@ -78,7 +78,7 @@ Register it alongside `destructive-guard.sh`:
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "/path/to/destructive-guard.sh" }
+          { "type": "command", "command": "$HOME/.claude/hooks/destructive-guard/destructive-guard.sh" }
         ]
       }
     ]

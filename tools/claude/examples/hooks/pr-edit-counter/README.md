@@ -30,7 +30,7 @@ Register as a PreToolUse hook on `Bash` in `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/pr-edit-counter.sh"
+            "command": "$HOME/.claude/hooks/pr-edit-counter/pr-edit-counter.sh"
           }
         ]
       }

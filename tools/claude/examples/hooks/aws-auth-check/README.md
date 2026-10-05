@@ -38,7 +38,7 @@ Register as a UserPromptSubmit hook in `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/aws-auth-check.sh"
+            "command": "$HOME/.claude/hooks/aws-auth-check/aws-auth-check.sh"
           }
         ]
       }

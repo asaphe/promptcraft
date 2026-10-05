@@ -31,7 +31,7 @@ Register as a PreToolUse hook on `Bash` in `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/ci-polling-guard.sh"
+            "command": "$HOME/.claude/hooks/ci-polling-guard/ci-polling-guard.sh"
           }
         ]
       }

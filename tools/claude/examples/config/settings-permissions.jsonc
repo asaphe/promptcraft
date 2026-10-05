@@ -101,9 +101,12 @@
       "Skill(deploy)"
     ],
 
-    // Additional directories Claude can access
+    // Additional directories Claude can access. The ~/ form works here in
+    // practice (documented for Edit()/Read() rules and sandbox.filesystem.allowWrite).
+    // Allow rules never pre-approve writes under ~/.claude/ (a protected path).
     "additionalDirectories": [
-      "/tmp"
+      "/tmp",
+      "~/scratch"
     ]
   }
 }

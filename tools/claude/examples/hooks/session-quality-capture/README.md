@@ -43,7 +43,7 @@ Register as a Stop hook in `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/session-quality-capture.sh"
+            "command": "$HOME/.claude/hooks/session-quality-capture/session-quality-capture.sh"
           }
         ]
       }

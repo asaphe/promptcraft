@@ -31,7 +31,7 @@ Then in `.claude/settings.json`:
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "/absolute/path/to/worktree-preflight.sh" }
+          { "type": "command", "command": "$HOME/.claude/hooks/worktree-preflight/worktree-preflight.sh" }
         ]
       }
     ]

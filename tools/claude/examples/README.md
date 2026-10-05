@@ -44,7 +44,7 @@ Supporting documentation referenced by agents and skills:
 - **`commit-attribution-guard/`** — Hard-blocks AI attribution markers in commit messages and `claude/` branch prefix.
 - **`worktree-preflight/`** — Blocks `git` write ops on a guarded repo's root when it's not on `main`.
 - **`gha-lint-guard/`** — Pre-commit `actionlint` on staged `.github/workflows/*.yaml`; blocks on failure.
-- **`model-recommendation/`** — UserPromptSubmit advisory hook (config-driven) that nudges on model-tier mismatch.
+- **`model-effort-pin-guard/`** — SessionStart hook that re-pins `model` and `effortLevel` in user settings, because a `/model` pick persists itself as the new default. Pins come from env (`PIN_MODEL`, `PIN_EFFORT`).
 - **`post-push-hygiene/`** — Reminds to resolve threads, update PR body, update tracker after a successful `git push`.
 - **`pr-create-guard/`** — Blocks `gh pr create` when prerequisites are missing (zero diff, unpushed commits, uncommitted changes).
 - **`pr-edit-counter/`** — Warns after 2+ body edits on the same PR.
@@ -53,6 +53,9 @@ Supporting documentation referenced by agents and skills:
 - **`session-log/`** — Stop hook plus a reader: appends what each turn did to a per-session markdown log, so "where did that session stop" is a `grep` rather than a transcript reconstruction. Backs the `/recap` and `/sessions` skills.
 - **`stateful-op-reminder/`** — Nudges on mutations to external systems — identity providers, IAM, databases, Kubernetes, Helm, Terraform apply — and appends a team heads-up template (draft a chat message for user approval — never auto-send; gates further mutations in the same change window).
 - **`post-apply-state-check/`** — PostToolUse nudge after a successful `terraform apply` / `kubectl apply`: exit 0 proves syntax, not correctness — verify the resource live.
+- **`settings-link-check/`** — SessionStart warning when the live `settings.json` stops being a symlink to the tracked dotfiles copy, so tracked edits silently stop reaching it. Reports the state and a summary of what differs.
+- **`skill-arg-substitution-guard/`** — Blocks a `SKILL.md` or `commands/*.md` edit that writes a `$<digits>` token (an awk field, a price) the skill loader would silently replace with an argument.
+- **`null-result-probe/`** — PostToolUse nudge: a command that returned nothing, or a scanner that reported a confident zero, while containing a construct that collapses silently (unquoted glob or expansion, git pathspec, `find` on `/tmp`) needs a control probe before the emptiness is read as a finding. Backs `rules/general/evidence-nulls.md`.
 - **`rtk/`** — PreToolUse hook that rewrites Bash commands through RTK (Rust Token Killer) for token savings.
 - **`statusline/`** — Statusline command showing directory, git branch/worktree, AWS profile, model name, effort level, context-window usage, PR review state, lines changed, and rate-limit reset.
 - Plus several auto-lint, AWS auth check, and kubectl context inject hook examples.
