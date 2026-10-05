@@ -6,13 +6,14 @@ An example of documenting a full hook set as an execution-order + cost reference
 
 **Each heading states its entry count, and that is the technique worth copying.** A count is the cheapest drift check available: if a heading disagrees with your `settings.json`, the doc is stale, and you find that out by counting rather than by reading. Keep the counts accurate or don't write them — a stale count is worse than none, because it asserts a check that isn't happening. The numbers below describe *this example*, not any real installation, so they are the pattern to imitate rather than figures to compare your own config against. Plugin-wired hooks are registered separately and are **not** included; see the last section.
 
-## SessionStart — 3 entries
+## SessionStart — 4 entries
 
 | Hook | Matcher | Purpose | Output | Cost |
 |------|---------|---------|--------|------|
 | `engineering-rules-inject.sh` | — | Injects universal engineering rigor rules | ~250 chars stdout → context | Once per session (~17ms) |
 | `org-context-inject.sh` | — | Injects org operating context (worktree, cloud profile, repos) — cwd-gated | ~200 chars stdout → context (silent outside org cwd) | Once per session (~5ms) |
 | `post-compact-reinject.sh` | `compact` | Re-injects behavioral rules + git state + active PRs after compaction | Plain-text stdout → context | Per compaction |
+| `model-effort-pin-guard.sh` | — | Re-pins `model` / `effortLevel` in user settings when a persisted `/model` or `/effort` pick has drifted; silent when nothing drifted | ~300 chars additionalContext (on drift only) | Once per session (one `jq` read) |
 
 Note the matcher on the third row. Re-injecting context after compaction is a **`SessionStart` entry with `matcher: "compact"`**, not a `PostCompact` hook — `PostCompact` is side-effects-only and cannot add anything to the context window. See [`hooks/post-compact-reinject/`](../hooks/post-compact-reinject/) for the full reasoning.
 
@@ -24,7 +25,7 @@ Note the matcher on the third row. Re-injecting context after compaction is a **
 
 Compaction is the one boundary where in-session reasoning is destroyed while anything derived from it survives — which is what makes spending tokens here worthwhile.
 
-## UserPromptSubmit — 7 entries (every prompt, in order)
+## UserPromptSubmit — 6 entries (every prompt, in order)
 
 | Hook | Purpose | Output | Cost |
 |------|---------|--------|------|
@@ -32,7 +33,6 @@ Compaction is the one boundary where in-session reasoning is destroyed while any
 | `engineering-rules-anchor.sh` | Engineering rules re-anchor | ~160 chars additionalContext | **Once per session** (stamp) |
 | `clone-id-inject.sh` | Identifies which repo clone | ~50 chars additionalContext | **Once per session** (stamp) |
 | `aws-auth-check.sh` | Validates SSO tokens, injects profile status | ~100 chars additionalContext | **Once per session** (~2.2s first call, <5ms after) |
-| `model-recommendation.sh` | Warns on model/task mismatch | ~80 chars additionalContext (on mismatch only) | Every prompt (reads transcript tail) |
 | `session-budget-warn.sh` | Nudges `/clear` when session is very old or context is very large | ~300 chars additionalContext (throttled 1/hr per session) | Every prompt (stat + transcript tail) |
 | `pr-context-inject.sh` | Injects active PR URLs from all repos | 1–5 lines additionalContext | **Once per session** (stamp), seeded from cache |
 

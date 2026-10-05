@@ -44,7 +44,7 @@ Supporting documentation referenced by agents and skills:
 - **`commit-attribution-guard/`** — Hard-blocks AI attribution markers in commit messages and `claude/` branch prefix.
 - **`worktree-preflight/`** — Blocks `git` write ops on a guarded repo's root when it's not on `main`.
 - **`gha-lint-guard/`** — Pre-commit `actionlint` on staged `.github/workflows/*.yaml`; blocks on failure.
-- **`model-recommendation/`** — UserPromptSubmit advisory hook (config-driven) that nudges on model-tier mismatch.
+- **`model-effort-pin-guard/`** — SessionStart hook that re-pins `model` and `effortLevel` in user settings, because a `/model` pick persists itself as the new default. Pins come from env (`PIN_MODEL`, `PIN_EFFORT`).
 - **`post-push-hygiene/`** — Reminds to resolve threads, update PR body, update tracker after a successful `git push`.
 - **`pr-create-guard/`** — Blocks `gh pr create` when prerequisites are missing (zero diff, unpushed commits, uncommitted changes).
 - **`pr-edit-counter/`** — Warns after 2+ body edits on the same PR.

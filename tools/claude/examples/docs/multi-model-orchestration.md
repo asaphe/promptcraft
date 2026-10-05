@@ -28,6 +28,26 @@ Sending work to a stronger Claude tier — a `planner` / `architect` subagent, o
 - **Effort is the primary intelligence / latency control — set it deliberately instead of reflexively maxing it.** Reserve the top level for genuinely hard synthesis (deep multi-file architecture, gnarly root-cause work) and drop to a middle or low level for routine mechanical work; on a frontier tier, high effort makes the model over-gather context and over-elaborate on tasks that did not need it. Claude Code exposes this as `--effort <level>` for the session, and hooks or Bash calls can read the active level from `$CLAUDE_EFFORT`.
 - **Never instruct a model to echo, transcribe, or explain its internal reasoning as response text.** Observed on a frontier tier: the request is refused and the harness silently falls back to a different model — so work you dispatched at one tier runs and bills quota at another, with different behavior and no error anywhere. That is a routing trap, not just a wasted prompt. Asking for cited *evidence* (`file:line`, command output) is fine; if you need the reasoning itself, read the structured thinking blocks. The authoring-side guard is in `rule-authoring.md`.
 
+## Model and effort by role
+
+Pin a model and an effort level per role instead of choosing per prompt. A pair names a role, not a string: effort names do not map across vendors or model generations, so re-tune a row after a model change rather than carrying the level over.
+
+| Role | Model | Effort |
+|---|---|---|
+| **Architect** — target design, trade-offs costly to reverse | `claude-fable-5-1` | `high` (`xhigh` only for the hardest synthesis) |
+| **Main session** — plan, orchestrate, judge | `claude-opus-5-5` | `medium` |
+| **Planner** — a decided objective into scoped, ordered tasks | `claude-opus-5-5` | `high` |
+| **Reviewer** — code review, security, adversarial grading | `claude-opus-5-5` | `high` |
+| **Implementer** — fully specified tasks, many in parallel | `claude-sonnet-5-5` | `medium` |
+| **Domain investigation** — read-only expert lanes | `claude-sonnet-5-5` | `medium` |
+| **Diagnostics batch** — read-only, mechanical | `claude-haiku-4-5` | effort not supported |
+
+- Opus 5.5 defaults to `medium`, and in Anthropic's testing its `medium` matches or exceeds Opus 5 at `high`; reserve `xhigh` and `max` for measured gains.
+- Fable 5.1: `high` for most tasks, `xhigh` for the most capability-sensitive work, lower for routine work, where higher effort over-gathers.
+- Sonnet 5.5: start at `medium` for agentic coding and multi-step tool use; use `high` at minimum for intelligence-sensitive work such as review.
+- Claude Code resolves effort as: an explicit choice (`CLAUDE_CODE_EFFORT_LEVEL`, `--effort`, `/effort`), then settings (`modelSettings.<model>.effortLevel`, where `/effort` saves, or the top-level `effortLevel`), then the model's default. Skill or subagent `effort:` frontmatter overrides the session level while it runs, but not the environment variable.
+- A `/model` pick persists itself as the new default; [`hooks/model-effort-pin-guard/`](../hooks/model-effort-pin-guard/) re-pins the settings file at each session start.
+
 ## Dispatching a CLI executor from Claude Code
 
 Claude Code's Bash tool starts a **fresh shell per call** and `export` does not persist across calls. So load any required credential/env and dispatch in the **same** call:

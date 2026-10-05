@@ -537,6 +537,7 @@ Production-tested hook examples with README documentation:
 | [Clone ID Inject](../examples/hooks/clone-id-inject/) | UserPromptSubmit | Injects repo clone identity for multi-clone setups | No (context) |
 | [Learning Capture](../examples/hooks/learning-capture/) | Stop / PreCompact | Capture session friction for later codification (ships in [claude-learning-loop](https://github.com/asaphe/claude-learning-loop)) | No |
 | [Post-Compact Reinject](../examples/hooks/post-compact-reinject/) | SessionStart (compact) | Re-inject critical context after compaction | No (context) |
+| [Model/Effort Pin Guard](../examples/hooks/model-effort-pin-guard/) | SessionStart | Re-pin `model` / `effortLevel` in user settings after a persisted `/model` pick | No (context) |
 | [Session Quality Capture](../examples/hooks/session-quality-capture/) | Stop | Record session metrics (tool calls, corrections, PR edits) | No (metrics) |
 
 ## Related Resources
