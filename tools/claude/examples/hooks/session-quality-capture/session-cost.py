@@ -2,12 +2,21 @@
 """Calculate Claude Code session cost from a JSONL session file."""
 import json, sys, os, glob, argparse
 
+# cache_creation is the 5m-TTL rate (1.25x input); the 1h TTL (2x input) is not modelled.
 PRICING = {
+    "claude-fable-5-1":   {"input": 10.00, "cache_creation": 12.50, "cache_read": 0.25, "output": 50.00},
+    "claude-fable-5":     {"input": 10.00, "cache_creation": 12.50, "cache_read": 1.00, "output": 50.00},
+    "claude-opus-5-5":    {"input": 4.00,  "cache_creation": 5.00,  "cache_read": 0.20, "output": 20.00},
+    "claude-opus-5":      {"input": 5.00,  "cache_creation": 6.25,  "cache_read": 0.50, "output": 25.00},
+    "claude-opus-4-8":    {"input": 5.00,  "cache_creation": 6.25,  "cache_read": 0.50, "output": 25.00},
+    "claude-opus-4-7":    {"input": 5.00,  "cache_creation": 6.25,  "cache_read": 0.50, "output": 25.00},
+    "claude-opus-4-6":    {"input": 5.00,  "cache_creation": 6.25,  "cache_read": 0.50, "output": 25.00},
+    "claude-sonnet-5-5":  {"input": 2.00,  "cache_creation": 2.50,  "cache_read": 0.20, "output": 10.00},
+    "claude-sonnet-5":    {"input": 2.00,  "cache_creation": 2.50,  "cache_read": 0.20, "output": 10.00},
     "claude-sonnet-4-6":  {"input": 3.00,  "cache_creation": 3.75,  "cache_read": 0.30, "output": 15.00},
-    "claude-opus-4-7":    {"input": 15.00, "cache_creation": 18.75, "cache_read": 1.50, "output": 75.00},
-    "claude-haiku-4-5":   {"input": 0.80,  "cache_creation": 1.00,  "cache_read": 0.08, "output": 4.00},
+    "claude-haiku-4-5":   {"input": 1.00,  "cache_creation": 1.25,  "cache_read": 0.10, "output": 5.00},
 }
-DEFAULT_PRICING = PRICING["claude-sonnet-4-6"]
+DEFAULT_PRICING = PRICING["claude-opus-5-5"]
 
 
 def _find_usage(d):
@@ -49,7 +58,8 @@ def calc_cost(jsonl_path):
                 pass
 
     prices = DEFAULT_PRICING
-    for key, p in PRICING.items():
+    # longest key first: "claude-opus-5" is a substring of "claude-opus-5-5"
+    for key, p in sorted(PRICING.items(), key=lambda kv: -len(kv[0])):
         if model and key in model:
             prices = p
             break
