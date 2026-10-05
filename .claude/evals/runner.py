@@ -15,6 +15,7 @@ Usage:
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -32,7 +33,7 @@ def load_cases(hook_dir: Path) -> list[dict]:
     return json.loads(path.read_text())
 
 
-def run_hook(hook_path: Path, command: str) -> tuple[int, str, str]:
+def run_hook(hook_path: Path, command: str, home: str) -> tuple[int, str, str]:
     """Run a hook with a simulated tool_input and return (exit_code, stdout, stderr).
 
     The channel a hook writes to is load-bearing, not cosmetic:
@@ -50,6 +51,7 @@ def run_hook(hook_path: Path, command: str) -> tuple[int, str, str]:
     with tempfile.TemporaryDirectory(prefix="hook-eval-logs-") as logdir:
         env = {
             **os.environ,
+            "HOME": home,
             "HOOK_DIAG_LOG": str(Path(logdir) / "diag.log"),
             "HOOK_DIAG_ALLOW_LOG": str(Path(logdir) / "allow.log"),
             "HOOK_DIAG_ASK_LOG": str(Path(logdir) / "ask.log"),
@@ -65,9 +67,10 @@ def run_hook(hook_path: Path, command: str) -> tuple[int, str, str]:
     return result.returncode, result.stdout.strip(), result.stderr.strip()
 
 
-def run_fixture(script: str) -> subprocess.CompletedProcess:
+def run_fixture(script: str, home: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        ["bash", "-c", script], capture_output=True, text=True, timeout=30
+        ["bash", "-c", script], capture_output=True, text=True, timeout=30,
+        env={**os.environ, "HOME": home},
     )
 
 
@@ -78,16 +81,20 @@ def check_case(hook_path: Path, case: dict) -> tuple[bool, str]:
     depends on real git state — branch detection cannot be exercised without a repo.
     A failing setup fails the case: without that, the fixture is silently absent and
     the case passes for the wrong reason.
+
+    Each case gets its own HOME: fixtures live under `$HOME`, and a shared one lets two
+    concurrent runs delete each other's repo mid-case.
     """
     command = case["command"]
     expected_exit = case.get("expected_exit")
+    home = tempfile.mkdtemp(prefix="hook-eval-home-")
 
     try:
         if case.get("setup"):
-            setup = run_fixture(case["setup"])
+            setup = run_fixture(case["setup"], home)
             if setup.returncode != 0:
                 return False, f"SETUP FAILED (exit {setup.returncode}): {setup.stderr.strip()[:200]}"
-        exit_code, stdout, stderr = run_hook(hook_path, command)
+        exit_code, stdout, stderr = run_hook(hook_path, command, home)
     except subprocess.TimeoutExpired:
         return False, "TIMEOUT (>10s)"
     except FileNotFoundError:
@@ -95,7 +102,8 @@ def check_case(hook_path: Path, case: dict) -> tuple[bool, str]:
     finally:
         # Inside the same try as setup: a partially-created fixture still needs tearing down.
         if case.get("cleanup"):
-            run_fixture(case["cleanup"])
+            run_fixture(case["cleanup"], home)
+        shutil.rmtree(home, ignore_errors=True)
 
     combined = (stdout + "\n" + stderr).strip()
 
