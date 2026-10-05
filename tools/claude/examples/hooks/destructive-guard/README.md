@@ -150,7 +150,7 @@ This hook ships twice: `tools/claude/examples/hooks/destructive-guard/` is what 
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/destructive-guard.sh"
+            "command": "$HOME/.claude/hooks/destructive-guard/destructive-guard.sh"
           }
         ]
       }

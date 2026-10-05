@@ -44,7 +44,7 @@ Register as a PreToolUse hook on `Bash` in `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/review-verification-guard.sh"
+            "command": "$HOME/.claude/hooks/review-verification-guard/review-verification-guard.sh"
           }
         ]
       }

@@ -173,6 +173,18 @@ Two habits follow:
 
 Editing an *existing* entry needs no link step in either class — the dotfiles file is already the live file.
 
+## What git cannot carry
+
+Symlinking `~/.claude/` into a dotfiles repo does not move these:
+
+| Item | Why git cannot carry it | What to do instead |
+|------|------------------------|--------------------|
+| MCP servers | Live in `~/.claude.json`, which Claude Code rewrites | `claude mcp add --scope user <name> -- <command>` from a setup script |
+| Plugins | `settings.json` records intent only; nothing is installed on a fresh machine | Install from a setup script — see [settings-json-guide.md](settings-json-guide.md) § Plugins and Marketplaces |
+| Codex `~/.codex/config.toml` | Codex writes absolute paths into it (trusted projects, hook trust state), so it cannot use `$HOME` | Re-root with `sed` when the home directory differs |
+| Session transcripts and history | Large, machine-specific | `rsync -aR` to an encrypted disk, never a synced cloud folder; import with `--ignore-existing` |
+| Credentials | Bound to the machine and account | Re-authenticate |
+
 ## The LOCAL_SENSITIVE.md Pattern
 
 Some reference material is valuable on every machine but shouldn't be committed to a shared repo (account IDs, resource ARNs, internal paths). The `LOCAL_SENSITIVE.md` file solves this:

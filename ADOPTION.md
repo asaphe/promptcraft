@@ -19,8 +19,8 @@ cp -r tools/claude/examples/hooks/stateful-op-reminder ~/.claude/hooks/
 cp -r tools/claude/examples/hooks/pr-create-guard ~/.claude/hooks/
 
 # Bring along the shared lib the destructive-guard sources.
-# (Each hook sources `../_lib/<lib>.sh` from its own directory,
-# so the lib needs to live as a sibling to the hook subdirs.)
+# (Each hook sources `$(dirname "$0")/../_lib/<lib>.sh`, so the layout is
+# ~/.claude/hooks/<name>/<name>.sh with _lib/ as a sibling of the hook subdirs.)
 mkdir -p ~/.claude/hooks/_lib
 # .pl too: strip-cmd.sh calls strip-quoted-args.pl from beside itself.
 cp tools/claude/examples/hooks/_lib/*.sh tools/claude/examples/hooks/_lib/*.pl ~/.claude/hooks/_lib/
@@ -102,7 +102,7 @@ Edit it — every section has `<TODO>` markers and inline comments. Replace comp
 
 ### 2. Extend with hooks
 
-The `tools/claude/examples/hooks/` directory has 26 production-tested hooks, each a standalone directory with a README and a script, plus 5 pointer stubs for hooks that moved into maintained plugins ([RETIRED.md](tools/claude/examples/RETIRED.md) maps those).
+The `tools/claude/examples/hooks/` directory has 27 production-tested hook directories, each with a script (most with a README), plus 5 pointer stubs for hooks that moved into maintained plugins ([RETIRED.md](tools/claude/examples/RETIRED.md) maps those).
 
 ```bash
 # Copy a hook:

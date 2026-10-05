@@ -33,7 +33,7 @@ A `UserPromptSubmit` inject hook typically uses a per-session stamp file to prev
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "/absolute/path/to/post-push-hygiene.sh" }
+          { "type": "command", "command": "$HOME/.claude/hooks/post-push-hygiene/post-push-hygiene.sh" }
         ]
       }
     ]

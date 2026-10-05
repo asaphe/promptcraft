@@ -39,7 +39,7 @@ HUE=$(( HASH % 360 ))
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "/absolute/path/to/iterm2-session-start.sh" }
+          { "type": "command", "command": "$HOME/.claude/hooks/iterm2-session/iterm2-session-start.sh" }
         ]
       }
     ],
@@ -47,7 +47,7 @@ HUE=$(( HASH % 360 ))
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "/absolute/path/to/iterm2-session-end.sh" }
+          { "type": "command", "command": "$HOME/.claude/hooks/iterm2-session/iterm2-session-end.sh" }
         ]
       }
     ]

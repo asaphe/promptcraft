@@ -29,7 +29,7 @@ Add to `.claude/settings.json`:
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "/absolute/path/to/commit-attribution-guard.sh" }
+          { "type": "command", "command": "$HOME/.claude/hooks/commit-attribution-guard/commit-attribution-guard.sh" }
         ]
       }
     ]

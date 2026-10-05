@@ -29,7 +29,7 @@ Hooks are defined in `settings.json` (global `~/.claude/settings.json` or projec
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/validate-bash.sh"
+            "command": "$HOME/.claude/hooks/validate-bash.sh"
           }
         ]
       }
@@ -40,7 +40,7 @@ Hooks are defined in `settings.json` (global `~/.claude/settings.json` or projec
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/on-stop.sh"
+            "command": "$HOME/.claude/hooks/on-stop.sh"
           }
         ]
       }
@@ -236,7 +236,7 @@ WORKTREES=$(git worktree list 2>/dev/null | grep -v "$(git rev-parse --show-topl
       "matcher": "compact",
       "hooks": [{
         "type": "command",
-        "command": "/path/to/post-compact-reinject.sh"
+        "command": "$HOME/.claude/hooks/post-compact-reinject/post-compact-reinject.sh"
       }]
     }]
   }
@@ -493,7 +493,7 @@ See the [Session Analytics Guide](session-analytics-guide.md) for queries and me
 | Hook silently fails (no output) | Always test with sample JSON before registering |
 | Hook consumes too many resources | Profile with `time` command; keep under 100ms |
 | Hook output isn't valid JSON | Validate with `jq` before deploying |
-| Hook path is relative | Use absolute paths or `$CLAUDE_PROJECT_DIR` in settings.json |
+| Hook path is relative, or hardcoded to one machine | Hook commands run through a shell, so `$HOME` and `~` expand. User-level hooks: `"$HOME/.claude/hooks/<name>.sh"`. Project hooks: `"$CLAUDE_PROJECT_DIR"/.claude/hooks/<name>.sh`. A hardcoded `/Users/<name>/...` is the anti-pattern: it breaks on every other machine |
 | Hook reads env vars instead of stdin | Claude Code passes hook data on stdin as JSON |
 | `<cmd> +<verb>` regex misses real-world commands | Real CLIs interpose flags between binary and verb (`kubectl --context X delete`, `gh --repo Y pr create`). Use the flag-permissive shape — see "Flag-Permissive Command Matching" below |
 | Pattern fires on text inside heredoc/`-m` bodies | A commit-message body that mentions `git push --force` triggers any hook with that pattern. Strip heredoc bodies and `-m` argument contents before matching — see "Strip Command-Message Text Before Matching" below |

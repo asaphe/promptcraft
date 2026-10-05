@@ -37,7 +37,7 @@ Register as a PostToolUse hook on `Bash`:
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/post-apply-state-check.sh"
+            "command": "$HOME/.claude/hooks/post-apply-state-check/post-apply-state-check.sh"
           }
         ]
       }

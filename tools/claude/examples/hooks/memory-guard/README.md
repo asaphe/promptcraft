@@ -34,7 +34,7 @@ Register as a PreToolUse hook on `Write` in `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/memory-guard.sh"
+            "command": "$HOME/.claude/hooks/memory-guard/memory-guard.sh"
           }
         ]
       }

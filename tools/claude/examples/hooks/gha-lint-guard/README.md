@@ -50,7 +50,7 @@ Add to `.claude/settings.json`:
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "/absolute/path/to/gha-lint-guard.sh" }
+          { "type": "command", "command": "$HOME/.claude/hooks/gha-lint-guard/gha-lint-guard.sh" }
         ]
       }
     ]
