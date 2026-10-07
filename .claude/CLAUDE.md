@@ -11,7 +11,7 @@ This repo runs its own example hooks from `../tools/claude/examples/hooks/`, cop
 - `stateful-op-reminder.sh` — nudges (never blocks) on mutations to external systems.
 - `destructive-guard.sh` — two-tier blocking (hard: push to main, destructive AWS; soft: PR ops, force-push).
 - `pr-create-guard.sh` — blocks PR creation on missing prerequisites.
-- `merge-grant.sh` — arms a one-turn merge grant when a prompt asks for a merge; `destructive-guard.sh` then asks instead of hard-blocking that turn's merges.
+- `merge-grant.sh` — arms one-turn grants from the user's words: a merge request makes `destructive-guard.sh` ask instead of hard-blocking that turn's merges; a request to open a PR, typed or picked in a menu, skips its `gh pr create` prompt.
 
 When updating a hook in `../tools/claude/examples/hooks/`, sync the `.claude/hooks/` copy too. Breaking dogfood = broken examples. CI enforces this: `.claude/scripts/check-mirrors.py` fails the build if a dogfooded copy has drifted from its published example.
 

@@ -34,7 +34,7 @@ Soft blocks emit `permissionDecision: ask` JSON on stdout and exit 0. Claude Cod
 
 | Pattern | Why |
 |---------|-----|
-| `gh pr create` | Visible shared action |
+| `gh pr create` | Visible shared action; no prompt in a turn whose prompt asked for a PR ([`merge-grant`](../merge-grant/)) |
 | `gh stack submit/link/unstack` | Acts on every PR in the stack, not one |
 | `gh issue <mutating verb>`, `gh api .../issues` with a method or field | Files an external artifact under your GitHub identity |
 | `gh run delete` | Permanently removes CI run history |
@@ -159,7 +159,7 @@ This hook ships twice: `tools/claude/examples/hooks/destructive-guard/` is what 
 }
 ```
 
-Requires `jq` and `perl` on PATH, plus `../_lib/hook-diag.sh`, `../_lib/strip-quoted-args.pl`, and `../_lib/split-cmd-segments.pl` installed under the same parent directory as the hook. Update the guard and helpers together. To let the agent merge when the user asks, also register [`merge-grant`](../merge-grant/); the guard reads its store from `$CLAUDE_MERGE_GRANT_DIR` (default `~/.claude/merge-grants`).
+Requires `jq` and `perl` on PATH, plus `../_lib/hook-diag.sh`, `../_lib/strip-quoted-args.pl`, and `../_lib/split-cmd-segments.pl` installed under the same parent directory as the hook. Update the guard and helpers together. To let the agent merge, or open a PR without a second prompt, when the user asks, also register [`merge-grant`](../merge-grant/); the guard reads its store from `$CLAUDE_MERGE_GRANT_DIR` (default `~/.claude/merge-grants`).
 
 ## Testing
 
@@ -209,4 +209,4 @@ The two-tier approach gives you both: unconditional safety for irreversible oper
 
 - **[`stateful-op-reminder`](../stateful-op-reminder/)** — Nudges (does not block) when detecting mutations to external systems. Catches plausible-looking API calls that destructive-guard can't pattern-match.
 - **[`pr-create-guard`](../pr-create-guard/)** — Verifies pre-creation conditions before allowing `gh pr create`.
-- **[`merge-grant`](../merge-grant/)** — Turns a merge into a permission prompt for the one turn whose prompt asked for it.
+- **[`merge-grant`](../merge-grant/)** — Turns a merge into a permission prompt, and drops the `gh pr create` prompt, for the one turn whose prompt asked for it.

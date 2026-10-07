@@ -10,8 +10,8 @@
 # SOFT BLOCK (JSON permissionDecision "ask" + exit 0): Visible/risky actions
 #   that need confirmation. Emits hookSpecificOutput JSON on stdout so Claude
 #   Code prompts the user, who can approve in the permission prompt.
-#   Examples: PR create, force-push to a feature branch, terraform destroy,
-#   kubectl delete, git reset --hard.
+#   Examples: PR create (outside a turn whose prompt asked for one), force-push
+#   to a feature branch, terraform destroy, kubectl delete, git reset --hard.
 #
 # Install: add to settings.json under hooks.PreToolUse[].hooks[]
 #   { "type": "command", "command": "/path/to/destructive-guard.sh" }
@@ -346,12 +346,13 @@ fi
 # see: tools/claude/examples/hooks/merge-grant/README.md — the user's own words this turn are the only approval path
 MERGE_FORMS="All four merge forms share one gate: 'gh pr merge', 'gh api .../pulls/N/merge', 'gh api graphql' mergePullRequest, 'gh stack merge'."
 
-# Prints the prompt that armed this session's merge grant; fails on anything short of a live grant.
-merge_grant_prompt() {
+# Prints the prompt that armed this session's grant for one action; fails on anything short of a live grant.
+grant_prompt() { # merge | pr
   local session file expires
   session=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null)
   case "$session" in ''|*[!A-Za-z0-9_-]*) return 1 ;; esac
   file="${CLAUDE_MERGE_GRANT_DIR:-$HOME/.claude/merge-grants}/${session}.json"
+  [ "$1" = merge ] || file="${file%.json}.$1.json"
   [ -f "$file" ] || return 1
   expires=$(jq -r '.expires_at // 0' "$file" 2>/dev/null) || return 1
   case "$expires" in ''|*[!0-9]*) return 1 ;; esac
@@ -361,7 +362,7 @@ merge_grant_prompt() {
 
 merge_gate() { # trigger, what this form lands
   local asked
-  if asked=$(merge_grant_prompt); then
+  if asked=$(grant_prompt merge); then
     add_soft "$1 — the user asked for a merge this turn (\"${asked}\"). $2 Approve only if it is a PR that message names."
   else
     HARD_REASON="$1 — STOP. A merge needs the user's own words in their current message, and this turn has none, so there is no approval path. $2 Hand over the PR link instead. ${MERGE_FORMS}"
@@ -456,7 +457,9 @@ fi
 
 # GitHub CLI — visible shared actions. Pattern allows flags between `gh` and
 # the subcommand (e.g., `gh --repo X pr create`).
-if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +create([[:space:]]|$)'; then
+# see: tools/claude/examples/hooks/merge-grant/README.md § The pr grant — the user's words this turn are the approval this prompt would ask for again
+if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?pr +create([[:space:]]|$)' \
+   && ! grant_prompt pr >/dev/null; then
   add_soft "gh pr create — creating a PR is a visible shared action. Confirm with the user first."
 fi
 

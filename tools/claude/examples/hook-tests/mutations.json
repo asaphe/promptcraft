@@ -15,16 +15,34 @@
     {
       "why": "notification text counts as the user's words, so an agent's own \"ready to merge\" arms the grant",
       "replace": {
-        "from": "<\\/task-notification>//gs'",
-        "to": "<\\/task-notification>/$&/gs'"
+        "from": "<\\/task-notification>//gs;",
+        "to": "<\\/task-notification>/$&/gs;"
+      }
+    },
+    {
+      "why": "a subagent's hand-back counts as the user's words, so its \"open the PR\" arms the pr grant",
+      "replace": {
+        "from": "s/<agent-message\\b[^>]*>.*?<\\/agent-message>//gs;",
+        "to": ""
       }
     },
     {
       "why": "a typographic apostrophe stops normalising, so a typed “don’t merge” arms the grant",
       "replace": {
-        "from": "sed -e \"s/’/'/g\"",
-        "to": "sed -e \"s/x/x/g\""
+        "from": "LC_ALL=C sed -e \"s/’/'/g\"",
+        "to": "LC_ALL=C sed -e \"s/x/x/g\""
       }
+    },
+    {
+      "why": "a negated PR request arms the pr grant, so \"don't open a PR yet\" drops the PR prompt",
+      "replace": {
+        "from": "act == \"pr\" && ($0 == \"open\" || $0 == \"create\" || $0 == \"raise\") && !negated && prev != \"no\" { pr_verb = 4 }",
+        "to": "act == \"pr\" && ($0 == \"open\" || $0 == \"create\" || $0 == \"raise\") { pr_verb = 4 }"
+      }
+    },
+    {
+      "why": "the verb window never closes, so a PR mentioned anywhere after \"open\" arms the pr grant",
+      "delete_matching": "pr_verb-- }"
     }
   ],
   "pr-create-guard": [
