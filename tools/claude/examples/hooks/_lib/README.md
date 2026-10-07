@@ -59,7 +59,7 @@ It also resolves a leading `~`, for the reason spelled out in the destructive-gu
 
 Gates that behave differently on your own PR need an authorship answer inside a `PreToolUse` hook, where a network round-trip per command is not affordable. These helpers cache authorship indefinitely (it never changes) and repository visibility on a 7-day TTL (it does change, and a stale `PRIVATE` would grant on a repo since made public). A *failed* lookup is cached too, on a one-hour TTL, so an unresolvable repository does not pay a fresh API call on every command.
 
-Every predicate fails closed: an unresolvable target, a missing `gh`, a timeout, and a public repository all answer false, so a caller gating on one keeps whatever verdict it already had. The repository owner is never used as a proxy for visibility — an organisation carrying both public and private repositories would grant on exactly the class meant to be excluded.
+Every predicate fails closed: an unresolvable target, a missing `gh`, a timeout, and a public repository all answer false, so a caller gating on one keeps whatever verdict it already had. Every `gh` call goes through `gh_bounded`, which kills it and its process group after `PR_AUTHOR_TIMEOUT` seconds (default 8) using perl's `alarm`, because a `PreToolUse` hook that runs past its own timeout lets the tool run, and stock macOS ships no `timeout` binary. Without `perl` the call is not made, and the predicate answers false. The repository owner is never used as a proxy for visibility — an organisation carrying both public and private repositories would grant on exactly the class meant to be excluded.
 
 ### `hook-diag.sh`
 

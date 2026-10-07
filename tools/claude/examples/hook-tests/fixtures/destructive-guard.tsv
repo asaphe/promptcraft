@@ -36,6 +36,33 @@ allow	cd {push_feature} && git push
 hard	cd {push_main} && git push
 hard	cd {push_master} && git push
 
+# --- hard: a redirect, a second refspec, an option's value or an all-branches flag hides main from a first-refspec read ---
+hard	git push>/dev/null origin main
+hard	git push 2>&1 origin main
+hard	git push &>/dev/null origin main
+hard	git push origin feature/my-branch main
+hard	git push origin feature/my-branch +main
+hard	git push origin 'refs/heads/*:refs/heads/*'
+hard	git push -o ci.skip origin main
+hard	git push --push-option ci.skip origin main
+hard	git push --all origin
+hard	git push --mirror origin
+hard	git push origin --delete main
+allow	git push origin feature/my-branch 2>&1 | tail -3
+allow	git push -o ci.skip origin feature/my-branch
+
+# --- the directory a bare push runs in: its own -C over a cd, a subshell's cd stays inside it ---
+allow	cd {push_main} && git -C {push_feature} push
+hard	cd {push_feature} && git -C {push_main} push
+hard	cd {push_main} && git -C . push
+hard	(cd {push_main} && git push)
+allow	(cd {push_main}) && git push
+allow	echo $(cd {push_main}) && git push
+hard	cd {push_main} && git push && cd {push_feature}
+hard	cd "$WORKTREE" && git push
+allow	cd "$WORKTREE" && git push origin feature/my-branch
+hard	(cd {push_main} && git checkout -b topic)
+
 # --- hard: merges. No merge grant is armed here (the setup points the grant store at an empty
 # directory), so there is no approval path. test-merge-grant.py covers the armed turn. ---
 hard	gh pr merge 42 --squash
@@ -56,6 +83,8 @@ ask	terraform destroy
 ask	git reset --hard HEAD~1
 ask	kubectl delete pod web-0
 ask	git push --force origin feature/my-branch
+ask	git push 2>&1 -f origin feature/my-branch
+ask	git push>/dev/null --delete origin feature/my-branch
 
 # --- allow: their read-only or non-destructive siblings ---
 allow	terraform plan

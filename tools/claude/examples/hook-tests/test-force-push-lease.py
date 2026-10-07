@@ -15,16 +15,25 @@ import pathlib
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 
 
 HERE = pathlib.Path(__file__).resolve().parent
 GUARD = HERE.parent / "hooks" / "destructive-guard" / "destructive-guard.sh"
 ME = "me@example.com"
+# `pr list` answers only for GH_REPO and applies the caller's own --jq, so the filter itself is under test.
 GH_STUB = """#!/usr/bin/env bash
 case "$*" in
   "api user"*) printf '%s\\n' "${GH_SELF:-}" ;;
-  "pr list"*) printf '%s\\n' "${GH_PR_AUTHOR:-}" ;;
+  "pr list --repo ${GH_REPO:-example/repo} "*)
+    [ -z "${GH_SLEEP:-}" ] || { sleep "$GH_SLEEP"; printf '%s\\n' "${GH_PR_AUTHOR:-}"; exit 0; }
+    filter=""
+    while [ $# -gt 0 ]; do [ "$1" = --jq ] && filter=$2; shift; done
+    {
+      for a in ${GH_PR_AUTHOR:-}; do printf '{"author":{"login":"%s"},"isCrossRepository":false}\\n' "$a"; done
+      for a in ${GH_FORK_AUTHOR:-}; do printf '{"author":{"login":"%s"},"isCrossRepository":true}\\n' "$a"; done
+    } | jq -s -r "$filter" ;;
 esac
 exit "${GH_EXIT:-0}"
 """
@@ -121,9 +130,9 @@ class OwnPrLeaseTest(unittest.TestCase):
                         "git push origin +feature",
                         "git push --force-with-lease origin feature",
                         "git push --force-with-lease=feature origin feature",
-                        "git push --force origin feature " + self.lease(),
-                        "git push --mirror origin feature " + self.lease()):
+                        "git push --force origin feature " + self.lease()):
             self.assert_verdict(command, "ask")
+        self.assert_verdict("git push --mirror origin feature " + self.lease(), "hard")
 
     def test_the_lease_must_name_the_pushed_branch_and_origin(self):
         self.assert_verdict("git push origin feature " + self.lease(ref="other"), "ask")
@@ -137,6 +146,14 @@ class OwnPrLeaseTest(unittest.TestCase):
     def test_someone_elses_pr_or_no_pr_keeps_the_prompt(self):
         self.assert_verdict("git push origin feature " + self.lease(), "ask", GH_PR_AUTHOR="them")
         self.assert_verdict("git push origin feature " + self.lease(), "ask", GH_PR_AUTHOR="")
+        self.assert_verdict("git push origin feature " + self.lease(), "ask", GH_PR_AUTHOR="me them")
+
+    def test_every_open_pr_from_the_branch_being_yours_is_enough(self):
+        self.assert_verdict("git push origin feature " + self.lease(), "allow", GH_PR_AUTHOR="me me")
+
+    def test_a_fork_pr_with_the_same_branch_name_is_not_the_branchs_pr(self):
+        self.assert_verdict("git push origin feature " + self.lease(), "ask", GH_PR_AUTHOR="", GH_FORK_AUTHOR="me")
+        self.assert_verdict("git push origin feature " + self.lease(), "allow", GH_FORK_AUTHOR="them")
 
     def test_fails_closed_when_a_lookup_cannot_answer(self):
         self.assert_verdict("git push origin feature " + self.lease(), "ask", GH_SELF="", GH_PR_AUTHOR="")
@@ -151,6 +168,34 @@ class OwnPrLeaseTest(unittest.TestCase):
 
     def test_main_stays_hard_whatever_the_lease(self):
         self.assert_verdict("git push origin main --force-with-lease=main:" + self.mine, "hard")
+
+    def test_a_redirect_or_separator_never_carries_another_refspec_or_push_past_the_prompt(self):
+        lease = "git push origin feature " + self.lease()
+        self.assert_verdict(lease + " &>/dev/null +main", "hard")
+        self.assert_verdict(lease + " &>/dev/null +refs/heads/*:refs/heads/*", "hard")
+        self.assert_verdict(lease + " &>/dev/null +other", "ask")
+        self.assert_verdict(lease + " &>/dev/null :other", "ask")
+        self.assert_verdict(lease + "; git push>/dev/null -f origin other", "ask")
+        self.assert_verdict(lease + "; git push>/dev/null -f origin main", "hard")
+        self.assert_verdict(lease + "\ngit push>/dev/null -f origin other", "ask")
+        self.assert_verdict(lease + " >/dev/null", "ask")
+        self.assert_verdict(lease + " $EXTRA", "ask")
+        self.assert_verdict("GIT_DIR=x " + lease, "ask")
+
+    def test_the_lookups_read_the_repository_the_push_reaches(self):
+        theirs = os.path.join(self.tmp, "theirs")
+        self.git("clone", "-q", self.repo, theirs, cwd=self.tmp)
+        self.git("remote", "set-url", "origin", "https://github.com/example/theirs.git", cwd=theirs)
+        self.assert_verdict("cd %s && git -C %s push origin feature %s" % (self.repo, theirs, self.lease()), "ask")
+        self.assert_verdict("git -c remote.origin.pushurl=https://github.com/example/theirs.git push origin feature "
+                            + self.lease(), "ask")
+        self.git("config", "remote.origin.pushurl", "https://github.com/example/theirs.git")
+        self.assert_verdict("git push origin feature " + self.lease(), "ask")
+
+    def test_a_hung_gh_is_bounded_and_keeps_the_prompt(self):
+        started = time.monotonic()
+        self.assert_verdict("git push origin feature " + self.lease(), "ask", GH_SLEEP="30", PR_AUTHOR_TIMEOUT="2")
+        self.assertLess(time.monotonic() - started, 6)
 
 
 if __name__ == "__main__":

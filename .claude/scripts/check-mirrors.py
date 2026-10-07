@@ -7,13 +7,16 @@ applied to one and not the other is invisible — the suite stays green against 
 was fixed while adopters get the copy that was not.
 
 Invariant: every file under .claude/_lib and .claude/hooks that has an examples counterpart
-must be byte-identical to it. Examples-only files are fine (nothing here consumes them).
+must be byte-identical to it, and every `../_lib/<file>` a dogfooded hook references must be
+mirrored too — a hook whose helper is missing here takes its degraded path, so the suite
+never exercises the branch adopters run. Other examples-only files are fine.
 
 Run: python3 .claude/scripts/check-mirrors.py
 """
 from __future__ import annotations
 
 import hashlib
+import re
 import sys
 from pathlib import Path
 
@@ -46,6 +49,11 @@ def main() -> None:
             missing.append(f"{rel} has no counterpart at {example.relative_to(ROOT)}")
         elif digest(local) != digest(example):
             drift.append(f"{rel} != {example.relative_to(ROOT)}")
+        if local.parent.name == "hooks":
+            refs = re.findall(r"(?:\.\./_lib|\$LIB|\$\{LIB\})/([A-Za-z0-9._-]+)", local.read_text())
+            for helper in sorted(set(refs)):
+                if not (ROOT / ".claude/_lib" / helper).is_file():
+                    missing.append(f"{rel} references ../_lib/{helper}, which .claude/_lib does not mirror")
 
     if missing or drift:
         for line in missing + drift:

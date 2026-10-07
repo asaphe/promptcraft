@@ -62,9 +62,14 @@ expand_path() {
   printf '%s' "$p"
 }
 
+# Redirections go with their targets, so `push>/dev/null`, `2>&1 -f` and `&>/dev/null +main` read as the push they are.
+strip_redirs() {
+  printf '%s' "$1" | perl -pe 's/(?:(?<=[\s;&|(])|^)\d+(?=[<>])//g; s/(?:&>>?|>\||>>?&?|<<<|<>|<&?)\s*[^\s;&|<>()]*/ /g'
+}
+
 # see: tools/claude/examples/hooks/destructive-guard/README.md § Parser hardening — token walk, and why separators are isolated first
 push_args() {
-  printf '%s\n' "$1" | sed 's/[;&|]/ & /g' | awk '{
+  strip_redirs "$1" | sed 's/[;&|]/ & /g' | awk '{
     out = ""; seen = 0
     for (i = 1; i <= NF; i++) {
       if (seen) { if ($i ~ /^[;&|]$/) break; out = out (out == "" ? "" : " ") $i }
@@ -74,16 +79,133 @@ push_args() {
   }'
 }
 
-# True only for `git push origin <branch> --force-with-lease=<branch>:<sha>` where every commit the lease
-# replaces is the user's own and the branch's one open PR is theirs; anything unresolvable answers false.
+# A path joined onto the directory it is relative to: "" is the session cwd, "?" a directory the text cannot name.
+join_dir() { # base, path
+  local p
+  p=$(expand_path "$(unquote "$2")")
+  case "$p" in
+    -|*QUOTED_ARG*|*SUBSTITUTION*|*'$'*|*'`'*) printf '?' ;;
+    /*) printf '%s' "$p" ;;
+    *) case "$1" in '?') printf '?' ;; '') printf '%s' "$p" ;; *) printf '%s/%s' "$1" "$p" ;; esac ;;
+  esac
+}
+
+# see: tools/claude/examples/hooks/destructive-guard/README.md § Parser hardening — the directory each segment runs in
+_SEG_DIRS=()
+_SEG_TEXT=()
+resolve_segment_dirs() {
+  local i seg cwd="" stack=() pops
+  _SEG_DIRS=()
+  _SEG_TEXT=()
+  for ((i = 0; i < ${#_SCOPED_TYPES[@]}; i++)); do
+    _SEG_DIRS[i]="$cwd"
+    _SEG_TEXT[i]=""
+    case "${_SCOPED_TYPES[$i]}" in
+      E) stack[${#stack[@]}]="$cwd"; continue ;;
+      X) cwd="${stack[${#stack[@]}-1]}"; unset 'stack[${#stack[@]}-1]'; continue ;;
+    esac
+    seg="${_SCOPED_VALUES[$i]}"
+    while :; do
+      case "$seg" in
+        '('*) stack[${#stack[@]}]="$cwd"; seg="${seg#?}" ;;
+        ' '*|'{'*) seg="${seg#?}" ;;
+        *) break ;;
+      esac
+    done
+    pops=0
+    while :; do
+      case "$seg" in
+        *')') pops=$((pops + 1)); seg="${seg%?}" ;;
+        *' '|*'}') seg="${seg%?}" ;;
+        *) break ;;
+      esac
+    done
+    _SEG_DIRS[i]="$cwd"
+    _SEG_TEXT[i]="$seg"
+    case "$seg" in
+      cd) cwd="$HOME" ;;
+      cd\ *) cwd=$(join_dir "$cwd" "$(printf '%s' "$seg" | awk '{ i = 2; if ($i == "--" || $i == "-P" || $i == "-L") i++; print $i }')") ;;
+    esac
+    while [ "$pops" -gt 0 ] && [ "${#stack[@]}" -gt 0 ]; do
+      cwd="${stack[${#stack[@]}-1]}"
+      unset 'stack[${#stack[@]}-1]'
+      pops=$((pops - 1))
+    done
+  done
+}
+
+# The directory a git segment acts on: each `-C` before the verb resolves against the one before it.
+segment_git_dir() { # segment, directory it runs in, verb pattern
+  local dir=$2 c
+  while IFS= read -r c; do
+    [ -n "$c" ] && dir=$(join_dir "$dir" "$c")
+  done <<EOF
+$(printf '%s' "$1" | sed -E "s/[[:space:]]($3)([[:space:]].*)?\$//" \
+  | grep -oE '(^|[[:space:]])-C +[^[:space:]]+' | sed -E 's/^[[:space:]]*-C +//')
+EOF
+  printf '%s' "$dir"
+}
+
+# Prints why a push segment lands on main or master and succeeds; quiet and false for any other push.
+push_hits_main() { # segment, directory it acts on
+  local toks tok skip="" remote="" force="" refs=() ref dst branch
+  read -r -a toks <<<"$(push_args "$1")"
+  for tok in "${toks[@]}"; do
+    [ -z "$skip" ] || { skip=""; continue; }
+    tok=$(unquote "$tok")
+    case "$tok" in
+      -o|--push-option|--repo|--receive-pack|--exec) skip=1 ;;
+      --all|--mirror|--branches)
+        printf '%s' "git push $tok — pushes every local branch, main included. Push the branch you mean by name."
+        return 0 ;;
+      --force|--force=*|--force-with-lease|--force-with-lease=*) force=1 ;;
+      --*) ;;
+      -*f*) force=1 ;;
+      -*) ;;
+      *) if [ -z "$remote" ]; then remote=$tok; else refs[${#refs[@]}]="$tok"; fi ;;
+    esac
+  done
+  [ "${#refs[@]}" -gt 0 ] || refs=(HEAD)
+  for ref in "${refs[@]}"; do
+    case "$ref" in +*) force=1; ref=${ref#+} ;; esac
+    dst=${ref##*:}
+    if [ "$dst" = HEAD ] || [ "$dst" = @ ]; then
+      if [ "$2" = "?" ]; then
+        printf '%s' "git push with no branch named, from a directory this guard cannot resolve (a variable, a quoted path with spaces) — name it: git push origin <branch>."
+        return 0
+      fi
+      # A failed cd does not stop a `;`-chained push — it runs in the session cwd, so an unusable directory falls back there.
+      branch=""
+      if [ -n "$2" ] && git -C "$2" rev-parse --git-dir >/dev/null 2>&1; then
+        branch=$(git -C "$2" branch --show-current 2>/dev/null)
+      fi
+      [ -n "$branch" ] || branch=$(git branch --show-current 2>/dev/null)
+      dst=$branch
+    fi
+    case "$dst" in *'*'*) dst=main ;; esac
+    if printf '%s' "$dst" | grep -qE '(^|/)(main|master)$'; then
+      if [ -n "$force" ]; then
+        printf '%s' "git push --force to main — rewrites shared history on the default branch."
+      else
+        printf '%s' "git push on main — changes must go through a PR. Create a branch first."
+      fi
+      return 0
+    fi
+  done
+  return 1
+}
+
+# True only for `git [-C <dir>] push origin <branch> --force-with-lease=<branch>:<sha>` typed as one simple command,
+# where every commit the lease replaces is the user's own and every open PR from the branch is theirs.
 # see: tools/claude/examples/hooks/destructive-guard/README.md § Own-PR lease
 own_pr_lease() {
-  local toks tok lease="" pos=() ref sha dir base me authors url repo author self to=""
+  local toks tok lease="" pos=() ref sha dir=. base me authors url repo author self
   [ "${PR_AUTHOR_LOOKUP:-1}" = "1" ] || return 1
-  # One push in the command, or clearing this prompt would also clear one another push raised.
-  [ "$(printf '%s\n' "$CMD_MATCH" | sed 's/[;&|]/ & /g' \
-       | awk '{ for (i = 1; i <= NF; i++) if ($i == "push") c++ } END { print c + 0 }')" = 1 ] || return 1
-  read -r -a toks <<<"$(push_args "$CMD_STRIPPED")"
+  # No separator, redirect, subshell, expansion, quote, escape or glob: nothing can carry a second push or refspec.
+  case "$CMD" in *[\;\&\|\<\>\(\)\{\}\`\$\\\"\'\*\?\[\#]*|*$'\n'*) return 1 ;; esac
+  printf '%s' "$CMD" | grep -qE '^git( -C [^ ]+)? push( |$)' || return 1
+  case "$CMD" in "git -C "*) dir=$(expand_path "$(printf '%s' "$CMD" | awk '{ print $3 }')") ;; esac
+  read -r -a toks <<<"${CMD#* push}"
   for tok in "${toks[@]}"; do
     case "$tok" in
       --force-with-lease=*:*) [ -z "$lease" ] || return 1; lease=${tok#--force-with-lease=} ;;
@@ -98,7 +220,6 @@ own_pr_lease() {
   [ "${lease%%:*}" = "$ref" ] || return 1
   sha=${lease#*:}
   printf '%s' "$sha" | grep -qE '^[0-9a-f]{7,40}$' || return 1
-  dir=${PUSH_DIR:-.}
   git -C "$dir" cat-file -e "${sha}^{commit}" 2>/dev/null || return 1
   base=$(git -C "$dir" merge-base "$sha" refs/remotes/origin/main 2>/dev/null \
          || git -C "$dir" merge-base "$sha" refs/remotes/origin/master 2>/dev/null)
@@ -106,17 +227,18 @@ own_pr_lease() {
   [ -n "$base" ] && [ -n "$me" ] || return 1
   # The lease overwrites exactly $sha, so a commit on it past the default branch by anyone else is their work lost.
   authors=$(git -C "$dir" log --format='%ae' "${base}..${sha}" 2>/dev/null) || return 1
-  [ -z "$(printf '%s' "$authors" | grep -v -x -F "$me")" ] || return 1
-  url=$(git -C "$dir" remote get-url origin 2>/dev/null)
+  ! printf '%s' "$authors" | grep -q -v -x -F "$me" || return 1
+  # The push URL, not the fetch URL: a pushurl or pushInsteadOf sends the push to a repository get-url alone never names.
+  url=$(git -C "$dir" remote get-url --push origin 2>/dev/null)
   repo=$(printf '%s' "$url" | sed -nE 's#^(https://|ssh://git@|git@)github\.com[:/]([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)/?$#\2#p')
   repo=${repo%.git}
   printf '%s' "$repo" | grep -qE '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$' || return 1
-  [ -r "$(dirname "$0")/../_lib/pr-author.sh" ] && command -v gh >/dev/null 2>&1 || return 1
-  # shellcheck source=/dev/null  # pr_self_login, cached; loaded only for this rare push shape
+  [ -r "$(dirname "$0")/../_lib/pr-author.sh" ] || return 1
+  # shellcheck source=/dev/null  # gh_bounded and pr_self_login, cached; loaded only for this rare push shape
   source "$(dirname "$0")/../_lib/pr-author.sh"
-  command -v timeout >/dev/null 2>&1 && to="timeout 8"
-  author=$($to gh pr list --repo "$repo" --head "$ref" --state open --json author \
-    --jq '[.[].author.login] | unique | if length == 1 then .[0] else empty end' 2>/dev/null)
+  # A fork's PR from a same-named branch is not this branch's PR, so only same-repository PRs count.
+  author=$(gh_bounded pr list --repo "$repo" --head "$ref" --state open --json author,isCrossRepository \
+    --jq '[.[] | select(.isCrossRepository | not) | .author.login] | unique | if length == 1 then .[0] else empty end' 2>/dev/null)
   self=$(pr_self_login)
   [ -n "$author" ] && [ -n "$self" ] && [ "$author" = "$self" ]
 }
@@ -230,69 +352,29 @@ ALSO: $1"
 # HARD BLOCKS — irreversible data loss or forbidden shared-state ops, exit 2
 # =====================================================================
 
-# git push targeting main/master (bypass PR process). Plain pushes and force
+# git push landing on main/master (bypass PR process). Plain pushes and force
 # pushes are both checked: force-push to main/master hard-blocks with its own
 # message; force-push to other refs falls through to the soft tier below.
 # Pattern allows flags between `git` and `push` (e.g., `git -C dir push`).
-if echo "$CMD_MATCH" | grep -qE 'git[[:space:]]([^|;&]* )?push([[:space:]]|$)'; then
-  # Determine the effective git directory — if the command does
-  # "cd /tmp/worktree && ... && git push", check the branch there,
-  # not in the hook's CWD (which stays on main per worktree rules).
-  PUSH_DIR=""
-  if echo "$CMD_FLAT_MATCH" | grep -qE 'cd +[^ ;&]+ *[;&].*git[[:space:]]([^|;&]* )?push'; then
-    PUSH_DIR=$(printf '%s' "$CMD_FLAT" | grep -oE 'cd +[^ ;&]+' | tail -1 | sed 's/^cd *//')
+PUSH_VIEW=$(strip_redirs "$CMD_MATCH")
+if echo "$PUSH_VIEW" | grep -qE 'git[[:space:]]([^|;&]* )?push([[:space:];&|)]|$)'; then
+  if ! load_scoped_segments; then
+    HARD_REASON="destructive-guard: scoped command parser failed while checking a push."
+  else
+    # Per segment, in the directory that segment runs in: an earlier bare `push` — in an echo, a grep, a
+    # message — must not capture the check, and a bare push's branch is the one where it runs.
+    resolve_segment_dirs
+    for ((PUSH_INDEX = 0; PUSH_INDEX < ${#_SCOPED_TYPES[@]}; PUSH_INDEX++)); do
+      [ "${_SCOPED_TYPES[$PUSH_INDEX]}" = S ] || continue
+      PUSH_SEGMENT=$(strip_redirs "${_SEG_TEXT[$PUSH_INDEX]}")
+      echo "$PUSH_SEGMENT" | grep -qE 'git[[:space:]]([^|;&]* )?push([[:space:]]|$)' || continue
+      if PUSH_HIT=$(push_hits_main "$PUSH_SEGMENT" \
+                    "$(segment_git_dir "$PUSH_SEGMENT" "${_SEG_DIRS[$PUSH_INDEX]}" push)"); then
+        HARD_REASON=$PUSH_HIT
+        break
+      fi
+    done
   fi
-  # `git -C <dir> push` form — extract <dir> as the effective directory.
-  if [ -z "$PUSH_DIR" ] && echo "$CMD_MATCH" | grep -qE 'git +-C +[^ ]+[^;&|]*push'; then
-    PUSH_DIR=$(echo "$CMD_STRIPPED" | grep -oE 'git +-C +[^ ]+' | head -1 | awk '{print $NF}')
-  fi
-  PUSH_DIR=$(expand_path "$(unquote "$PUSH_DIR")")
-
-  # Per segment, not once per command: an earlier bare `push` — in an echo, a grep, a message —
-  # otherwise captured the extraction and hid the real `git push` in a later segment.
-  load_segments
-  for PUSH_SEGMENT in "${_SEGS[@]}"; do
-    echo "$PUSH_SEGMENT" | grep -qE 'git[[:space:]]([^|;&]* )?push([[:space:]]|$)' || continue
-    PUSH_PORTION=$(push_args "$PUSH_SEGMENT")
-    # Keep only words that don't start with "-"; plain sed 's/--*[^ ]*//g' corrupts main-hotfix → main.
-    PUSH_REF=$(echo "$PUSH_PORTION" | awk 'BEGIN{n=0} {for(i=1;i<=NF;i++) if(substr($i,1,1)!="-") {n++; if(n==2) {print $i; exit}}}')
-    # Quotes survive extraction, and `"main"` compares equal to nothing.
-    PUSH_REF=$(unquote "$PUSH_REF")
-    # A leading `+` is the force marker, not part of the ref name, so `+main` still reads as main.
-    PUSH_REF="${PUSH_REF#+}"
-    # Bare HEAD names no branch, so it must fall through to the branch lookup rather than read as a ref.
-    [ "$PUSH_REF" = "HEAD" ] && PUSH_REF=""
-
-    WILL_PUSH_MAIN=""
-    if [ -z "$PUSH_REF" ]; then
-      # A failed cd does not stop the push — it runs in the session cwd, so an unusable PUSH_DIR
-      # must fall back there rather than leave an empty branch that reads as "not main".
-      BRANCH=""
-      if [ -n "$PUSH_DIR" ] && git -C "$PUSH_DIR" rev-parse --git-dir >/dev/null 2>&1; then
-        BRANCH=$(git -C "$PUSH_DIR" branch --show-current 2>/dev/null)
-      fi
-      if [ -z "$BRANCH" ]; then
-        BRANCH=$(git branch --show-current 2>/dev/null)
-      fi
-      if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
-        WILL_PUSH_MAIN=1
-      fi
-    elif [ "$PUSH_REF" = "main" ] || [ "$PUSH_REF" = "master" ]; then
-      WILL_PUSH_MAIN=1
-    elif echo "$PUSH_REF" | grep -qE '(^|[/:])(main|master)$'; then
-      WILL_PUSH_MAIN=1
-    fi
-
-    if [ -n "$WILL_PUSH_MAIN" ]; then
-      # Force flags: --force, --force-with-lease(=ref), or short -f (possibly bundled, e.g. -uf).
-      if echo "$PUSH_PORTION" | grep -qE '(^|[[:space:]])(--force(-with-lease)?(=[^[:space:]]*)?|-[a-zA-Z]*f[a-zA-Z]*)([[:space:]]|$)'; then
-        HARD_REASON="git push --force to main — rewrites shared history on the default branch."
-      else
-        HARD_REASON="git push on main — changes must go through a PR. Create a branch first."
-      fi
-      break
-    fi
-  done
 fi
 
 # see: tools/claude/examples/hooks/destructive-guard/README.md § Why `--dry-run` is not exempt — an exemption is satisfiable by an earlier segment
@@ -451,32 +533,15 @@ if echo "$CMD_MATCH" | grep -qE 'git[[:space:]]([^|;&]* )?(checkout|switch)([[:s
 if ! load_scoped_segments; then
   HARD_REASON="destructive-guard: scoped command parser failed while checking a branch switch."
 else
-CHECKOUT_CWD=""
-CHECKOUT_CWD_STACK=()
+resolve_segment_dirs
 for ((CO_INDEX=0; CO_INDEX<${#_SCOPED_TYPES[@]}; CO_INDEX++)); do
-  case "${_SCOPED_TYPES[$CO_INDEX]}" in
-    E) CHECKOUT_CWD_STACK[${#CHECKOUT_CWD_STACK[@]}]="$CHECKOUT_CWD"; continue ;;
-    X)
-      CHECKOUT_CWD="${CHECKOUT_CWD_STACK[${#CHECKOUT_CWD_STACK[@]}-1]}"
-      unset 'CHECKOUT_CWD_STACK[${#CHECKOUT_CWD_STACK[@]}-1]'
-      continue
-      ;;
-  esac
-  CO_SEG="${_SCOPED_VALUES[$CO_INDEX]}"
-  # A `cd` moves the effective directory for every segment after it, exactly as the shell does.
-  case "$CO_SEG" in
-    cd\ *) CHECKOUT_CWD=$(printf '%s' "$CO_SEG" | sed -E 's/^cd +([^ ;]+).*/\1/') ;;
-  esac
+  [ "${_SCOPED_TYPES[$CO_INDEX]}" = S ] || continue
+  CO_SEG="${_SEG_TEXT[$CO_INDEX]}"
   echo "$CO_SEG" | grep -qE 'git[[:space:]]([^|;&]* )?(checkout|switch)([[:space:]]|$)' || continue
   echo "$CO_SEG" | grep -qE 'git[[:space:]]([^|;&]* )?checkout +(-- |--$)' && continue
 
-  # The -C belonging to THIS invocation, not the first one anywhere in the command.
-  if echo "$CO_SEG" | grep -qE 'git +-C +'; then
-    CMD_TARGET=$(echo "$CO_SEG" | grep -oE '\-C +[^ ]+' | head -1 | sed 's/^-C *//')
-  else
-    CMD_TARGET="$CHECKOUT_CWD"
-  fi
-  CMD_TARGET=$(expand_path "$(unquote "$CMD_TARGET")")
+  # The -C belonging to THIS invocation, resolved against the directory its segment runs in.
+  CMD_TARGET=$(segment_git_dir "$CO_SEG" "${_SEG_DIRS[$CO_INDEX]}" 'checkout|switch')
   if [ -n "$CMD_TARGET" ]; then
     CMD_TARGET_ABS=$(cd "$CMD_TARGET" 2>/dev/null && pwd || echo "$CMD_TARGET")
     SESSION_CWD=$(pwd)
@@ -532,13 +597,13 @@ fi
 PUSH_SEG='git[[:space:]]([^|;&]* )?push[^|;&]*[[:space:]]'
 
 # Both spellings of one act: matching only the colon refspec left `push --delete origin br` unguarded.
-if echo "$CMD_MATCH" | grep -qE 'git[[:space:]]([^|;&]* )?push +[^ |;&]+ +:' \
-   || echo "$CMD_MATCH" | grep -qE "${PUSH_SEG}(--delete|-d)([[:space:]]|\$)"; then
+if echo "$PUSH_VIEW" | grep -qE 'git[[:space:]]([^|;&]* )?push +[^ |;&]+ +:' \
+   || echo "$PUSH_VIEW" | grep -qE "${PUSH_SEG}(--delete|-d)([[:space:])]|\$)"; then
   add_soft "git push origin :branch — deletes a remote branch, which auto-closes any PR using it. Covers both spellings: the colon refspec and --delete/-d."
 fi
 
 # `-f`, a bundled `-uf` and a `+refspec` are force-pushes too; matching only `--force` left them unguarded.
-if echo "$CMD_MATCH" | grep -qE "${PUSH_SEG}(--force(-with-lease)?(=[^[:space:]]*)?|-[a-zA-Z]*f[a-zA-Z]*|\+[A-Za-z0-9._/:-]+)([[:space:]]|\$)"; then
+if echo "$PUSH_VIEW" | grep -qE "${PUSH_SEG}(--force(-with-lease)?(=[^[:space:]]*)?|-[a-zA-Z]*f[a-zA-Z]*|\+[A-Za-z0-9._/:*-]+)([[:space:])]|\$)"; then
   own_pr_lease || add_soft "git push --force — rewrites remote history (also matches -f and +refspec). Confirm with the user first. On your own open PR, \`git push origin <branch> --force-with-lease=<branch>:<sha>\` over only your own commits runs without this prompt."
 fi
 
