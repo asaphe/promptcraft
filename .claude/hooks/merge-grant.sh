@@ -34,28 +34,34 @@ grant_file() { # action
 
 # see: tools/claude/examples/hooks/merge-grant/README.md § What arms it
 asks_for() { # action, text
-  printf '%s' "$2" | LC_ALL=C sed -e "s/’/'/g" | LC_ALL=C tr '[:upper:]' '[:lower:]' \
-    | LC_ALL=C tr '\t\n' ' .' | LC_ALL=C sed -e "s/[.,;:!?()]/ . /g" -e "s/[^a-z'. ]/ /g" \
+  printf '%s' "$2" | LC_ALL=C sed -e "s/’/'/g" -e "s/‘/'/g" -e "s/\`/'/g" | LC_ALL=C tr '[:upper:]' '[:lower:]' \
+    | LC_ALL=C tr '\t\n' ' .' | LC_ALL=C sed -e "s/[.;!?]/ . /g" -e "s/[,:()]/ , /g" \
+      -e "s/pull[^a-z]*requests*/ pr /g" -e "s/[^a-z'., ]/ /g" \
     | LC_ALL=C tr -s ' ' '\n' | awk -v q="'" -v act="$1" '
-      BEGIN { n = split("don" q "t dont not never without", w, " "); for (i = 1; i <= n; i++) neg[w[i]] = 1 }
+      BEGIN { n = split("dont not never without cannot cant wont shouldnt couldnt wouldnt", w, " "); for (i = 1; i <= n; i++) neg[w[i]] = 1 }
       { gsub("^" q "+|" q "+$", "") }
       $0 == "" { next }
-      $0 == "." || $0 == "but" { negated = 0; prev = ""; pr_verb = 0; next }
-      $0 in neg { negated = 1 }
+      $0 == "." || $0 == "but" { negated = 0; prev = ""; pr_verb = 0; adj = 0; next }
+      $0 == "," { prev = ","; next }
+      $0 in neg || $0 ~ ("n" q "t$") { negated = 1 }
       act == "merge" && $0 == "merge" && !negated && prev != "no" { found = 1 }
-      act == "pr" && pr_verb > 0 && ($0 == "pr" || $0 == "prs" || $0 == "pull") { found = 1 }
+      act == "pr" && pr_verb > 0 && ($0 == "pr" || $0 == "prs") && !adj { found = 1 }
       act == "pr" && pr_verb > 0 { pr_verb-- }
-      act == "pr" && ($0 == "open" || $0 == "create" || $0 == "raise") && !negated && prev != "no" { pr_verb = 4 }
+      { adj = 0 }
+      act == "pr" && ($0 == "open" || $0 == "create" || $0 == "raise") && !negated && prev != "no" { pr_verb = 4; adj = ($0 == "open" && prev != "" && prev != ",") }
       { prev = $0 }
       END { exit !found }'
 }
 
 # see: tools/claude/examples/hooks/merge-grant/README.md § Menu answers
 answer_consents() { # answer
-  local a
-  a=$(printf '%s' "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]' | sed -e "s/’/'/g" -e 's/(recommended)//g')
-  printf '%s' "$a" | grep -qE "(^|[^a-z'])(don'?t|do not|not|never|no|without|skip|hold|wait|later|cancel|stop|abort|decline|keep)([^a-z]|\$)" && return 1
-  printf '%s' "$a" | grep -qE '^[[:space:]]*(yes|y|open|create|raise|proceed|go|approve|approved|confirm|ok|okay|sure|do it)([^a-z]|$)'
+  printf '%s' "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]' | sed -e 's/(recommended)//g' \
+    | LC_ALL=C tr -c "a-z'\n" ' ' | LC_ALL=C tr -s ' ' '\n' | awk '
+      BEGIN { n = split("yes y yep yeah ok okay sure approve approved confirm confirmed proceed go ahead do it please", w, " "); for (i = 1; i <= n; i++) ok[w[i]] = 1 }
+      $0 == "" { next }
+      { words++ }
+      !($0 in ok) { other = 1 }
+      END { exit !(words > 0 && !other) }'
 }
 
 grant_context() { # action
@@ -103,7 +109,8 @@ PROMPT=$(printf '%s' "$INPUT" | jq -r '.prompt // empty' 2>/dev/null)
 # see: tools/claude/examples/hooks/merge-grant/README.md § Harness-injected blocks
 if ! OWN=$(printf '%s' "$PROMPT" | perl -0777 -pe '
       s/<task-notification>.*?<\/task-notification>//gs;
-      s/<agent-message\b[^>]*>.*?<\/agent-message>//gs;'); then
+      s/<agent-message\b[^>]*>.*?<\/agent-message>//gs;') \
+   || printf '%s' "$OWN" | grep -qE '</?(task-notification|agent-message)'; then
   for a in $ACTIONS; do rm -f "$(grant_file "$a")"; done
   exit 0
 fi

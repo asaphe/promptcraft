@@ -34,9 +34,9 @@ The two-hour expiry is a backstop, not the lifetime. The lifetime is "until the 
 
 **`merge`:** the word `merge` — not `merged`, `merging` or `mergeable` — used at least once outside the reach of a negation.
 
-**`pr`:** `open`, `create` or `raise` outside the reach of a negation, followed within the next four words by `PR`, `PRs` or `pull`.
+**`pr`:** `open`, `create` or `raise` outside the reach of a negation, followed within the next four words by `PR`, `PRs` or `pull request(s)` — `pull` alone is not a PR (`pull main`, `a pull-down menu`). `open` directly before `PR`/`PRs` is the verb only when it starts its clause (`open PRs for both branches`); anywhere else it is the adjective (`list my open PRs`, `close the stale open PRs`).
 
-Negation is the same for both. `don't`, `dont`, `not`, `never` and `without` negate every later word in their clause; a clause ends at `. , ; : ! ? ( )`, a line break, or `but`. `no` negates only the word right after it, because it is usually a determiner (`there are no blockers so merge 17`). Hyphens, backticks, asterisks and quotes separate words without ending a clause, and a typographic apostrophe counts (`don’t merge`).
+Negation is the same for both. `not`, `never`, `without`, `cannot`, any `…n't` word (`don't`, `can't`, `won't`, `shouldn't`, …) and the apostrophe-less `dont`, `cant`, `wont`, `shouldnt`, `couldnt` and `wouldnt` negate every later word in their clause. A clause ends at `. ; ! ?`, a line break, or `but`. A `,`, `:` or parenthesis is an aside inside the clause, so `Do not, under any circumstances, merge 17` stays negated. `no` negates only the word right after it, because it is usually a determiner (`there are no blockers so merge 17`, `no, merge it`). Hyphens, asterisks and quotes separate words without ending a clause, and a typographic or backtick apostrophe counts (`don’t merge`, ``don`t merge``).
 
 | Prompt | Grant |
 |---|---|
@@ -49,9 +49,11 @@ Negation is the same for both. `don't`, `dont`, `not`, `never` and `without` neg
 | `looks good, open the PR` | pr |
 | `create a PR for this, then merge it` | pr and merge |
 | `don't open a PR yet` | none |
+| `Don't (yet) open a PR` | none — the parenthesis does not end the negation |
+| `how many open PRs do we have?` | none — `open` is the adjective |
 | `the PR is open, what's its CI state?` | none — no verb before the PR |
 
-The predicate is lexical, so it errs in both directions, and the errors cost different things. **Over-arming** — `should I merge this?` arms `merge`, `open questions on the PR` arms `pr` — costs one permission prompt the user can refuse for a merge, and one skipped prompt for a PR, still checked by [`pr-create-guard`](../pr-create-guard/). **Under-arming** — `it's not flaky so merge it` stays negated — costs a re-phrase. It cannot tell *which* PRs were named: confirming an ambiguous list ("the ones above", a range) before the first merge is the agent's job, which the armed-grant context says in so many words.
+The predicate is lexical, so it errs in both directions, and the errors cost different things. **Over-arming** — `should I merge this?` arms `merge`, `open questions on the PR` arms `pr` — costs one permission prompt the user can refuse for a merge. For a PR it costs more: a PR opened that nobody asked for, with no prompt. [`pr-create-guard`](../pr-create-guard/) still checks its prerequisites, not whether the user wanted it, so the PR side of the predicate leans toward under-arming. **Under-arming** — `it's not flaky so merge it` stays negated, and so does `don't wait, merge 17` — costs a re-phrase. It cannot tell *which* PRs were named: confirming an ambiguous list ("the ones above", a range) before the first merge is the agent's job, which the armed-grant context says in so many words.
 
 ## The pr grant
 
@@ -68,7 +70,7 @@ What still checks a `gh pr create` in a granted turn:
 When the agent asks with `AskUserQuestion` and the user picks "Open the PR", a typed-words-only grant would follow that pick with a permission prompt for the same `gh pr create`. Registered on PostToolUse for `AskUserQuestion`, the hook reads each question and the answer picked for it, and arms `pr` when either:
 
 - the answer itself asks for a PR, by the same test as a typed prompt (this covers a free-text "Other" reply); or
-- the question asks for a PR, and the answer consents: it opens with `yes`, `open`, `create`, `raise`, `proceed`, `go`, `approve`, `confirm`, `ok`, `sure` or `do it`, and contains none of `don't`, `not`, `never`, `no`, `without`, `skip`, `hold`, `wait`, `later`, `cancel`, `stop`, `abort`, `decline` or `keep`. A `(Recommended)` suffix is ignored.
+- the question asks for a PR, and the answer is a bare affirmation: every word in it is one of `yes`, `y`, `yep`, `yeah`, `ok`, `okay`, `sure`, `approve(d)`, `confirm(ed)`, `proceed`, `go`, `ahead`, `do`, `it` or `please`, ignoring punctuation and a `(Recommended)` suffix. `Yes, go ahead` consents. `Proceed with the e2e suite first`, `Go back and add tests first` and `Yes, but only after CI` do not: when a question offers alternatives, an answer that says anything more may be choosing one of them.
 
 A bare "Yes" to a question that names no action arms nothing.
 
@@ -87,7 +89,7 @@ Both are observed behavior, not documented contracts. The hook strips every such
 
 - **A prompt that is only such blocks** neither arms nor clears. The turn it starts continues the user's last request, which is what lets "merge 17 when CI is green" finish after a background CI watch reports. The expiry bounds how long that can last.
 - **A prompt with the user's own words around a block** is the user speaking. Only their words count, so a pasted "ready to merge" or a worker's "open the PR" arms nothing, and "actually, do NOT merge anything" clears the grant.
-- **If the strip itself fails**, every grant is cleared, never armed from the raw prompt.
+- **If the strip itself fails, or leaves a tag behind**, every grant is cleared, never armed from the raw prompt. A block's body can quote its own closing tag — an agent reporting what it grepped, say — and the strip ends that block early; the remainder is not the user's words. A typed prompt that mentions one of these tags literally is caught by the same check: it clears, and the user re-phrases.
 
 ## Fails closed
 

@@ -37,18 +37,29 @@ allow	don't squash-merge 17
 allow	do not *merge*
 allow	don't `merge` it
 
+# --- allow: a comma, colon or parenthesis is an aside, not the end of the clause a negation governs ---
+allow	Don't, please, merge this
+allow	Do not, under any circumstances, merge 17
+allow	never (ever) merge without me
+ctx	no, merge it
+ctx	ok: merge 17
+
 # --- a notification is not the user speaking; text around a pasted one is ---
 allow	<task-notification>agent finished: ready to merge</task-notification>
 ctx	<task-notification>x</task-notification> looks good, merge 17
 allow	<task-notification>ready to merge</task-notification> actually, do NOT merge anything
 allow	<agent-message from="worker">all green, open the PR</agent-message>
 ctx	<agent-message from="worker">done</agent-message> thanks, open the PR
+allow	<agent-message from="worker">it strips </agent-message> blocks; open the PR</agent-message>
 
 # --- ctx: a request to open a PR — open/create/raise, then PR/PRs/pull within the next four words ---
 ctx	looks good, open the PR
 ctx	create a PR for this
 ctx	raise PRs for both branches
 ctx	open a pull request against main
+ctx	open PRs for both branches
+ctx	please open a PR for this
+ctx	can you open a pull-request?
 
 # --- allow: a PR is mentioned, but nobody asked to open one ---
 allow	don't open a PR yet
@@ -56,4 +67,22 @@ allow	never create PRs without asking
 allow	the PR is open, what's its CI state?
 allow	reopen the PR
 allow	open the file and tell me what the function does before we talk about the PR
+
+# --- allow: `open` right before PR is an adjective, and `pull` is a PR only as `pull request` ---
+allow	list my open PRs
+allow	how many open PRs do we have?
+allow	close the stale open PRs
+allow	open the terminal and pull main
+allow	create a pull-down menu in the settings page
+
+# --- allow: every way people spell the negation ---
+allow	Do not, under any circumstances, open a PR.
+allow	Don't (yet) open a PR
+allow	Never, ever open a PR for this
+allow	we shouldn't open a PR yet
+allow	you can't open a PR until CI passes
+allow	I won't need you to open a PR
+allow	you cannot open a PR here
+allow	don`t open a PR
+allow	don‘t open a PR
 allow	<absent>

@@ -36,13 +36,48 @@
     {
       "why": "a negated PR request arms the pr grant, so \"don't open a PR yet\" drops the PR prompt",
       "replace": {
-        "from": "act == \"pr\" && ($0 == \"open\" || $0 == \"create\" || $0 == \"raise\") && !negated && prev != \"no\" { pr_verb = 4 }",
-        "to": "act == \"pr\" && ($0 == \"open\" || $0 == \"create\" || $0 == \"raise\") { pr_verb = 4 }"
+        "from": "act == \"pr\" && ($0 == \"open\" || $0 == \"create\" || $0 == \"raise\") && !negated && prev != \"no\" { pr_verb = 4;",
+        "to": "act == \"pr\" && ($0 == \"open\" || $0 == \"create\" || $0 == \"raise\") { pr_verb = 4;"
       }
     },
     {
       "why": "the verb window never closes, so a PR mentioned anywhere after \"open\" arms the pr grant",
       "delete_matching": "pr_verb-- }"
+    },
+    {
+      "why": "a comma ends the negation again, so \"Don't, please, merge this\" arms the grant",
+      "replace": {
+        "from": "$0 == \",\" { prev = \",\"; next }",
+        "to": "$0 == \",\" { negated = 0; prev = \",\"; next }"
+      }
+    },
+    {
+      "why": "only a fixed list negates, so \"we shouldn't open a PR yet\" arms the pr grant",
+      "replace": {
+        "from": " || $0 ~ (\"n\" q \"t$\")",
+        "to": ""
+      }
+    },
+    {
+      "why": "open right before PR reads as the verb again, so \"list my open PRs\" arms the pr grant",
+      "replace": {
+        "from": "($0 == \"pr\" || $0 == \"prs\") && !adj {",
+        "to": "($0 == \"pr\" || $0 == \"prs\") {"
+      }
+    },
+    {
+      "why": "pull request stops reading as a PR, so \"open a pull request against main\" arms nothing",
+      "replace": {
+        "from": " -e \"s/pull[^a-z]*requests*/ pr /g\"",
+        "to": ""
+      }
+    },
+    {
+      "why": "a block the strip leaves unbalanced counts as the user's words, so a hand-back quoting its own closing tag arms a grant",
+      "replace": {
+        "from": "   || printf '%s' \"$OWN\" | grep -qE '</?(task-notification|agent-message)'; then",
+        "to": "   ; then"
+      }
     }
   ],
   "pr-create-guard": [
