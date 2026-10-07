@@ -36,6 +36,9 @@ python3 test-expansion-semantics.py
 
 # merge-grant and destructive-guard together: the grant file is a contract between two hooks
 python3 test-merge-grant.py
+
+# destructive-guard's own-PR lease, against a real repository and a gh stub
+python3 test-force-push-lease.py
 ```
 
 `--hooks-dir` resolves both layouts: flat `<dir>/<name>.sh`, which is how hooks sit in an installed `~/.claude/hooks/`, and nested `<dir>/<name>/<name>.sh`, which is how they sit in this repo. Installed alongside your own hooks as `~/.claude/hooks/tests/`, the default is already right and the flag can be dropped.

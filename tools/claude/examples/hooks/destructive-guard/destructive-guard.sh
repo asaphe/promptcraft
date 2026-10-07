@@ -74,6 +74,53 @@ push_args() {
   }'
 }
 
+# True only for `git push origin <branch> --force-with-lease=<branch>:<sha>` where every commit the lease
+# replaces is the user's own and the branch's one open PR is theirs; anything unresolvable answers false.
+# see: tools/claude/examples/hooks/destructive-guard/README.md § Own-PR lease
+own_pr_lease() {
+  local toks tok lease="" pos=() ref sha dir base me authors url repo author self to=""
+  [ "${PR_AUTHOR_LOOKUP:-1}" = "1" ] || return 1
+  # One push in the command, or clearing this prompt would also clear one another push raised.
+  [ "$(printf '%s\n' "$CMD_MATCH" | sed 's/[;&|]/ & /g' \
+       | awk '{ for (i = 1; i <= NF; i++) if ($i == "push") c++ } END { print c + 0 }')" = 1 ] || return 1
+  read -r -a toks <<<"$(push_args "$CMD_STRIPPED")"
+  for tok in "${toks[@]}"; do
+    case "$tok" in
+      --force-with-lease=*:*) [ -z "$lease" ] || return 1; lease=${tok#--force-with-lease=} ;;
+      -u|--set-upstream|--force-if-includes|-q|--quiet|-v|--verbose) ;;
+      -*) return 1 ;;
+      *) pos[${#pos[@]}]="$tok" ;;
+    esac
+  done
+  [ "${#pos[@]}" -eq 2 ] && [ "${pos[0]}" = "origin" ] || return 1
+  ref=${pos[1]}
+  case "$ref" in ''|*:*|+*|main|master|HEAD|refs/*) return 1 ;; esac
+  [ "${lease%%:*}" = "$ref" ] || return 1
+  sha=${lease#*:}
+  printf '%s' "$sha" | grep -qE '^[0-9a-f]{7,40}$' || return 1
+  dir=${PUSH_DIR:-.}
+  git -C "$dir" cat-file -e "${sha}^{commit}" 2>/dev/null || return 1
+  base=$(git -C "$dir" merge-base "$sha" refs/remotes/origin/main 2>/dev/null \
+         || git -C "$dir" merge-base "$sha" refs/remotes/origin/master 2>/dev/null)
+  me=$(git -C "$dir" config user.email)
+  [ -n "$base" ] && [ -n "$me" ] || return 1
+  # The lease overwrites exactly $sha, so a commit on it past the default branch by anyone else is their work lost.
+  authors=$(git -C "$dir" log --format='%ae' "${base}..${sha}" 2>/dev/null) || return 1
+  [ -z "$(printf '%s' "$authors" | grep -v -x -F "$me")" ] || return 1
+  url=$(git -C "$dir" remote get-url origin 2>/dev/null)
+  repo=$(printf '%s' "$url" | sed -nE 's#^(https://|ssh://git@|git@)github\.com[:/]([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)/?$#\2#p')
+  repo=${repo%.git}
+  printf '%s' "$repo" | grep -qE '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$' || return 1
+  [ -r "$(dirname "$0")/../_lib/pr-author.sh" ] && command -v gh >/dev/null 2>&1 || return 1
+  # shellcheck source=/dev/null  # pr_self_login, cached; loaded only for this rare push shape
+  source "$(dirname "$0")/../_lib/pr-author.sh"
+  command -v timeout >/dev/null 2>&1 && to="timeout 8"
+  author=$($to gh pr list --repo "$repo" --head "$ref" --state open --json author \
+    --jq '[.[].author.login] | unique | if length == 1 then .[0] else empty end' 2>/dev/null)
+  self=$(pr_self_login)
+  [ -n "$author" ] && [ -n "$self" ] && [ "$author" = "$self" ]
+}
+
 # Newlines flattened: every pattern below is line-scoped, so a construct split across lines matched nothing.
 CMD_FLAT=$(printf '%s' "$CMD_STRIPPED" | tr '\n' ';')
 # The matching twin, so a loop or `cd` quoted inside an echo is prose rather than a construct.
@@ -492,7 +539,7 @@ fi
 
 # `-f`, a bundled `-uf` and a `+refspec` are force-pushes too; matching only `--force` left them unguarded.
 if echo "$CMD_MATCH" | grep -qE "${PUSH_SEG}(--force(-with-lease)?(=[^[:space:]]*)?|-[a-zA-Z]*f[a-zA-Z]*|\+[A-Za-z0-9._/:-]+)([[:space:]]|\$)"; then
-  add_soft "git push --force — rewrites remote history (also matches -f and +refspec). Confirm with the user first."
+  own_pr_lease || add_soft "git push --force — rewrites remote history (also matches -f and +refspec). Confirm with the user first. On your own open PR, \`git push origin <branch> --force-with-lease=<branch>:<sha>\` over only your own commits runs without this prompt."
 fi
 
 if echo "$CMD_MATCH" | grep -qE 'git[[:space:]]([^|;&]* )?branch +-D'; then

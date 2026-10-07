@@ -50,3 +50,7 @@ jobs:
           python3 tools/claude/examples/hook-tests/run-fixtures.py merge-grant --hooks-dir tools/claude/examples/hooks
           python3 tools/claude/examples/hook-tests/mutate-fixtures.py --hooks-dir tools/claude/examples/hooks merge-grant
           python3 tools/claude/examples/hook-tests/test-merge-grant.py
+
+      # The lease exemption reads live git and PR state, so it needs a repository and a gh stub per case.
+      - name: Check the own-PR force-push lease
+        run: python3 tools/claude/examples/hook-tests/test-force-push-lease.py

@@ -38,7 +38,7 @@ Soft blocks emit `permissionDecision: ask` JSON on stdout and exit 0. Claude Cod
 | `gh stack submit/link/unstack` | Acts on every PR in the stack, not one |
 | `gh issue <mutating verb>`, `gh api .../issues` with a method or field | Files an external artifact under your GitHub identity |
 | `gh run delete` | Permanently removes CI run history |
-| `git push --force`/`-f`/`+refspec` to a non-default branch | History rewriting (reversible via reflog) |
+| `git push --force`/`-f`/`+refspec` to a non-default branch | History rewriting (reversible via reflog); an exact lease on your own PR runs unprompted ([Own-PR lease](#own-pr-lease)) |
 | `git push --delete` / `git push origin :branch` | Deletes a remote branch, auto-closing any PR on it |
 | `git reset --hard` | Discards uncommitted changes (recoverable via reflog) |
 | `git branch -D` (single), `git checkout --`, `git restore` | Discards local changes |
@@ -105,6 +105,21 @@ Installed with [`merge-grant`](../merge-grant/), a merge becomes a permission pr
 
 A grant never lifts a hard block raised by anything else in the same command: `gh pr merge --admin` — checked on the values view, so `F=--admin; gh pr merge 17 $F` counts — or a merge chained with `git clean -f` still exits 2.
 
+## Own-PR lease
+
+A force-push to your own PR branch is routine — a rebase, a squash, an amended commit — and a prompt on every one of them trains the approver to click through. The prompt exists to protect *someone else's* commits on the remote, so one exact shape runs without it, `git push origin <branch> --force-with-lease=<branch>:<sha>`, and only when all of these hold:
+
+| Condition | Why |
+|---|---|
+| The command has one `push`, its remote is `origin`, and it names one plain branch — not `main`/`master`, `HEAD`, a `src:dst` refspec, a `refs/` path or a `+branch` | Clearing the prompt must not also clear one that a second push, or a wider refspec, raised |
+| The only force flag is `--force-with-lease=<branch>:<sha>` for that same branch, with a 7–40 hex SHA; besides it only `-u`/`--set-upstream`, `--force-if-includes`, `-q` and `-v` | `--force`, `-f`, a bare `--force-with-lease`, a lease without a SHA, and any other flag (`--mirror`, `--all`, …) keep the prompt |
+| Every commit between the default branch and `<sha>` has your `git config user.email` as its author | The lease overwrites exactly `<sha>`; a collaborator's commit under it is work the push destroys |
+| `origin` is a GitHub URL, and the branch has exactly one open PR, opened by the account `gh` is logged in as | "Your own PR" is read from GitHub, not inferred from the branch name |
+
+Every lookup fails closed. A missing commit, no `origin/main` or `origin/master`, a non-GitHub remote, a missing `gh` or `../_lib/pr-author.sh`, a timeout, no open PR, two PRs from different authors, or `PR_AUTHOR_LOOKUP=0` leaves the prompt in place. The prompt names the exempt shape, so an agent that trips it learns the form that does not need a human.
+
+The author check reads `git config user.email`, which anyone can set. It is a guard against overwriting a collaborator by accident, not against an agent that sets out to forge authorship.
+
 ## AWS coverage
 
 Two layers, because a per-service denylist always trails the API:
@@ -159,7 +174,7 @@ This hook ships twice: `tools/claude/examples/hooks/destructive-guard/` is what 
 }
 ```
 
-Requires `jq` and `perl` on PATH, plus `../_lib/hook-diag.sh`, `../_lib/strip-quoted-args.pl`, and `../_lib/split-cmd-segments.pl` installed under the same parent directory as the hook. Update the guard and helpers together. To let the agent merge, or open a PR without a second prompt, when the user asks, also register [`merge-grant`](../merge-grant/); the guard reads its store from `$CLAUDE_MERGE_GRANT_DIR` (default `~/.claude/merge-grants`).
+Requires `jq` and `perl` on PATH, plus `../_lib/hook-diag.sh`, `../_lib/strip-quoted-args.pl`, and `../_lib/split-cmd-segments.pl` installed under the same parent directory as the hook. The [own-PR lease](#own-pr-lease) also needs `../_lib/pr-author.sh` and an authenticated `gh`; without them that push asks, as every other force-push does. Update the guard and helpers together. To let the agent merge, or open a PR without a second prompt, when the user asks, also register [`merge-grant`](../merge-grant/); the guard reads its store from `$CLAUDE_MERGE_GRANT_DIR` (default `~/.claude/merge-grants`).
 
 ## Testing
 
@@ -168,6 +183,8 @@ The repo's own copy of this hook is covered by `.claude/evals/destructive-guard/
 Cases whose behaviour depends on real git state carry `setup`/`cleanup` shell snippets — branch detection cannot be exercised without a repository to detect a branch in. A failing `setup` fails the case rather than letting it pass against a fixture that was never created.
 
 The published [hook tests](../../hook-tests/) also exercise expansion syntax against Bash with inert command stubs, then check the guard verdict. Run `python3 tools/claude/examples/hook-tests/test-expansion-semantics.py` from the repository root. Its selected fixture scripts execute with a temporary-only `PATH`, controlled startup files, and temporary working directories; the corpus must still be reviewed before execution.
+
+The own-PR lease reads live state — the commits under the lease and the PR's author — so `tools/claude/examples/hook-tests/test-force-push-lease.py` builds it per case: a real repository whose `origin` is a GitHub URL and a `gh` stub on `PATH`. Every `allow` case there answers `ask` with the predicate disabled.
 
 When you add a rule, add the case *and* mutation-test it: revert the rule, confirm the new case goes red, restore, and check the file is byte-identical again. A case that stays green with the rule removed is testing nothing.
 
