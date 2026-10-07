@@ -21,11 +21,12 @@ HERE = pathlib.Path(__file__).resolve().parent
 DISPATCHER = HERE / "bash-hook-dispatcher.sh"
 CHILDREN = ("destructive-guard/destructive-guard.sh", "pr-create-guard/pr-create-guard.sh",
             "post-push-hygiene/post-push-hygiene.sh")
-# Each stub reads STUB_<NAME> for its outcome: pass, block, ask, deny, crash, garbage or context.
+# Each stub reads STUB_<NAME> for its outcome: pass, block, mute, ask, deny, crash, garbage or context.
 STUB = """#!/usr/bin/env bash
 cat >/dev/null
 case "${STUB_%s:-pass}" in
   block) echo "stub refuses" >&2; exit 2 ;;
+  mute) exit 2 ;;
   ask) printf '%%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"confirm"}}' ;;
   deny) printf '%%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"no"}}' ;;
   crash) echo "boom" >&2; exit 1 ;;
@@ -80,6 +81,25 @@ class DispatcherTest(unittest.TestCase):
                                        ("PR_CREATE_GUARD", "crash", "failing closed"),
                                        ("DESTRUCTIVE_GUARD", "garbage", "cannot honour")):
             self.assert_blocks(self.event("PreToolUse", **{"STUB_" + child: outcome}), reason)
+
+    def test_the_first_refusal_wins_and_later_children_never_run(self):
+        proc = self.event("PreToolUse", STUB_DESTRUCTIVE_GUARD="deny", STUB_PR_CREATE_GUARD="block")
+        self.assert_blocks(proc, "no")
+        self.assertNotIn("stub refuses", proc.stderr)
+
+    def test_an_exit_2_without_a_reason_gets_one(self):
+        self.assert_blocks(self.event("PreToolUse", STUB_DESTRUCTIVE_GUARD="mute"), "exited 2 without a reason")
+
+    def test_context_from_two_children_is_merged(self):
+        proc = self.event("PreToolUse", STUB_DESTRUCTIVE_GUARD="context", STUB_PR_CREATE_GUARD="context",
+                          STUB_EVENT="PreToolUse")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"], "note\n\nnote")
+
+    def test_a_post_tool_use_crash_is_reported_not_blocked(self):
+        proc = self.event("PostToolUse", STUB_POST_PUSH_HYGIENE="crash")
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertIn("exited 1", proc.stderr)
 
     def test_a_missing_child_blocks(self):
         os.remove(os.path.join(self.hooks, CHILDREN[1]))

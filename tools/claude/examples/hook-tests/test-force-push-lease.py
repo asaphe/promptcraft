@@ -187,6 +187,10 @@ class OwnPrLeaseTest(unittest.TestCase):
         self.git("clone", "-q", self.repo, theirs, cwd=self.tmp)
         self.git("remote", "set-url", "origin", "https://github.com/example/theirs.git", cwd=theirs)
         self.assert_verdict("cd %s && git -C %s push origin feature %s" % (self.repo, theirs, self.lease()), "ask")
+        # `git clone` does not copy user.email, and without it the lease asks before any lookup runs.
+        self.git("config", "user.email", ME, cwd=theirs)
+        self.assert_verdict("git -C %s push origin feature %s" % (theirs, self.lease()), "ask")
+        self.assert_verdict("git -C %s push origin feature %s" % (theirs, self.lease()), "allow", GH_REPO="example/theirs")
         self.assert_verdict("git -c remote.origin.pushurl=https://github.com/example/theirs.git push origin feature "
                             + self.lease(), "ask")
         self.git("config", "remote.origin.pushurl", "https://github.com/example/theirs.git")

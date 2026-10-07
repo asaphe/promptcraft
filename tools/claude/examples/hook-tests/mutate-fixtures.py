@@ -71,6 +71,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("hooks", nargs="*")
     ap.add_argument("--hooks-dir", default=str(HERE.parent))
+    # A per-case TIMEOUT fails the suite too, so on a loaded host it would score every mutation as caught.
+    ap.add_argument("--timeout", help="per-case timeout passed to run-fixtures.py")
     args = ap.parse_args()
 
     manifest = {k: v for k, v in json.loads(MANIFEST.read_text()).items()
@@ -100,10 +102,10 @@ def main():
             target.write_text(broken)
             # A shared library has no suite of its own; run one that consumes it.
             suite = mutation.get("suite", hook)
-            proc = subprocess.run(
-                [sys.executable, str(HERE / "run-fixtures.py"), suite, "--hooks-dir", str(tree)],
-                capture_output=True, text=True,
-            )
+            cmd = [sys.executable, str(HERE / "run-fixtures.py"), suite, "--hooks-dir", str(tree)]
+            if args.timeout:
+                cmd += ["--timeout", args.timeout]
+            proc = subprocess.run(cmd, capture_output=True, text=True)
             target.write_text(pristine)
             caught = proc.returncode != 0
             tally = next((ln for ln in proc.stdout.splitlines() if "passed" in ln), "?")

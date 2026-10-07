@@ -30,6 +30,8 @@ python3 probe-hooks.py --selftest
 
 # Break each hook on purpose; every mutation must be caught
 python3 mutate-fixtures.py --hooks-dir ../hooks
+# On a loaded machine raise the per-case timeout: a timed-out case fails the suite, which would count as a catch
+python3 mutate-fixtures.py --hooks-dir ../hooks --timeout 60 destructive-guard
 
 # Compare selected expansion fixtures with Bash using inert command stubs
 python3 test-expansion-semantics.py

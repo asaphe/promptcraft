@@ -59,10 +59,10 @@
       }
     },
     {
-      "why": "open right before PR reads as the verb again, so \"list my open PRs\" arms the pr grant",
+      "why": "open mid-clause reads as the verb again, so \"list the open draft PRs\" arms the pr grant",
       "replace": {
-        "from": "($0 == \"pr\" || $0 == \"prs\") && !adj {",
-        "to": "($0 == \"pr\" || $0 == \"prs\") {"
+        "from": "if (!($0 in det)) pr_verb = 0; ",
+        "to": ""
       }
     },
     {
@@ -77,6 +77,83 @@
       "replace": {
         "from": "   || printf '%s' \"$OWN\" | grep -qE '</?(task-notification|agent-message)'; then",
         "to": "   ; then"
+      }
+    }
+  ],
+  "destructive-guard": [
+    {
+      "why": "an empty directory reads as the current one again, so `cd \"$(…)\" && git push` reads the session's branch",
+      "replace": {
+        "from": "    ''|-|*QUOTED_ARG*",
+        "to": "    -|*QUOTED_ARG*"
+      }
+    },
+    {
+      "why": "an escaped space resolves to a missing directory again, so `cd main\\ wt && git push` reads the session's branch",
+      "replace": {
+        "from": "*'`'*|*'\\'*) printf '?' ;;",
+        "to": "*'`'*) printf '?' ;;"
+      }
+    },
+    {
+      "why": "a cd behind if/then/do/builtin/command/time stops moving the directory",
+      "delete_matching": "^        'if '\\*\\|'then '\\*"
+    },
+    {
+      "why": "a case pattern's `)` closes a subshell again, so a later bare push reads the parent directory",
+      "replace": {
+        "from": "[ \"$in_case\" -gt 0 ] && [ -z \"$arm\" ] && [[",
+        "to": "false && [["
+      }
+    },
+    {
+      "why": "every `)` closes a subshell again, so `$((1+1))` pops the directory a cd set",
+      "replace": {
+        "from": "pops=$((${#closes} - ${#opens}))",
+        "to": "pops=${#closes}"
+      }
+    },
+    {
+      "why": "pushd stops moving the directory, so `pushd <main> && git push` reads the session's branch",
+      "replace": {
+        "from": "cd\\ *|pushd\\ *)",
+        "to": "cd\\ *)"
+      }
+    },
+    {
+      "why": "--git-dir and GIT_DIR= stop making the repository unresolvable, so a bare push through them reads the session's branch",
+      "delete_matching": "\\*' --git-dir'\\*\\|"
+    },
+    {
+      "why": "--recurse-submodules stops consuming its value, so `git push --recurse-submodules check origin` reads `check` as the remote",
+      "replace": {
+        "from": "|--exec|--recurse-submodules) skip=1",
+        "to": "|--exec) skip=1"
+      }
+    },
+    {
+      "why": "a tags-only push defaults to HEAD again, so `git push origin --tags` from main hard-blocks",
+      "replace": {
+        "from": " || [ -n \"$tags\" ] ||",
+        "to": " ||"
+      }
+    },
+    {
+      "why": "an unreadable destination stops standing for the checked-out branch, so `git push origin $(git branch --show-current)` from main passes",
+      "delete_matching": "case \"\\$dst\" in \\*SUBSTITUTION\\*"
+    },
+    {
+      "why": "a separator glued to a force or delete flag hides it again, so `git push origin x -f;echo` skips the prompt",
+      "replace": {
+        "from": "PUSH_VIEW=$(strip_redirs \"$CMD_MATCH\" | sed 's/[;&|]/ & /g')",
+        "to": "PUSH_VIEW=$(strip_redirs \"$CMD_MATCH\")"
+      }
+    },
+    {
+      "why": "a colon refspec after the first counts as no delete, so `git push origin x :other` skips the prompt",
+      "replace": {
+        "from": "grep -qE \"${PUSH_SEG}\\\\+?:\"",
+        "to": "grep -qE 'git[[:space:]]([^|;&]* )?push +[^ |;&]+ +:'"
       }
     }
   ],
@@ -139,14 +216,30 @@
   ],
   "_lib/split-cmd-segments.pl": [
     {
-      "why": "a completed dollar-parenthesis substitution is discarded, hiding a nested destructive command",
+      "why": "a completed substitution is discarded, hiding a nested destructive command",
       "suite": "destructive-guard",
-      "delete_matching": "collect_segments\\(substr\\(\\$text, \\$i \\+ 2"
+      "delete_matching": "collect_segments\\(substr\\(\\$text, \\$start"
     },
     {
       "why": "a substitution scope opener is omitted, so checkout directory state cannot be restored safely",
       "suite": "destructive-guard",
       "delete_matching": "emit_scope\\(\\$out, 'E'\\)"
+    },
+    {
+      "why": "a substitution cuts its enclosing segment again, so `git -C \"$(…)\" push` reaches no push check",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "$segment .= substitution(",
+        "to": "emit_segment($out, $segment); $segment = substitution("
+      }
+    },
+    {
+      "why": "process substitution stops being a substitution, so `diff <(git push origin main) x` passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "($char eq '<' || $char eq '>')",
+        "to": "($char eq \"\\0\")"
+      }
     }
   ],
   "_lib/strip-quoted-args.pl": [
