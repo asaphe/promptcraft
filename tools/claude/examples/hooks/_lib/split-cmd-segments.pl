@@ -27,6 +27,16 @@ sub emit_segment {
 
 sub emit_scope { push @{$_[0]}, [$_[1]]; }
 
+# see: README.md § split-cmd-segments.pl — the enclosing segment stays open, so `git -C "$(…)" push` reaches the push check whole
+sub substitution {
+    my ($text, $start, $end, $out, $scoped, $quote) = @_;
+    emit_scope($out, 'E') if $scoped;
+    collect_segments(substr($text, $start, $end - $start), $out, $scoped);
+    return ' SUBSTITUTION ' unless $scoped;
+    emit_scope($out, 'X');
+    return $quote eq '"' ? 'SUBSTITUTION' : ' SUBSTITUTION ';
+}
+
 sub collect_segments {
     my ($text, $out, $scoped) = @_;
     my ($segment, $quote, $i) = ('', '', 0);
@@ -66,14 +76,16 @@ sub collect_segments {
             }
             my $end = command_substitution_end($text, $i + 1);
             if (defined $end) {
-                if ($scoped) {
-                    emit_segment($out, $segment);
-                    $segment = '';
-                    emit_scope($out, 'E');
-                }
-                collect_segments(substr($text, $i + 2, $end - $i - 2), $out, $scoped);
-                emit_scope($out, 'X') if $scoped;
-                $segment .= ' SUBSTITUTION ';
+                $segment .= substitution($text, $i + 2, $end, $out, $scoped, $quote);
+                $i = $end + 1;
+                next;
+            }
+        }
+        # Process substitution runs its command too; `cat <(…)` was hard only because a trailing `)` was trimmed.
+        if (!$quote && ($char eq '<' || $char eq '>') && $i + 1 < $length && substr($text, $i + 1, 1) eq '(') {
+            my $end = command_substitution_end($text, $i + 1);
+            if (defined $end) {
+                $segment .= substitution($text, $i + 2, $end, $out, $scoped, $quote);
                 $i = $end + 1;
                 next;
             }
@@ -81,14 +93,7 @@ sub collect_segments {
         if ($char eq '`') {
             my $end = backtick_end($text, $i);
             if (defined $end) {
-                if ($scoped) {
-                    emit_segment($out, $segment);
-                    $segment = '';
-                    emit_scope($out, 'E');
-                }
-                collect_segments(substr($text, $i + 1, $end - $i - 1), $out, $scoped);
-                emit_scope($out, 'X') if $scoped;
-                $segment .= ' SUBSTITUTION ';
+                $segment .= substitution($text, $i + 1, $end, $out, $scoped, $quote);
                 $i = $end + 1;
                 next;
             }

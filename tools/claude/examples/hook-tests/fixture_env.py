@@ -111,10 +111,12 @@ def _grant_dir(tmp):
 
 def destructive_guard(tmp):
     feature = _init(os.path.join(tmp, "push-feature"), branch="feature")
+    spaced = _init(os.path.join(tmp, "push main wt"))
     return {"cwd": feature, "env": _grant_dir(tmp), "tokens": {
         "push_feature": feature,
         "push_main": _init(os.path.join(tmp, "push-main")),
         "push_master": _init(os.path.join(tmp, "push-master"), branch="master"),
+        "push_main_esc": spaced.replace(" ", "\\ "),
     }}
 
 

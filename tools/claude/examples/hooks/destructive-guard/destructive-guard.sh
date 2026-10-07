@@ -84,7 +84,7 @@ join_dir() { # base, path
   local p
   p=$(expand_path "$(unquote "$2")")
   case "$p" in
-    -|*QUOTED_ARG*|*SUBSTITUTION*|*'$'*|*'`'*) printf '?' ;;
+    ''|-|*QUOTED_ARG*|*SUBSTITUTION*|*'$'*|*'`'*|*'\'*) printf '?' ;;
     /*) printf '%s' "$p" ;;
     *) case "$1" in '?') printf '?' ;; '') printf '%s' "$p" ;; *) printf '%s/%s' "$1" "$p" ;; esac ;;
   esac
@@ -93,8 +93,9 @@ join_dir() { # base, path
 # see: tools/claude/examples/hooks/destructive-guard/README.md § Parser hardening — the directory each segment runs in
 _SEG_DIRS=()
 _SEG_TEXT=()
+CASE_ARM_RE='^[(]?[^[:space:]()]+[)]'
 resolve_segment_dirs() {
-  local i seg cwd="" stack=() pops
+  local i seg cwd="" stack=() pops opens closes in_case=0 arm
   _SEG_DIRS=()
   _SEG_TEXT=()
   for ((i = 0; i < ${#_SCOPED_TYPES[@]}; i++)); do
@@ -105,17 +106,29 @@ resolve_segment_dirs() {
       X) cwd="${stack[${#stack[@]}-1]}"; unset 'stack[${#stack[@]}-1]'; continue ;;
     esac
     seg="${_SCOPED_VALUES[$i]}"
+    # A reserved word, a builtin prefix or a case pattern leaves the command after it in charge: `if cd <dir>` still moves.
+    arm=""
     while :; do
+      if [ "$in_case" -gt 0 ] && [ -z "$arm" ] && [[ $seg =~ $CASE_ARM_RE ]]; then
+        arm=1; seg="${seg#*')'}"; continue
+      fi
       case "$seg" in
         '('*) stack[${#stack[@]}]="$cwd"; seg="${seg#?}" ;;
         ' '*|'{'*) seg="${seg#?}" ;;
+        'case '*' in'|'case '*' in '*) in_case=$((in_case + 1)); arm=""; seg="${seg#* in}" ;;
+        'if '*|'then '*|'else '*|'elif '*|'do '*|'while '*|'until '*|'! '*|'time '*|'builtin '*|'command '*) seg="${seg#* }" ;;
         *) break ;;
       esac
     done
-    pops=0
+    case "$seg" in 'esac'|'esac '*|'esac)'*|'esac}'*) [ "$in_case" -eq 0 ] || in_case=$((in_case - 1)) ;; esac
+    # Only an unbalanced `)` closes a subshell; the pair in `$((1+1))` closes nothing.
+    opens=${seg//[!(]/}
+    closes=${seg//[!)]/}
+    pops=$((${#closes} - ${#opens}))
+    [ "$pops" -gt 0 ] || pops=0
+    for ((arm = 0; arm < pops; arm++)); do seg="${seg%')'*}${seg##*')'}"; done
     while :; do
       case "$seg" in
-        *')') pops=$((pops + 1)); seg="${seg%?}" ;;
         *' '|*'}') seg="${seg%?}" ;;
         *) break ;;
       esac
@@ -124,7 +137,8 @@ resolve_segment_dirs() {
     _SEG_TEXT[i]="$seg"
     case "$seg" in
       cd) cwd="$HOME" ;;
-      cd\ *) cwd=$(join_dir "$cwd" "$(printf '%s' "$seg" | awk '{ i = 2; if ($i == "--" || $i == "-P" || $i == "-L") i++; print $i }')") ;;
+      pushd|popd|popd\ *|pushd\ [+-][0-9]*) cwd='?' ;;
+      cd\ *|pushd\ *) cwd=$(join_dir "$cwd" "$(printf '%s' "$seg" | awk '{ i = 2; if ($i == "--" || $i == "-P" || $i == "-L") i++; print $i }')") ;;
     esac
     while [ "$pops" -gt 0 ] && [ "${#stack[@]}" -gt 0 ]; do
       cwd="${stack[${#stack[@]}-1]}"
@@ -137,6 +151,8 @@ resolve_segment_dirs() {
 # The directory a git segment acts on: each `-C` before the verb resolves against the one before it.
 segment_git_dir() { # segment, directory it runs in, verb pattern
   local dir=$2 c
+  # --git-dir, --work-tree and GIT_DIR= move the repository without a -C, so the text cannot name its branch.
+  case " $1" in *' --git-dir'*|*' --work-tree'*|*' GIT_DIR='*|*' GIT_WORK_TREE='*) printf '?'; return ;; esac
   while IFS= read -r c; do
     [ -n "$c" ] && dir=$(join_dir "$dir" "$c")
   done <<EOF
@@ -148,16 +164,17 @@ EOF
 
 # Prints why a push segment lands on main or master and succeeds; quiet and false for any other push.
 push_hits_main() { # segment, directory it acts on
-  local toks tok skip="" remote="" force="" refs=() ref dst branch
+  local toks tok skip="" remote="" force="" tags="" refs=() ref dst branch
   read -r -a toks <<<"$(push_args "$1")"
   for tok in "${toks[@]}"; do
     [ -z "$skip" ] || { skip=""; continue; }
     tok=$(unquote "$tok")
     case "$tok" in
-      -o|--push-option|--repo|--receive-pack|--exec) skip=1 ;;
+      -o|--push-option|--repo|--receive-pack|--exec|--recurse-submodules) skip=1 ;;
       --all|--mirror|--branches)
         printf '%s' "git push $tok — pushes every local branch, main included. Push the branch you mean by name."
         return 0 ;;
+      --tags) tags=1 ;;
       --force|--force=*|--force-with-lease|--force-with-lease=*) force=1 ;;
       --*) ;;
       -*f*) force=1 ;;
@@ -165,13 +182,16 @@ push_hits_main() { # segment, directory it acts on
       *) if [ -z "$remote" ]; then remote=$tok; else refs[${#refs[@]}]="$tok"; fi ;;
     esac
   done
-  [ "${#refs[@]}" -gt 0 ] || refs=(HEAD)
+  # `--tags` alone pushes tags only, so no branch is defaulted in.
+  [ "${#refs[@]}" -gt 0 ] || [ -n "$tags" ] || refs=(HEAD)
   for ref in "${refs[@]}"; do
     case "$ref" in +*) force=1; ref=${ref#+} ;; esac
     dst=${ref##*:}
+    # see: tools/claude/examples/hooks/destructive-guard/README.md § Parser hardening — an unreadable destination is the checked-out branch
+    case "$dst" in *SUBSTITUTION*|*QUOTED_ARG*|*'$'*|*'`'*) dst=HEAD ;; esac
     if [ "$dst" = HEAD ] || [ "$dst" = @ ]; then
       if [ "$2" = "?" ]; then
-        printf '%s' "git push with no branch named, from a directory this guard cannot resolve (a variable, a quoted path with spaces) — name it: git push origin <branch>."
+        printf '%s' "git push with no branch named, from a directory this guard cannot resolve (a variable, a substitution, a quoted or escaped path, --git-dir) — name it: git push origin <branch>."
         return 0
       fi
       # A failed cd does not stop a `;`-chained push — it runs in the session cwd, so an unusable directory falls back there.
@@ -356,7 +376,7 @@ ALSO: $1"
 # pushes are both checked: force-push to main/master hard-blocks with its own
 # message; force-push to other refs falls through to the soft tier below.
 # Pattern allows flags between `git` and `push` (e.g., `git -C dir push`).
-PUSH_VIEW=$(strip_redirs "$CMD_MATCH")
+PUSH_VIEW=$(strip_redirs "$CMD_MATCH" | sed 's/[;&|]/ & /g')
 if echo "$PUSH_VIEW" | grep -qE 'git[[:space:]]([^|;&]* )?push([[:space:];&|)]|$)'; then
   if ! load_scoped_segments; then
     HARD_REASON="destructive-guard: scoped command parser failed while checking a push."
@@ -597,14 +617,14 @@ fi
 PUSH_SEG='git[[:space:]]([^|;&]* )?push[^|;&]*[[:space:]]'
 
 # Both spellings of one act: matching only the colon refspec left `push --delete origin br` unguarded.
-if echo "$PUSH_VIEW" | grep -qE 'git[[:space:]]([^|;&]* )?push +[^ |;&]+ +:' \
+if echo "$PUSH_VIEW" | grep -qE "${PUSH_SEG}\\+?:" \
    || echo "$PUSH_VIEW" | grep -qE "${PUSH_SEG}(--delete|-d)([[:space:])]|\$)"; then
   add_soft "git push origin :branch — deletes a remote branch, which auto-closes any PR using it. Covers both spellings: the colon refspec and --delete/-d."
 fi
 
 # `-f`, a bundled `-uf` and a `+refspec` are force-pushes too; matching only `--force` left them unguarded.
 if echo "$PUSH_VIEW" | grep -qE "${PUSH_SEG}(--force(-with-lease)?(=[^[:space:]]*)?|-[a-zA-Z]*f[a-zA-Z]*|\+[A-Za-z0-9._/:*-]+)([[:space:])]|\$)"; then
-  own_pr_lease || add_soft "git push --force — rewrites remote history (also matches -f and +refspec). Confirm with the user first. On your own open PR, \`git push origin <branch> --force-with-lease=<branch>:<sha>\` over only your own commits runs without this prompt."
+  own_pr_lease || add_soft "git push --force — rewrites remote history (also matches -f and +refspec). Confirm with the user first. On your own open PR, \`git push origin <branch> --force-with-lease=<branch>:<sha>\` over only your own commits runs without this prompt when it is the whole command: use \`git -C <dir> push …\`, not \`cd <dir> && git push …\`."
 fi
 
 if echo "$CMD_MATCH" | grep -qE 'git[[:space:]]([^|;&]* )?branch +-D'; then
