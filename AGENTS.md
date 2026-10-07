@@ -6,11 +6,11 @@ For content to *adopt* into your own projects, see `README.md` and the `shared/`
 
 ## Project Overview
 
-- **Purpose**: share production-tested patterns for working with Claude Code, Cursor, and ChatGPT.
+- **Purpose**: share production-tested patterns for working with Claude Code, Codex, Cursor, and ChatGPT.
 - **Audience**: engineers setting up their own AI assistant configurations. Readers copy, adapt, and remix — they do not install promptcraft as a dependency.
 - **Layout**:
   - `shared/` — tool-agnostic content (principles, language rules, infrastructure, workflows, quality standards).
-  - `tools/<tool>/` — tool-specific adaptations (Claude Code, Cursor, ChatGPT).
+  - `tools/<tool>/` — tool-specific adaptations (Claude Code, Codex, Cursor, ChatGPT).
   - `.claude/` — contributor config for working on this repo with Claude Code (not example content).
   - `.github/` — CI, issue/PR templates.
   - `docs/index.html` — a prepared GitHub Pages landing page (branding, hero). Pages is **not** enabled on this repo, so nothing is served from it. **Do not edit or repurpose without a Pages plan.**

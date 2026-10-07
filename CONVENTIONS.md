@@ -14,6 +14,7 @@ Structural and stylistic rules for content in this repo. If you're editing anyth
 │   └── quality/             # Code / docs / research quality
 ├── tools/<tool>/            # Tool-specific adaptations and extras
 │   ├── claude/
+│   ├── codex/
 │   ├── cursor/
 │   └── chatgpt/
 ├── .claude/                 # Contributor config (editing THIS repo)

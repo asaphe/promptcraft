@@ -1,6 +1,6 @@
 # promptcraft
 
-> Rules, agents, skills, and configs for AI coding assistants — Claude Code, Cursor, ChatGPT. Tool-agnostic universal content under `shared/`, tool-specific adaptations under `tools/`.
+> Rules, agents, skills, and configs for AI coding assistants — Claude Code, Codex, Cursor, ChatGPT. Tool-agnostic universal content under `shared/`, tool-specific adaptations under `tools/`.
 
 A reference library meant for humans and AI assistants to browse, copy, and adapt. Not a package or runtime — nothing is installed.
 
@@ -30,6 +30,12 @@ Tool-agnostic — applies to any AI coding assistant.
 - [tools/claude/examples/](tools/claude/examples/): complete reference `.claude/` directory — hooks, agents, rules, skills, evals, config, docs. [RETIRED.md](tools/claude/examples/RETIRED.md) maps examples that moved into maintained plugins.
 - [tools/claude/scaffolding/](tools/claude/scaffolding/): ready-to-copy `.claude/` skeleton for a new repo.
 - [tools/claude/specs/](tools/claude/specs/): RFC-style specifications (CI/CD standard).
+
+## Codex (tools/codex/)
+
+- [tools/codex/claude-code-translation.md](tools/codex/claude-code-translation.md): where each Claude Code piece lives in Codex — instruction files, skills, subagents, permissions, MCP, plugins — and which `config.toml` fields need absolute paths.
+- [tools/codex/shared-hooks.md](tools/codex/shared-hooks.md): running Claude Code hooks under Codex, and the `PreToolUse` outcomes Codex lets through.
+- [tools/codex/bash-hook-dispatcher.sh](tools/codex/bash-hook-dispatcher.sh): one registered Codex hook that runs Claude Code Bash hooks in order and fails closed.
 
 ## Cursor (tools/cursor/)
 

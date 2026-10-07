@@ -1,6 +1,6 @@
 # promptcraft
 
-Rules, agents, skills, and configs for AI coding assistants — Claude Code, Cursor, ChatGPT.
+Rules, agents, skills, and configs for AI coding assistants — Claude Code, Codex, Cursor, ChatGPT.
 
 Distilled from real production use. Copy what fits, ignore what doesn't, adapt to your stack.
 
@@ -9,10 +9,11 @@ Distilled from real production use. Copy what fits, ignore what doesn't, adapt t
 Pick your assistant:
 
 - **Claude Code** → [`tools/claude/`](tools/claude/) — CLAUDE.md patterns, hooks, agents, skills, full example config.
+- **Codex** → [`tools/codex/`](tools/codex/) — running a Claude Code setup under Codex: the config map, the fields that need absolute paths, and a dispatcher that keeps ported guard hooks blocking.
 - **Cursor** → [`tools/cursor/`](tools/cursor/) — `.cursor/rules/*.mdc` project rules, user-rules UI copy-paste, MCP configuration.
 - **ChatGPT** → [`tools/chatgpt/`](tools/chatgpt/) — Custom Instructions (global) and Project Instructions (scoped).
 
-The universal content — principles, language standards, infra patterns, CI/CD, quality — lives in [`shared/`](shared/) and is referenced by all three tool directories.
+The universal content — principles, language standards, infra patterns, CI/CD, quality — lives in [`shared/`](shared/) and is referenced by the tool directories.
 
 ## Who this is for
 
@@ -44,6 +45,7 @@ The strongest ideas in this repo are concentrated in a handful of files. If you 
 │   └── quality/          # Code, docs, research standards
 ├── tools/
 │   ├── claude/           # Claude Code — guides, templates, examples, scaffolding, specs
+│   ├── codex/            # Codex — Claude Code translation, shared hooks, dispatcher
 │   ├── cursor/           # Cursor — user rules, project rules (.mdc), MCP, recovery
 │   └── chatgpt/          # ChatGPT — global Custom Instructions, Project Instructions
 ├── AGENTS.md             # Per-repo instructions for AI agents editing this repo
@@ -64,6 +66,7 @@ See [`ADOPTION.md`](ADOPTION.md) for step-by-step per-tool setup.
 TL;DR:
 
 - **Claude Code:** drop files from `tools/claude/examples/` into your own `.claude/` directory and edit to taste.
+- **Codex:** map your `.claude/` setup with `tools/codex/claude-code-translation.md`; run your Claude Code Bash hooks through `tools/codex/bash-hook-dispatcher.sh`.
 - **Cursor:** copy `tools/cursor/rules/user/*.md` into Settings → Rules → User Rules; drop `tools/cursor/rules/mdc/*.mdc` into your repo's `.cursor/rules/`.
 - **ChatGPT:** paste `tools/chatgpt/global/*.md` into Settings → Custom Instructions; paste `tools/chatgpt/projects/*.md` into a Project's instructions.
 

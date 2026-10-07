@@ -1,6 +1,6 @@
 # ADOPTION.md
 
-How to start using promptcraft content in your own AI assistant setup. Three tools, three starting paths.
+How to start using promptcraft content in your own AI assistant setup. Each tool has its own starting path.
 
 Nothing here is installed — you copy, paste, edit, commit. The repo is source material, not a dependency.
 
@@ -176,6 +176,13 @@ Inside a ChatGPT Project, set Instructions by pasting one of:
 - `tools/chatgpt/projects/mixed-project.md`
 
 These layer on top of your global Custom Instructions.
+
+## Codex
+
+Codex reads its own config, so this content does not copy across unchanged. Start from your Claude Code setup:
+
+1. Map each piece with [`tools/codex/claude-code-translation.md`](tools/codex/claude-code-translation.md). Instruction files, skills and subagents move. `.claude/rules/` has no Codex equivalent, and several `config.toml` fields need absolute paths.
+2. Run your Claude Code Bash hooks under Codex through [`tools/codex/bash-hook-dispatcher.sh`](tools/codex/bash-hook-dispatcher.sh). Registered directly, a guard that asks for confirmation lets the command through. [`tools/codex/shared-hooks.md`](tools/codex/shared-hooks.md) explains why.
 
 ## Universal content (any assistant)
 
