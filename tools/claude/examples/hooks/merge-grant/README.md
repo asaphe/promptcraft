@@ -34,7 +34,7 @@ The two-hour expiry is a backstop, not the lifetime. The lifetime is "until the 
 
 **`merge`:** the word `merge` — not `merged`, `merging` or `mergeable` — used at least once outside the reach of a negation.
 
-**`pr`:** `open`, `create` or `raise` outside the reach of a negation, followed within the next four words by `PR`, `PRs` or `pull request(s)` — `pull` alone is not a PR (`pull main`, `a pull-down menu`). `open` directly before `PR`/`PRs` is the verb only when it starts its clause (`open PRs for both branches`); anywhere else it is the adjective (`list my open PRs`, `close the stale open PRs`).
+**`pr`:** `open`, `create` or `raise` outside the reach of a negation, followed within the next four words by `PR`, `PRs` or `pull request(s)` — `pull` alone is not a PR (`pull main`, `a pull-down menu`). `open` that starts its clause is the verb (`open PRs for both branches`); anywhere else it is the verb only when a determiner follows it — `a`, `an`, `the`, `this`, `that`, `these`, `those`, `my`, `our`, `your`, `its`, `their`, `one`, `two`, `both`, `new`, `another`, `separate` (`please open a PR`, `then open the two PRs`). Otherwise it is the adjective (`list my open PRs`, `list the open draft PRs`, `how many open dependabot PRs are there?`).
 
 Negation is the same for both. `not`, `never`, `without`, `cannot`, any `…n't` word (`don't`, `can't`, `won't`, `shouldn't`, …) and the apostrophe-less `dont`, `cant`, `wont`, `shouldnt`, `couldnt` and `wouldnt` negate every later word in their clause. A clause ends at `. ; ! ?`, a line break, or `but`. A `,`, `:` or parenthesis is an aside inside the clause, so `Do not, under any circumstances, merge 17` stays negated. `no` negates only the word right after it, because it is usually a determiner (`there are no blockers so merge 17`, `no, merge it`). Hyphens, asterisks and quotes separate words without ending a clause, and a typographic or backtick apostrophe counts (`don’t merge`, ``don`t merge``).
 
@@ -51,6 +51,7 @@ Negation is the same for both. `not`, `never`, `without`, `cannot`, any `…n't`
 | `don't open a PR yet` | none |
 | `Don't (yet) open a PR` | none — the parenthesis does not end the negation |
 | `how many open PRs do we have?` | none — `open` is the adjective |
+| `list the open draft PRs` | none — no determiner after a mid-clause `open` |
 | `the PR is open, what's its CI state?` | none — no verb before the PR |
 
 The predicate is lexical, so it errs in both directions, and the errors cost different things. **Over-arming** — `should I merge this?` arms `merge`, `open questions on the PR` arms `pr` — costs one permission prompt the user can refuse for a merge. For a PR it costs more: a PR opened that nobody asked for, with no prompt. [`pr-create-guard`](../pr-create-guard/) still checks its prerequisites, not whether the user wanted it, so the PR side of the predicate leans toward under-arming. **Under-arming** — `it's not flaky so merge it` stays negated, and so does `don't wait, merge 17` — costs a re-phrase. It cannot tell *which* PRs were named: confirming an ambiguous list ("the ones above", a range) before the first merge is the agent's job, which the armed-grant context says in so many words.

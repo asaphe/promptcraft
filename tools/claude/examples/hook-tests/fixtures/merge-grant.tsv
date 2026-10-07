@@ -72,6 +72,18 @@ allow	open the file and tell me what the function does before we talk about the 
 allow	list my open PRs
 allow	how many open PRs do we have?
 allow	close the stale open PRs
+allow	list the open draft PRs
+allow	close the open stale PRs
+allow	how many open dependabot PRs are there?
+allow	review the open/draft PRs
+allow	summarize my open draft pull requests
+allow	any open renovate PRs I should look at?
+allow	show the open, stale PRs
+allow	which of the open (draft) PRs are mine?
+ctx	go ahead and open the PR
+ctx	then open a new PR for the fix
+ctx	open a draft PR
+ctx	ok, open the two PRs
 allow	open the terminal and pull main
 allow	create a pull-down menu in the settings page
 
