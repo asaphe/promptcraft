@@ -13,18 +13,19 @@ command -v jq >/dev/null 2>&1 || { echo "bash-hook-dispatcher: jq not on PATH, f
 PRE_HOOKS=(destructive-guard/destructive-guard.sh pr-create-guard/pr-create-guard.sh)
 POST_HOOKS=(post-push-hygiene/post-push-hygiene.sh)
 
-EVENT=$(printf '%s' "$INPUT" | jq -r '.hook_event_name // empty' 2>/dev/null)
-case "$EVENT" in
-  PreToolUse) HOOKS=("${PRE_HOOKS[@]}"); ALLOWED='["hookEventName","additionalContext","permissionDecision","permissionDecisionReason"]' ;;
-  PostToolUse) HOOKS=("${POST_HOOKS[@]}"); ALLOWED='["hookEventName","additionalContext"]' ;;
-  *) echo "bash-hook-dispatcher: unsupported event '${EVENT:-<empty>}'" >&2; exit 1 ;;
-esac
-
 # Codex blocks only on exit 2 WITH a stderr reason, or an explicit deny; every other outcome runs the tool.
 block() {
   echo "bash-hook-dispatcher: $1" >&2
   exit 2
 }
+
+# An event it cannot read may be a PreToolUse it cannot see, so it blocks rather than exit 1 and run the tool.
+EVENT=$(printf '%s' "$INPUT" | jq -r '.hook_event_name // empty' 2>/dev/null)
+case "$EVENT" in
+  PreToolUse) HOOKS=("${PRE_HOOKS[@]}"); ALLOWED='["hookEventName","additionalContext","permissionDecision","permissionDecisionReason"]' ;;
+  PostToolUse) HOOKS=("${POST_HOOKS[@]}"); ALLOWED='["hookEventName","additionalContext"]' ;;
+  *) block "unsupported event '${EVENT:-<empty>}', failing closed" ;;
+esac
 
 CONTEXT=""
 for HOOK in "${HOOKS[@]}"; do

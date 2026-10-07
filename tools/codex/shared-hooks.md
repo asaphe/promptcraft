@@ -98,6 +98,9 @@ Verified behaviour of the script as published, with stub children and with this 
 | crash under `PostToolUse` | exit 1, reported |
 | missing child script | exit 2 |
 | no `jq` on `PATH` (the event cannot be read) | exit 2, "failing closed" |
+| no `hook_event_name`, an unknown one (`pre_tool_use`), malformed or empty JSON | exit 2, "unsupported event … failing closed": an event it cannot read may be a `PreToolUse` |
+
+`python3 tools/codex/test-bash-hook-dispatcher.py` re-runs these outcomes with stub children; CI runs it on every pull request.
 | real `destructive-guard`: `git status` / push to `main` / `gh pr create` | exit 0 / exit 2 (hard block) / exit 2 (its ask, blocked) |
 
 ## Hooks that cannot be shared

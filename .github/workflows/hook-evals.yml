@@ -54,3 +54,7 @@ jobs:
       # The lease exemption reads live git and PR state, so it needs a repository and a gh stub per case.
       - name: Check the own-PR force-push lease
         run: python3 tools/claude/examples/hook-tests/test-force-push-lease.py
+
+      # Codex runs the tool on any exit but 2-with-a-reason, so each way the dispatcher can fail must still block.
+      - name: Check the Codex hook dispatcher fails closed
+        run: python3 tools/codex/test-bash-hook-dispatcher.py
