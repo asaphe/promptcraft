@@ -97,6 +97,7 @@ Verified behaviour of the script as published, with stub children and with this 
 | exit 2 with empty stderr | exit 2 with a generated reason |
 | crash under `PostToolUse` | exit 1, reported |
 | missing child script | exit 2 |
+| no `jq` on `PATH` (the event cannot be read) | exit 2, "failing closed" |
 | real `destructive-guard`: `git status` / push to `main` / `gh pr create` | exit 0 / exit 2 (hard block) / exit 2 (its ask, blocked) |
 
 ## Hooks that cannot be shared

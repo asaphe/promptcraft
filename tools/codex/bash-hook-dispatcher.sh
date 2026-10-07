@@ -6,6 +6,9 @@ set -u
 HOOKS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 INPUT=$(cat)
 
+# Without jq the event is unreadable, and any exit but 2-with-a-reason lets Codex run the command.
+command -v jq >/dev/null 2>&1 || { echo "bash-hook-dispatcher: jq not on PATH, failing closed" >&2; exit 2; }
+
 # Order is run order, and the first block wins.
 PRE_HOOKS=(destructive-guard/destructive-guard.sh pr-create-guard/pr-create-guard.sh)
 POST_HOOKS=(post-push-hygiene/post-push-hygiene.sh)
