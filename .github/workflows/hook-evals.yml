@@ -62,17 +62,23 @@ jobs:
   # Every mutation reruns a whole suite, so they get their own sharded job instead of the evals budget.
   mutations:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         include:
-          - suite: destructive-guard 1/3
-            args: --shard 1/3 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 2/3
-            args: --shard 2/3 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 3/3
-            args: --shard 3/3 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 1/6
+            args: --shard 1/6 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 2/6
+            args: --shard 2/6 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 3/6
+            args: --shard 3/6 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 4/6
+            args: --shard 4/6 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 5/6
+            args: --shard 5/6 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 6/6
+            args: --shard 6/6 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
           - suite: merge-grant and strip-cmd
             args: merge-grant _lib/strip-cmd
     name: mutations (${{ matrix.suite }})
