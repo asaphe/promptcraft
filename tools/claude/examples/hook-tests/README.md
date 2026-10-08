@@ -30,8 +30,12 @@ python3 probe-hooks.py --selftest
 
 # Break each hook on purpose; every mutation must be caught
 python3 mutate-fixtures.py --hooks-dir ../hooks
-# On a loaded machine raise the per-case timeout: a timed-out case fails the suite, which would count as a catch
+# On a loaded machine raise the per-case timeout: a run that fails only on timeouts is INCONCLUSIVE, not a catch
 python3 mutate-fixtures.py --hooks-dir ../hooks --timeout 60 destructive-guard
+# Split one long run across machines: every 3rd mutation, starting at the 1st
+python3 mutate-fixtures.py --hooks-dir ../hooks --timeout 60 --shard 1/3 destructive-guard
+# The scorer itself: a timeout is never a catch, and shards never overlap
+python3 test-mutate-fixtures.py
 
 # Compare selected expansion fixtures with Bash using inert command stubs
 python3 test-expansion-semantics.py
@@ -44,6 +48,8 @@ python3 test-force-push-lease.py
 ```
 
 `--hooks-dir` resolves both layouts: flat `<dir>/<name>.sh`, which is how hooks sit in an installed `~/.claude/hooks/`, and nested `<dir>/<name>/<name>.sh`, which is how they sit in this repo. Installed alongside your own hooks as `~/.claude/hooks/tests/`, the default is already right and the flag can be dropped.
+
+Each mutation runs its suite with `run-fixtures.py --fail-fast`, which stops at the first mismatch that is not a TIMEOUT, so a caught mutation costs the rows up to its first failure instead of the whole suite. A mutation scores as caught only when at least one failure is a real verdict mismatch; a run whose failures are all timeouts (or that crashed before printing any) is reported INCONCLUSIVE and fails the run, because on a slow runner it would otherwise read as caught whatever the fixture asserts.
 
 `test-expansion-semantics.py` checks selected destructive-guard fixtures against `/bin/bash` and, when present, Homebrew Bash. It first asserts the ordered calls to inert command stubs, then checks the guard verdict. Payloads execute from reviewed fixture files with a temporary-only `PATH`, controlled startup files, and temporary working directories. This is a test harness, not a sandbox for untrusted shell input.
 

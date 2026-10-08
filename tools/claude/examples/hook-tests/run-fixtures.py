@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 r"""Assert a hook produces the expected OUTCOME for each fixture command.
 
-Usage: run-fixtures.py <hook-name> [--hooks-dir DIR] [--cwd PATH]
+Usage: run-fixtures.py <hook-name> [--hooks-dir DIR] [--cwd PATH] [--timeout S] [--fail-fast]
 
 Fixtures live in fixtures/<hook-name>.tsv as `expected <TAB> command`, with `#`
 comments. Exits non-zero if any case mismatches, so it works as a pre-commit gate.
@@ -275,7 +275,8 @@ def build_payload(cmd, output, flags, tool, event, cwd, tmp):
 
 
 def run_cases(cases, tokens, cwd, env, args, hook_path, failures, tmp):
-    for expected, cmd, output, flags, tool, event in cases:
+    """Returns how many cases ran: --fail-fast stops at the first mismatch that is not a TIMEOUT."""
+    for ran, (expected, cmd, output, flags, tool, event) in enumerate(cases, 1):
         if cmd != ABSENT:
             cmd = substitute(cmd, tokens)
         output = substitute(output, tokens)
@@ -304,6 +305,9 @@ def run_cases(cases, tokens, cwd, env, args, hook_path, failures, tmp):
               % ("ok  " if got == expected else "FAIL", expected, got, cmd[:78]))
         if got == "error" and expected != "error":
             print("       stderr: %s" % " ".join(proc.stderr.split())[:150])
+        if args.fail_fast and got != expected and got != "TIMEOUT":
+            return ran
+    return len(cases)
 
 
 def main():
@@ -314,6 +318,9 @@ def main():
                     help="where the hooks live (default: this directory's parent)")
     ap.add_argument("--cwd", default=os.getcwd())
     ap.add_argument("--timeout", type=float, default=10.0)
+    # A timeout says the host was slow, not that the hook is wrong, so it never stops the run.
+    ap.add_argument("--fail-fast", action="store_true",
+                    help="stop at the first mismatch that is not a TIMEOUT (mutation runs)")
     args = ap.parse_args()
 
     hook_path = resolve_hook(pathlib.Path(args.hooks_dir).expanduser().resolve(), args.hook)
@@ -346,11 +353,13 @@ def main():
 
     failures = []
     try:
-        run_cases(cases, tokens, cwd, env, args, hook_path, failures, tmp)
+        ran = run_cases(cases, tokens, cwd, env, args, hook_path, failures, tmp)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
-    print("\n%d/%d passed" % (len(cases) - len(failures), len(cases)))
+    if ran < len(cases):
+        print("\nstopped at the first failure (--fail-fast): %d of %d cases run" % (ran, len(cases)))
+    print("\n%d/%d passed" % (ran - len(failures), ran))
     if failures:
         print("\n%d FAILURES:" % len(failures))
         for expected, got, cmd in failures:
