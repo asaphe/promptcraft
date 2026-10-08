@@ -39,17 +39,19 @@ asks_for() { # action, text
       -e "s/pull[^a-z]*requests*/ pr /g" -e "s/[^a-z'., ]/ /g" \
     | LC_ALL=C tr -s ' ' '\n' | awk -v q="'" -v act="$1" '
       BEGIN { n = split("dont not never without cannot cant wont shouldnt couldnt wouldnt", w, " "); for (i = 1; i <= n; i++) neg[w[i]] = 1
-              n = split("a an the this that these those my our your its their one two both new another separate", w, " "); for (i = 1; i <= n; i++) det[w[i]] = 1 }
+              n = split("a an the this that these those my our your its their both another separate", w, " "); for (i = 1; i <= n; i++) det[w[i]] = 1
+              n = split("ok okay yes yeah yep sure great good fine thanks please alright cool perfect lgtm", w, " "); for (i = 1; i <= n; i++) intj[w[i]] = 1
+              n = split("keep keeps kept leave leaves left", w, " "); for (i = 1; i <= n; i++) hold[w[i]] = 1 }
       { gsub("^" q "+|" q "+$", "") }
       $0 == "" { next }
-      $0 == "." || $0 == "but" { negated = 0; prev = ""; pr_verb = 0; opening = 0; next }
-      $0 == "," { prev = ","; next }
+      $0 == "." || $0 == "but" { negated = 0; prev = ""; lead = ""; pr_verb = 0; opening = 0; next }
+      $0 == "," { if (prev != ",") lead = prev; prev = ","; next }
       $0 in neg || $0 ~ ("n" q "t$") { negated = 1 }
       act == "merge" && $0 == "merge" && !negated && prev != "no" { found = 1 }
       act == "pr" && opening { if (!($0 in det)) pr_verb = 0; opening = 0 }
       act == "pr" && pr_verb > 0 && ($0 == "pr" || $0 == "prs") { found = 1 }
       act == "pr" && pr_verb > 0 { pr_verb-- }
-      act == "pr" && ($0 == "open" || $0 == "create" || $0 == "raise") && !negated && prev != "no" { pr_verb = 4; opening = ($0 == "open" && prev != "" && prev != ",") }
+      act == "pr" && ($0 == "open" || $0 == "create" || $0 == "raise") && !negated && prev != "no" && !($0 == "open" && (prev in hold)) { pr_verb = 4; opening = ($0 == "open" && prev != "" && !(prev == "," && (lead in intj))) }
       { prev = $0 }
       END { exit !found }'
 }

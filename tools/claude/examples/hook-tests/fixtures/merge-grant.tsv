@@ -84,6 +84,16 @@ ctx	go ahead and open the PR
 ctx	then open a new PR for the fix
 ctx	open a draft PR
 ctx	ok, open the two PRs
+ctx	ok, open PRs for both branches
+ctx	Yes, open draft PRs
+allow	Status report: open PRs, failing CI, stale branches
+allow	Weekly summary: open PRs and their CI state
+allow	list everything still in flight (open PRs, issues)
+allow	can you check: open PRs older than a week?
+allow	for each repo, open PRs count and review status
+allow	review the open new PRs from today
+allow	list the open two PRs that touch auth
+allow	keep open the PRs from dependabot, close the rest
 allow	open the terminal and pull main
 allow	create a pull-down menu in the settings page
 
