@@ -21,10 +21,11 @@ HERE = pathlib.Path(__file__).resolve().parent
 DISPATCHER = HERE / "bash-hook-dispatcher.sh"
 CHILDREN = ("destructive-guard/destructive-guard.sh", "pr-create-guard/pr-create-guard.sh",
             "post-push-hygiene/post-push-hygiene.sh")
-# Each stub reads STUB_<NAME> for its outcome: pass, block, mute, ask, deny, crash, garbage or context.
+# Each stub reads STUB_<NAME> for its outcome (pass, block, mute, ask, deny, crash, garbage, context) and touches STUB_MARK_<NAME>.
 STUB = """#!/usr/bin/env bash
 cat >/dev/null
-case "${STUB_%s:-pass}" in
+[ -z "${STUB_MARK_%(name)s:-}" ] || : > "${STUB_MARK_%(name)s}"
+case "${STUB_%(name)s:-pass}" in
   block) echo "stub refuses" >&2; exit 2 ;;
   mute) exit 2 ;;
   ask) printf '%%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"confirm"}}' ;;
@@ -49,7 +50,7 @@ class DispatcherTest(unittest.TestCase):
             os.makedirs(os.path.dirname(path))
             name = os.path.basename(os.path.dirname(path)).replace("-", "_").upper()
             with open(path, "w", encoding="utf-8") as fh:
-                fh.write(STUB % name)
+                fh.write(STUB % {"name": name})
             os.chmod(path, 0o755)
 
     def tearDown(self):
@@ -83,9 +84,12 @@ class DispatcherTest(unittest.TestCase):
             self.assert_blocks(self.event("PreToolUse", **{"STUB_" + child: outcome}), reason)
 
     def test_the_first_refusal_wins_and_later_children_never_run(self):
-        proc = self.event("PreToolUse", STUB_DESTRUCTIVE_GUARD="deny", STUB_PR_CREATE_GUARD="block")
+        mark = pathlib.Path(self.tmp) / "pr-create-guard-ran"
+        proc = self.event("PreToolUse", STUB_DESTRUCTIVE_GUARD="deny", STUB_PR_CREATE_GUARD="block",
+                          STUB_MARK_PR_CREATE_GUARD=str(mark))
         self.assert_blocks(proc, "no")
         self.assertNotIn("stub refuses", proc.stderr)
+        self.assertFalse(mark.exists(), "a child after the refusal ran")
 
     def test_an_exit_2_without_a_reason_gets_one(self):
         self.assert_blocks(self.event("PreToolUse", STUB_DESTRUCTIVE_GUARD="mute"), "exited 2 without a reason")
