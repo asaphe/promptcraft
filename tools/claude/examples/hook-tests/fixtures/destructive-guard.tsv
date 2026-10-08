@@ -93,7 +93,7 @@ hard	cd {push_main} && git push -u origin "$(git rev-parse --abbrev-ref HEAD)"
 hard	cd {push_main} && git push origin "$B"
 allow	git push -u origin $(git branch --show-current)
 allow	git -C "$(git rev-parse --show-toplevel)" push origin feature/my-branch
-hard	diff <(git push origin main) /dev/null
+hard	diff <(git push origin main) empty.txt
 hard	cat >(git push origin main) </dev/null
 
 # --- a cd behind a reserved word or a builtin prefix, pushd and popd, and a repository moved by --git-dir ---
@@ -120,6 +120,17 @@ hard	export GIT_DIR={push_main}/.git && git push
 hard	GIT_DIR={push_main}/.git; git push
 allow	export GIT_DIR={push_main}/.git && git push origin feature/my-branch
 allow	export FOO=1 && git push
+# WHY: an exported GIT_DIR resolves where each later git runs, as a GIT_DIR= prefix would; unset restores the directory's repository.
+allow	export GIT_DIR={push_feature}/.git && cd {push_main} && git push
+allow	cd {push_main} && export GIT_DIR=.git && cd {push_feature} && git push
+hard	cd {push_feature} && export GIT_DIR=.git && cd {push_main} && git push
+hard	export GIT_DIR=$REPO/.git && git push
+hard	export GIT_DIR && git push
+allow	export GIT_DIR={push_main}/.git; unset GIT_DIR; git push
+allow	export GIT_WORK_TREE={push_main} && git push
+hard	export GIT_DIR={push_main}/.git && git checkout -b topic
+hard	declare -x GIT_DIR={push_main}/.git; git switch -c topic
+allow	export GIT_DIR={push_feature}/.git && git checkout -b topic
 hard	cd -P -- {push_main} && git push
 allow	cd {push_main} && cd -P && git push
 allow	cd {push_main} && cd -- && git push
@@ -287,6 +298,24 @@ hard	exec bash -c 'git push origin main'
 hard	bash -ec 'git push origin main'
 # WHY: login-shell startup can change PATH, so this fixture is intentionally not an oracle probe.
 hard	bash -lc 'git push origin main'
+# WHY: a wrapper runs its operands as a command, so the shell after it still receives the -c string.
+hard	printf a | xargs -I{} sh -c 'git push origin main'
+hard	xargs -0 -n1 bash -c 'git push'
+hard	timeout 30 bash -c 'git push origin main'
+hard	nice -n 5 sh -c 'git push origin main'
+hard	nohup bash -c 'git push origin main'
+hard	find . -name '*.sh' -exec sh -c 'git push origin main' \;
+hard	sudo -u builder bash -c 'git push origin main'
+hard	timeout 30 ssh build-host 'git push origin main'
+# WHY: these commands hand their own string operand to a shell.
+hard	su -c 'git push origin main'
+hard	flock repo.lock -c 'git push origin main'
+hard	watch -n 60 'git push origin main'
+allow	printf a | xargs -I{} sh -c 'git push origin feature/x'
+allow	echo bash -c 'git push origin main'
+allow	xargs grep -c 'git push origin main'
+allow	find . -name 'git push origin main'
+allow	timeout 30 git commit -m 'git push origin main'
 allow	printf x; git commit -m 'bash -c git push origin main'
 hard	git commit -m "$(git push origin main)"
 hard	git commit -m "prefix $(git push origin main) suffix"

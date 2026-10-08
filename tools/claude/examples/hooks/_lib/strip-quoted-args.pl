@@ -12,7 +12,14 @@ sub executable_string {
     my @words = command_words($_[0]);
     return 0 unless @words;
     my $program = shift @words;
-    return 1 if $program =~ m{(?:^|/)(?:eval|ssh)$};
+    # see: README.md § strip-quoted-args.pl — a wrapper execs its operands, so a shell or ssh after it still runs the string
+    if ($program =~ m{(?:^|/)(?:xargs|timeout|nice|nohup|sudo|doas|stdbuf|setsid|ionice|find)$}) {
+        shift @words while @words && $words[0] !~ m{(?:^|/)(?:ssh|bash|sh|zsh|ksh|dash|ash)$};
+        return 0 unless @words;
+        $program = shift @words;
+    }
+    return 1 if $program =~ m{(?:^|/)(?:eval|ssh|watch)$};
+    return 1 if $program =~ m{(?:^|/)(?:su|flock)$} && @words && $words[-1] =~ /^(?:-[^-]*c|--command)$/;
     return 0 unless $program =~ m{(?:^|/)(?:bash|sh|zsh|ksh|dash|ash)$};
     return @words && $words[-1] =~ /^-[^-]*c/ ? 1 : 0;
 }

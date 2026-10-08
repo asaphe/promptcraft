@@ -36,8 +36,29 @@
     {
       "why": "a negated PR request arms the pr grant, so \"don't open a PR yet\" drops the PR prompt",
       "replace": {
-        "from": "act == \"pr\" && ($0 == \"open\" || $0 == \"create\" || $0 == \"raise\") && !negated && prev != \"no\" { pr_verb = 4;",
-        "to": "act == \"pr\" && ($0 == \"open\" || $0 == \"create\" || $0 == \"raise\") { pr_verb = 4;"
+        "from": "act == \"pr\" && ($0 == \"open\" || $0 == \"create\" || $0 == \"raise\") && !negated && prev != \"no\" && !(",
+        "to": "act == \"pr\" && ($0 == \"open\" || $0 == \"create\" || $0 == \"raise\") && !("
+      }
+    },
+    {
+      "why": "open after keep or leave reads as the verb, so \"keep open the PRs from dependabot\" arms the pr grant",
+      "replace": {
+        "from": " && !($0 == \"open\" && (prev in hold))",
+        "to": ""
+      }
+    },
+    {
+      "why": "an interjection stops leading a clause, so \"ok, open PRs for both branches\" no longer arms the pr grant",
+      "replace": {
+        "from": " && !(prev == \",\" && (lead in intj))",
+        "to": ""
+      }
+    },
+    {
+      "why": "a number or `new` counts as a determiner again, so \"list the open two PRs that touch auth\" arms the pr grant",
+      "replace": {
+        "from": "their both another separate",
+        "to": "their one two new both another separate"
       }
     },
     {
@@ -47,8 +68,8 @@
     {
       "why": "a comma ends the negation again, so \"Don't, please, merge this\" arms the grant",
       "replace": {
-        "from": "$0 == \",\" { prev = \",\"; next }",
-        "to": "$0 == \",\" { negated = 0; prev = \",\"; next }"
+        "from": "$0 == \",\" { if (prev != \",\") lead = prev;",
+        "to": "$0 == \",\" { negated = 0; if (prev != \",\") lead = prev;"
       }
     },
     {
@@ -123,8 +144,8 @@
     {
       "why": "--git-dir and GIT_DIR= stop naming the repository, so `git --git-dir=<main>/.git push` reads the session's branch",
       "replace": {
-        "from": "[ -z \"$c\" ] || dir=$(join_dir \"$dir\" \"$c\")",
-        "to": ":"
+        "from": "*) dir=$(join_dir \"$dir\" \"$c\") ;; esac",
+        "to": "*) ;; esac"
       }
     },
     {
@@ -190,15 +211,36 @@
     {
       "why": "an exported GIT_DIR stops moving the repository, so `export GIT_DIR=<main>/.git && git push` reads the session's branch",
       "replace": {
-        "from": "[[ $seg =~ $GITENV_RE ]] && gitenv=1",
-        "to": ":"
+        "from": "if [[ $seg =~ $GITDIR_EXPORT_RE ]]; then",
+        "to": "if false; then"
+      }
+    },
+    {
+      "why": "a bare GIT_DIR= assignment stops making the repository unknown, so `GIT_DIR=<main>/.git; git push` reads the session's branch",
+      "replace": {
+        "from": "elif [[ $seg =~ $GITDIR_ASSIGN_RE ]]; then gitenv='?'",
+        "to": "elif false; then :"
+      }
+    },
+    {
+      "why": "unset GIT_DIR stops restoring the directory's repository, so `export GIT_DIR=<main>/.git; unset GIT_DIR; git push` blocks from a feature checkout",
+      "replace": {
+        "from": "elif [[ $seg =~ $GITDIR_UNSET_RE ]]; then gitenv=\"\"",
+        "to": "elif false; then :"
+      }
+    },
+    {
+      "why": "an export with no value stops making the repository unknown, so `export GIT_DIR && git push` reads the session's branch",
+      "replace": {
+        "from": "*) gitenv='?' ;; esac",
+        "to": "*) gitenv='' ;; esac"
       }
     },
     {
       "why": "a push inside a shell string reads the segment's directory again, so `sh -c \"cd <main> && git push\"` from a feature checkout passes",
       "replace": {
-        "from": " || push_in_shell_string \"$PUSH_SEGMENT\"",
-        "to": ""
+        "from": "push_in_shell_string \"$PUSH_SEGMENT\" && PUSH_DIR='?'",
+        "to": ":"
       }
     },
     {
@@ -284,7 +326,7 @@
     {
       "why": "a completed substitution is discarded, hiding a nested destructive command",
       "suite": "destructive-guard",
-      "delete_matching": "collect_segments\\(substr\\(\\$text, \\$start"
+      "delete_matching": "collect_segments\\(\\$inner, \\$out"
     },
     {
       "why": "a substitution scope opener is omitted, so checkout directory state cannot be restored safely",
@@ -363,6 +405,30 @@
       "replace": {
         "from": "} elsif (!$doc->{quoted}) {",
         "to": "} else {"
+      }
+    },
+    {
+      "why": "a wrapper hides the shell after it, so `printf a | xargs -I{} sh -c 'git push origin main'` reads the push as data",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "if ($program =~ m{(?:^|/)(?:xargs|timeout|nice|nohup|sudo|doas|stdbuf|setsid|ionice|find)$}) {",
+        "to": "if (0) {"
+      }
+    },
+    {
+      "why": "su -c and flock -c strings stop counting as code, so `su -c 'git push origin main'` reads the push as data",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "return 1 if $program =~ m{(?:^|/)(?:su|flock)$}",
+        "to": "return 0 if $program =~ m{(?:^|/)(?:su|flock)$}"
+      }
+    },
+    {
+      "why": "watch's operand stops counting as code, so `watch -n 60 'git push origin main'` reads the push as data",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "(?:eval|ssh|watch)$}",
+        "to": "(?:eval|ssh)$}"
       }
     }
   ]

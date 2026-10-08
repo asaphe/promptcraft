@@ -97,7 +97,9 @@ _SEG_DIRS=()
 _SEG_TEXT=()
 _SEG_GITENV=()
 CASE_ARM_RE='^[(]?[^[:space:]()]+[)]'
-GITENV_RE='^(export|declare +-x|typeset +-x)( +[^ ]+)* +GIT_(DIR|WORK_TREE)=|^([A-Za-z_][A-Za-z0-9_]*=[^ ]* +)*GIT_(DIR|WORK_TREE)=[^ ]*( +[A-Za-z_][A-Za-z0-9_]*=[^ ]*)*$'
+GITDIR_EXPORT_RE='^(export|declare +-x|typeset +-x)( +[^ ]+)* +GIT_DIR(=[^ ]*)?( |$)'
+GITDIR_ASSIGN_RE='^([A-Za-z_][A-Za-z0-9_]*=[^ ]* +)*GIT_DIR=[^ ]*( +[A-Za-z_][A-Za-z0-9_]*=[^ ]*)*$'
+GITDIR_UNSET_RE='^unset( +[^ ]+)* +GIT_DIR( |$)'
 resolve_segment_dirs() {
   local i seg bare op cwd="" stack=() case_depth=() pops opens closes arm gitenv=""
   _SEG_DIRS=()
@@ -144,8 +146,13 @@ resolve_segment_dirs() {
     done
     _SEG_DIRS[i]="$cwd"
     _SEG_TEXT[i]="$seg"
-    # An exported GIT_DIR moves the repository of every later git command, whatever directory it runs in.
-    [[ $seg =~ $GITENV_RE ]] && gitenv=1
+    # An exported GIT_DIR moves every later git command; a bare assignment reaches git only if it was exported earlier.
+    if [[ $seg =~ $GITDIR_EXPORT_RE ]]; then
+      gitenv=${seg##* GIT_DIR}
+      case "$gitenv" in =*) gitenv=${gitenv#=}; gitenv=${gitenv%% *} ;; *) gitenv='?' ;; esac
+    elif [[ $seg =~ $GITDIR_ASSIGN_RE ]]; then gitenv='?'
+    elif [[ $seg =~ $GITDIR_UNSET_RE ]]; then gitenv=""
+    fi
     case "$seg" in
       cd) cwd="$HOME" ;;
       pushd|popd|popd\ *|pushd\ [+-][0-9]*) cwd='?' ;;
@@ -166,7 +173,7 @@ resolve_segment_dirs() {
 }
 
 # The directory a git segment acts on: each `-C` before the verb resolves against the one before it.
-segment_git_dir() { # segment, directory it runs in, verb pattern
+segment_git_dir() { # segment, directory it runs in, verb pattern, GIT_DIR exported before it
   local dir=$2 c head
   head=$(printf '%s' "$1" | sed -E "s/[[:space:]]($3)([[:space:]].*)?\$//")
   while IFS= read -r c; do
@@ -176,7 +183,9 @@ $(printf '%s' "$head" | grep -oE '(^|[[:space:]])-C +[^[:space:]]+' | sed -E 's/
 EOF
   # --git-dir and GIT_DIR= name the repository itself, past any -C; --work-tree leaves it where it was.
   c=$(printf '%s' " $head" | grep -oE '[[:space:]](--git-dir|GIT_DIR)(=| +)[^[:space:]]+' | tail -1 | sed -E 's/^[[:space:]]*[^= ]+(=| +)//')
-  [ -z "$c" ] || dir=$(join_dir "$dir" "$c")
+  # Without its own, an invocation takes the exported GIT_DIR, resolved where it runs as git resolves a relative one.
+  [ -n "$c" ] || c=${4:-}
+  case "$c" in '') ;; '?') dir='?' ;; *) dir=$(join_dir "$dir" "$c") ;; esac
   printf '%s' "$dir"
 }
 
@@ -430,10 +439,8 @@ if echo "$PUSH_VIEW" | grep -qE 'git[[:space:]]([^|;&]* )?push(["'"'"'[:space:];
       [ "${_SCOPED_TYPES[$PUSH_INDEX]}" = S ] || continue
       PUSH_SEGMENT=$(strip_redirs "${_SEG_TEXT[$PUSH_INDEX]}")
       echo "$PUSH_SEGMENT" | grep -qE "$PUSH_GATE_RE" || continue
-      PUSH_DIR=$(segment_git_dir "$PUSH_SEGMENT" "${_SEG_DIRS[$PUSH_INDEX]}" push)
-      if [ -n "${_SEG_GITENV[$PUSH_INDEX]}" ] || push_in_shell_string "$PUSH_SEGMENT"; then
-        PUSH_DIR='?'
-      fi
+      PUSH_DIR=$(segment_git_dir "$PUSH_SEGMENT" "${_SEG_DIRS[$PUSH_INDEX]}" push "${_SEG_GITENV[$PUSH_INDEX]}")
+      push_in_shell_string "$PUSH_SEGMENT" && PUSH_DIR='?'
       if PUSH_HIT=$(push_hits_main "$PUSH_SEGMENT" "$PUSH_DIR"); then
         HARD_REASON=$PUSH_HIT
         break
@@ -606,7 +613,7 @@ for ((CO_INDEX=0; CO_INDEX<${#_SCOPED_TYPES[@]}; CO_INDEX++)); do
   echo "$CO_SEG" | grep -qE 'git[[:space:]]([^|;&]* )?checkout +(-- |--$)' && continue
 
   # The -C belonging to THIS invocation, resolved against the directory its segment runs in.
-  CMD_TARGET=$(segment_git_dir "$CO_SEG" "${_SEG_DIRS[$CO_INDEX]}" 'checkout|switch')
+  CMD_TARGET=$(segment_git_dir "$CO_SEG" "${_SEG_DIRS[$CO_INDEX]}" 'checkout|switch' "${_SEG_GITENV[$CO_INDEX]}")
   if [ -n "$CMD_TARGET" ]; then
     CMD_TARGET_ABS=$(cd "$CMD_TARGET" 2>/dev/null && pwd || echo "$CMD_TARGET")
     SESSION_CWD=$(pwd)
