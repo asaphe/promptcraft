@@ -92,8 +92,9 @@ Verified behaviour of the script as published, with stub children and with this 
 | silent | exit 0, no output |
 | two children add context | one merged `additionalContext` |
 | `ask` | exit 2, reason names the child |
-| `deny` from the first child | exit 2; the second child never runs |
-| crash (exit 1) under `PreToolUse` | exit 2, "failing closed" |
+| `deny`, or exit 2 with a reason, from the first child | exit 2 with that reason; the second child never runs |
+| crash (exit 1), killed (137) or not found (127) under `PreToolUse` | exit 2, "failing closed" |
+| output Codex would not honour here: not JSON, the older `{"decision":"block"}` shape, `continue`, `updatedInput` | exit 2, "cannot honour" |
 | exit 2 with empty stderr | exit 2 with a generated reason |
 | crash under `PostToolUse` | exit 1, reported |
 | missing child script | exit 2 |

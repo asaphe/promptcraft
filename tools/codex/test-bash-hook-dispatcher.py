@@ -21,7 +21,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 DISPATCHER = HERE / "bash-hook-dispatcher.sh"
 CHILDREN = ("destructive-guard/destructive-guard.sh", "pr-create-guard/pr-create-guard.sh",
             "post-push-hygiene/post-push-hygiene.sh")
-# Each stub reads STUB_<NAME> for its outcome (pass, block, mute, ask, deny, crash, garbage, context) and touches STUB_MARK_<NAME>.
+# Each stub reads STUB_<NAME> for its outcome (see the case below) and touches STUB_MARK_<NAME>.
 STUB = """#!/usr/bin/env bash
 cat >/dev/null
 [ -z "${STUB_MARK_%(name)s:-}" ] || : > "${STUB_MARK_%(name)s}"
@@ -29,9 +29,14 @@ case "${STUB_%(name)s:-pass}" in
   block) echo "stub refuses" >&2; exit 2 ;;
   mute) exit 2 ;;
   ask) printf '%%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"confirm"}}' ;;
-  deny) printf '%%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"no"}}' ;;
+  deny) printf '%%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"deny-reason-x"}}' ;;
   crash) echo "boom" >&2; exit 1 ;;
+  killed) kill -9 $$ ;;
+  notfound) exit 127 ;;
   garbage) echo "not json" ;;
+  legacy) printf '%%s' '{"decision":"block","reason":"legacy refuses"}' ;;
+  halt) printf '%%s' '{"continue":false}' ;;
+  rewrite) printf '%%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","updatedInput":{"command":"true"}}}' ;;
   context) printf '{"hookSpecificOutput":{"hookEventName":"%%s","additionalContext":"note"}}' "${STUB_EVENT:-PostToolUse}" ;;
 esac
 exit 0
@@ -78,18 +83,26 @@ class DispatcherTest(unittest.TestCase):
     def test_every_child_refusal_blocks(self):
         for child, outcome, reason in (("DESTRUCTIVE_GUARD", "block", "stub refuses"),
                                        ("DESTRUCTIVE_GUARD", "ask", "cannot prompt"),
-                                       ("PR_CREATE_GUARD", "deny", "no"),
-                                       ("PR_CREATE_GUARD", "crash", "failing closed"),
-                                       ("DESTRUCTIVE_GUARD", "garbage", "cannot honour")):
-            self.assert_blocks(self.event("PreToolUse", **{"STUB_" + child: outcome}), reason)
+                                       ("PR_CREATE_GUARD", "deny", "deny-reason-x"),
+                                       ("PR_CREATE_GUARD", "crash", "exited 1, failing closed"),
+                                       ("DESTRUCTIVE_GUARD", "killed", "exited 137, failing closed"),
+                                       ("DESTRUCTIVE_GUARD", "notfound", "exited 127, failing closed"),
+                                       ("DESTRUCTIVE_GUARD", "garbage", "cannot honour"),
+                                       ("DESTRUCTIVE_GUARD", "legacy", "cannot honour"),
+                                       ("PR_CREATE_GUARD", "halt", "cannot honour"),
+                                       ("PR_CREATE_GUARD", "rewrite", "cannot honour")):
+            with self.subTest(child=child, outcome=outcome):
+                self.assert_blocks(self.event("PreToolUse", **{"STUB_" + child: outcome}), reason)
 
     def test_the_first_refusal_wins_and_later_children_never_run(self):
-        mark = pathlib.Path(self.tmp) / "pr-create-guard-ran"
-        proc = self.event("PreToolUse", STUB_DESTRUCTIVE_GUARD="deny", STUB_PR_CREATE_GUARD="block",
-                          STUB_MARK_PR_CREATE_GUARD=str(mark))
-        self.assert_blocks(proc, "no")
-        self.assertNotIn("stub refuses", proc.stderr)
-        self.assertFalse(mark.exists(), "a child after the refusal ran")
+        for first, reason in (("deny", "deny-reason-x"), ("block", "stub refuses")):
+            with self.subTest(first=first):
+                mark = pathlib.Path(self.tmp) / ("pr-create-guard-ran-" + first)
+                proc = self.event("PreToolUse", STUB_DESTRUCTIVE_GUARD=first, STUB_PR_CREATE_GUARD="crash",
+                                  STUB_MARK_PR_CREATE_GUARD=str(mark))
+                self.assert_blocks(proc, reason)
+                self.assertNotIn("boom", proc.stderr)
+                self.assertFalse(mark.exists(), "a child after the refusal ran")
 
     def test_an_exit_2_without_a_reason_gets_one(self):
         self.assert_blocks(self.event("PreToolUse", STUB_DESTRUCTIVE_GUARD="mute"), "exited 2 without a reason")
