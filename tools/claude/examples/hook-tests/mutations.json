@@ -82,10 +82,10 @@
   ],
   "destructive-guard": [
     {
-      "why": "an empty directory reads as the current one again, so `cd \"$(…)\" && git push` reads the session's branch",
+      "why": "a substitution in a cd stops making the directory unresolvable, so `cd \"$(dirname <main>/x)\" && git push` reads the session's branch",
       "replace": {
-        "from": "    ''|-|*QUOTED_ARG*",
-        "to": "    -|*QUOTED_ARG*"
+        "from": "    -|*QUOTED_ARG*|*SUBSTITUTION*|",
+        "to": "    -|*QUOTED_ARG*|"
       }
     },
     {
@@ -102,8 +102,8 @@
     {
       "why": "a case pattern's `)` closes a subshell again, so a later bare push reads the parent directory",
       "replace": {
-        "from": "[ \"$in_case\" -gt 0 ] && [ -z \"$arm\" ] && [[",
-        "to": "false && [["
+        "from": "if [ \"${#case_depth[@]}\" -gt 0 ] && [ -z \"$arm\" ]",
+        "to": "if false && [ -z \"$arm\" ]"
       }
     },
     {
@@ -121,8 +121,11 @@
       }
     },
     {
-      "why": "--git-dir and GIT_DIR= stop making the repository unresolvable, so a bare push through them reads the session's branch",
-      "delete_matching": "\\*' --git-dir'\\*\\|"
+      "why": "--git-dir and GIT_DIR= stop naming the repository, so `git --git-dir=<main>/.git push` reads the session's branch",
+      "replace": {
+        "from": "[ -z \"$c\" ] || dir=$(join_dir \"$dir\" \"$c\")",
+        "to": ":"
+      }
     },
     {
       "why": "--recurse-submodules stops consuming its value, so `git push --recurse-submodules check origin` reads `check` as the remote",
@@ -154,6 +157,69 @@
       "replace": {
         "from": "grep -qE \"${PUSH_SEG}\\\\+?:\"",
         "to": "grep -qE 'git[[:space:]]([^|;&]* )?push +[^ |;&]+ +:'"
+      }
+    },
+    {
+      "why": "a subshell's last word inside a case arm reads as a pattern again, so `case x in x) (cd <feature>; true); git push;; esac` keeps the subshell's directory",
+      "replace": {
+        "from": "[ \"${#stack[@]}\" -eq \"${case_depth[${#case_depth[@]}-1]}\" ]",
+        "to": "true"
+      }
+    },
+    {
+      "why": "`esac)` reads as a case pattern again, so a subshell wrapped around a case never closes",
+      "replace": {
+        "from": " && [[ $seg != 'esac)'* ]]",
+        "to": ""
+      }
+    },
+    {
+      "why": "an escaped parenthesis counts as a subshell boundary again, so `(cd <main>; echo a\\)b; git push)` pops early",
+      "replace": {
+        "from": "bare=${seg//\\\\?/}",
+        "to": "bare=$seg"
+      }
+    },
+    {
+      "why": "the toplevel idiom becomes unresolvable again, so `cd \"$(git rev-parse --show-toplevel)\" && git push -u origin HEAD` blocks from a feature checkout",
+      "replace": {
+        "from": "[ \"$p\" = TOPLEVEL ] && { printf '%s' \"$1\"; return; }",
+        "to": ""
+      }
+    },
+    {
+      "why": "an exported GIT_DIR stops moving the repository, so `export GIT_DIR=<main>/.git && git push` reads the session's branch",
+      "replace": {
+        "from": "[[ $seg =~ $GITENV_RE ]] && gitenv=1",
+        "to": ":"
+      }
+    },
+    {
+      "why": "a push inside a shell string reads the segment's directory again, so `sh -c \"cd <main> && git push\"` from a feature checkout passes",
+      "replace": {
+        "from": " || push_in_shell_string \"$PUSH_SEGMENT\"",
+        "to": ""
+      }
+    },
+    {
+      "why": "an abbreviated long option stops naming its option, so `git push --recu check origin` from main reads `check` as the remote",
+      "replace": {
+        "from": "case \"$tok\" in --?*) tok=$(expand_push_option \"$tok\") ;; esac",
+        "to": ""
+      }
+    },
+    {
+      "why": "a bundled -o stops taking its value, so `git push -uo ci.skip origin` from main reads `ci.skip` as the remote",
+      "replace": {
+        "from": "-[!-]*o) skip=1;",
+        "to": "-[!-]*o)"
+      }
+    },
+    {
+      "why": "a force refspec with `~`, `^` or `@` stops asking, so `git push origin +HEAD~1:feature` rewinds the remote unprompted",
+      "replace": {
+        "from": "|\\+[^[:space:]]+)",
+        "to": "|\\+[A-Za-z0-9._/:*-]+)"
       }
     }
   ],
@@ -239,6 +305,14 @@
       "replace": {
         "from": "($char eq '<' || $char eq '>')",
         "to": "($char eq \"\\0\")"
+      }
+    },
+    {
+      "why": "a substitution after `=` is split off its option again, so `git push --push-option=$(echo x) origin` from main reads it as the remote",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "return $before =~ /[=:]\\z/ ? \"$word \" : \" $word \";",
+        "to": "return \" $word \";"
       }
     }
   ],
