@@ -4,6 +4,7 @@
 # refuse (merge) or one skipped prompt pr-create-guard still backs (pr); under-arming costs a
 # re-phrase. Both directions are pinned here; test-merge-grant.py checks WHICH grant each arms.
 
+#!escapes
 #!event UserPromptSubmit
 #!setup merge-grant
 
@@ -108,3 +109,30 @@ allow	you cannot open a PR here
 allow	don`t open a PR
 allow	don‘t open a PR
 allow	<absent>
+
+# --- third review: what counts as asking for a PR ---
+# WHY: a line break ends a clause, so a heading or bullet starting `open PRs` is a list, not a request.
+allow	Status report\nopen PRs, failing CI, stale branches
+allow	Here is the dashboard:\n- open PRs: 4\n- failing CI: 2\nwhat should I look at first?
+allow	Open PRs: 3, failing CI: 1
+allow	open PRs?
+# WHY: a comma ends the verb's reach, so `open, the PR` is a state and a comma, not a request.
+allow	Leave it open, the PR needs another review
+allow	keep them open, the PRs from dependabot can wait
+allow	List PRs by how long they've been open, the oldest PRs first
+# WHY: only a clause of interjections leads into the verb, not a status that ends in `fine` or `ok`.
+allow	CI is fine, open PRs need review though
+allow	Build: ok, open PRs: 3, failing: 0
+ctx	ok great, open PRs for both
+ctx	the build is red, ok, open PRs for both
+ctx	no, open PRs for both
+ctx	yes, please open PRs for both branches
+ctx	please open PRs for both branches
+# WHY: a preposition ends the verb's reach, so a report about PRs is not a request to create one.
+allow	create a list of PRs older than a week
+allow	Create a table: PRs, owners, CI state
+allow	raise the priority of PRs from security
+ctx	create PRs in both repos
+# WHY: a number after PR names one that exists, so opening it is reading it.
+allow	open PR 17 in the browser
+allow	open PR #1234 and read the review comments

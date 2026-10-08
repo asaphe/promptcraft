@@ -36,22 +36,30 @@ grant_file() { # action
 asks_for() { # action, text
   printf '%s' "$2" | LC_ALL=C sed -e "s/’/'/g" -e "s/‘/'/g" -e "s/\`/'/g" | LC_ALL=C tr '[:upper:]' '[:lower:]' \
     | LC_ALL=C tr '\t\n' ' .' | LC_ALL=C sed -e "s/[.;!?]/ . /g" -e "s/[,:()]/ , /g" \
-      -e "s/pull[^a-z]*requests*/ pr /g" -e "s/[^a-z'., ]/ /g" \
+      -e "s/pull[^a-z]*requests*/ pr /g" -e "s/^prs* *#* *[0-9][0-9]*/ prref /" -e "s/\([^a-z]\)prs* *#* *[0-9][0-9]*/\1 prref /g" \
+      -e "s/[^a-z'., ]/ /g" \
     | LC_ALL=C tr -s ' ' '\n' | awk -v q="'" -v act="$1" '
       BEGIN { n = split("dont not never without cannot cant wont shouldnt couldnt wouldnt", w, " "); for (i = 1; i <= n; i++) neg[w[i]] = 1
               n = split("a an the this that these those my our your its their both another separate", w, " "); for (i = 1; i <= n; i++) det[w[i]] = 1
-              n = split("ok okay yes yeah yep sure great good fine thanks please alright cool perfect lgtm", w, " "); for (i = 1; i <= n; i++) intj[w[i]] = 1
-              n = split("keep keeps kept leave leaves left", w, " "); for (i = 1; i <= n; i++) hold[w[i]] = 1 }
+              n = split("ok okay yes yeah yep no sure great good fine thanks please alright cool perfect lgtm", w, " "); for (i = 1; i <= n; i++) intj[w[i]] = 1
+              n = split("keep keeps kept leave leaves left", w, " "); for (i = 1; i <= n; i++) hold[w[i]] = 1
+              n = split("of on about from with by per in into", w, " "); for (i = 1; i <= n; i++) stop[w[i]] = 1
+              seg_intj = 1; clause_intj = 1 }
       { gsub("^" q "+|" q "+$", "") }
       $0 == "" { next }
-      $0 == "." || $0 == "but" { negated = 0; prev = ""; lead = ""; pr_verb = 0; opening = 0; next }
-      $0 == "," { if (prev != ",") lead = prev; prev = ","; next }
+      $0 == "." || $0 == "but" { negated = 0; prev = ""; lead_ok = 0; seg_intj = 1; seg_n = 0; clause_intj = 1; pr_verb = 0; opening = 0; fresh = 0; pending = 0; next }
+      $0 == "," { pr_verb = 0; opening = 0; fresh = 0; pending = 0; if (seg_n > 0) lead_ok = seg_intj; seg_intj = 1; seg_n = 0; prev = ","; next }
+      { seg_n++; lead_intj = clause_intj; if (!($0 in intj)) { seg_intj = 0; clause_intj = 0 } }
+      act == "pr" && pending { found = 1; pending = 0 }
       $0 in neg || $0 ~ ("n" q "t$") { negated = 1 }
       act == "merge" && $0 == "merge" && !negated && prev != "no" { found = 1 }
+      act == "pr" && pr_verb > 0 && ($0 in stop) { pr_verb = 0; opening = 0 }
       act == "pr" && opening { if (!($0 in det)) pr_verb = 0; opening = 0 }
+      act == "pr" && fresh && pr_verb > 0 && ($0 == "pr" || $0 == "prs") { pending = 1; pr_verb = 0 }
       act == "pr" && pr_verb > 0 && ($0 == "pr" || $0 == "prs") { found = 1 }
       act == "pr" && pr_verb > 0 { pr_verb-- }
-      act == "pr" && ($0 == "open" || $0 == "create" || $0 == "raise") && !negated && prev != "no" && !($0 == "open" && (prev in hold)) { pr_verb = 4; opening = ($0 == "open" && prev != "" && !(prev == "," && (lead in intj))) }
+      { fresh = 0 }
+      act == "pr" && ($0 == "open" || $0 == "create" || $0 == "raise") && !negated && prev != "no" && !($0 == "open" && (prev in hold)) { pr_verb = 4; fresh = 1; opening = ($0 == "open" && prev != "" && !lead_intj && !(prev == "," && lead_ok)) }
       { prev = $0 }
       END { exit !found }'
 }
