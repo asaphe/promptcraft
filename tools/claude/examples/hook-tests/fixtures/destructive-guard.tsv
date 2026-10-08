@@ -62,9 +62,17 @@ hard	cd {push_main} && git push && cd {push_feature}
 hard	cd "$WORKTREE" && git push
 allow	cd "$WORKTREE" && git push origin feature/my-branch
 hard	(cd {push_main} && git checkout -b topic)
+hard	git -C {push_main} --work-tree={push_main} checkout -b topic
+hard	git -C {push_main} --git-dir={push_main}/.git checkout -b topic
+hard	git --git-dir={push_main}/.git checkout -b topic
+allow	git --git-dir={push_feature}/.git checkout -b topic
 
 # --- a substitution in the -C, the remote or the refspec does not cut the push out of its own segment ---
-hard	git -C "$(git rev-parse --show-toplevel)" push
+allow	git -C "$(git rev-parse --show-toplevel)" push
+allow	cd "$(git rev-parse --show-toplevel)" && git push -u origin HEAD
+allow	cd $(git rev-parse --show-toplevel) && git push
+hard	cd {push_main} && cd "$(git rev-parse --show-toplevel)" && git push
+hard	git -C "$(git -C {push_main} rev-parse --show-toplevel)" push
 hard	git -C "$(git -C {push_main} rev-parse --show-toplevel)" push origin main
 hard	git -C $(echo {push_main}) push origin main
 hard	git -C `echo {push_main}` push origin main
@@ -72,6 +80,11 @@ hard	git push $(git remote) main
 hard	git push origin feature/my-branch $(echo x) main
 hard	git push -o "$(echo ci.skip)" origin main
 hard	git push --push-option="$(echo a)" origin main
+hard	cd {push_main} && git push --push-option=$(echo x) origin
+hard	cd {push_main} && git push --receive-pack=$(echo git-receive-pack) origin
+hard	cd {push_main} && git push --force-with-lease=main:$(git rev-parse origin/main) origin
+hard	cd {push_main} && git push $(echo) origin
+allow	git push --push-option=$(echo x) origin
 hard	git push origin "$(git rev-parse HEAD)":refs/heads/main
 hard	git push origin `git rev-parse HEAD`:main
 hard	cd "$(dirname {push_main}/x)" && git push
@@ -101,6 +114,23 @@ allow	if cd {push_feature}; then git push; fi
 allow	builtin cd {push_feature} && git push
 allow	pushd {push_feature} && git push
 allow	git --git-dir={push_main}/.git push origin feature/my-branch
+allow	git --git-dir={push_feature}/.git push
+allow	git -C {push_main} --work-tree={push_main} --git-dir={push_feature}/.git push
+hard	export GIT_DIR={push_main}/.git && git push
+hard	GIT_DIR={push_main}/.git; git push
+allow	export GIT_DIR={push_main}/.git && git push origin feature/my-branch
+allow	export FOO=1 && git push
+hard	cd -P -- {push_main} && git push
+allow	cd {push_main} && cd -P && git push
+allow	cd {push_main} && cd -- && git push
+
+# --- a push inside a shell string runs where this guard cannot follow, so a bare one must name its branch ---
+hard	cd {push_main} && bash -c "git push"
+hard	bash -c 'git push'
+hard	eval "git push"
+hard	sh -c "cd {push_main} && git push"
+allow	bash -c "git push origin feature/my-branch"
+allow	GIT_SSH_COMMAND="ssh -o BatchMode=yes" git push
 
 # --- an escaped space, an option that takes its value as the next word, and a tags-only push ---
 hard	cd {push_main_esc} && git push
@@ -110,6 +140,16 @@ hard	cd {push_main} && git push --recurse-submodules check origin
 allow	git push --recurse-submodules check origin
 allow	cd {push_main} && git push origin --tags
 hard	cd {push_main} && git push origin --tags main
+
+# --- git accepts any unique prefix of a long option and bundled short flags ---
+hard	cd {push_main} && git push --recu check origin
+hard	cd {push_main} && git push --push ci.skip origin
+hard	cd {push_main} && git push -uo ci.skip origin
+hard	git push --mirr
+hard	git push --al origin
+hard	git push --bran origin
+allow	git push --recu check origin
+allow	git push -uo ci.skip origin feature/my-branch
 
 # --- an arithmetic expansion or a case pattern inside a subshell does not close the subshell ---
 hard	(cd {push_main}; x=$((1+1)); git push)
@@ -123,6 +163,18 @@ allow	(cd {push_main}) 2>&1; git push
 hard	case x in x) cd {push_main}; git push;; esac
 allow	case x in x) cd {push_feature}; git push;; esac
 hard	if true; then (cd {push_main} && git push); fi
+hard	cd {push_main} && case x in x) (cd {push_feature}; true); git push;; esac
+hard	cd {push_main} && case x in x) (cd {push_feature} && pwd); git push;; esac
+hard	cd {push_main} && (cd {push_feature}; case x in y) true;; esac); git push
+hard	cd {push_main} && (case x in x) cd {push_feature};; esac); git push
+allow	(cd {push_main}; case x in y) true;; esac); git push
+hard	case a in a|b) cd {push_main}; git push;; esac
+hard	case x in (x) cd {push_main};; esac; git push
+
+# --- an escaped parenthesis neither opens nor closes a subshell ---
+hard	(cd {push_main}; echo a\)b; git push)
+allow	(cd {push_main}; echo \(); git push
+hard	cd {push_main} && (cd {push_feature}; echo \(); git push
 
 # --- hard: merges. No merge grant is armed here (the setup points the grant store at an empty
 # directory), so there is no approval path. test-merge-grant.py covers the armed turn. ---
@@ -153,6 +205,13 @@ ask	git push origin feature/my-branch -f|cat
 ask	git push origin feature/my-branch :other
 ask	git push origin feature/my-branch --delete;
 ask	git push $(echo origin) :feature/my-branch
+ask	git push origin +HEAD~1:feature/my-branch
+ask	git push origin +HEAD^:feature/my-branch
+ask	git push origin +@:feature/my-branch
+ask	git push origin +feature/my-branch@{1}:feature/my-branch
+ask	git push -qd origin feature/my-branch
+ask	git push --del origin feature/my-branch
+ask	git push --force-w origin feature/my-branch
 allow	git push origin HEAD:feature/my-branch
 allow	git push origin feature/my-branch:other
 

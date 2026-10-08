@@ -112,7 +112,9 @@ def _grant_dir(tmp):
 def destructive_guard(tmp):
     feature = _init(os.path.join(tmp, "push-feature"), branch="feature")
     spaced = _init(os.path.join(tmp, "push main wt"))
-    return {"cwd": feature, "env": _grant_dir(tmp), "tokens": {
+    # HOME is a checkout off the default branch, so `cd -P && git push` reads a branch no other repo here holds.
+    env = dict(_grant_dir(tmp), HOME=_init(os.path.join(tmp, "home"), branch="home"))
+    return {"cwd": feature, "env": env, "tokens": {
         "push_feature": feature,
         "push_main": _init(os.path.join(tmp, "push-main")),
         "push_master": _init(os.path.join(tmp, "push-master"), branch="master"),

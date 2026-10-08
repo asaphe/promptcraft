@@ -29,12 +29,15 @@ sub emit_scope { push @{$_[0]}, [$_[1]]; }
 
 # see: README.md § split-cmd-segments.pl — the enclosing segment stays open, so `git -C "$(…)" push` reaches the push check whole
 sub substitution {
-    my ($text, $start, $end, $out, $scoped, $quote) = @_;
+    my ($text, $start, $end, $out, $scoped, $quote, $before) = @_;
+    my $inner = substr($text, $start, $end - $start);
     emit_scope($out, 'E') if $scoped;
-    collect_segments(substr($text, $start, $end - $start), $out, $scoped);
-    return ' SUBSTITUTION ' unless $scoped;
-    emit_scope($out, 'X');
-    return $quote eq '"' ? 'SUBSTITUTION' : ' SUBSTITUTION ';
+    collect_segments($inner, $out, $scoped);
+    emit_scope($out, 'X') if $scoped;
+    # see: README.md § split-cmd-segments.pl — TOPLEVEL, and why a value after `=` or `:` keeps its word
+    my $word = $inner =~ /\A\s*git\s+rev-parse\s+--show-toplevel\s*\z/ ? 'TOPLEVEL' : 'SUBSTITUTION';
+    return $word if $scoped && $quote eq '"';
+    return $before =~ /[=:]\z/ ? "$word " : " $word ";
 }
 
 sub collect_segments {
@@ -76,7 +79,7 @@ sub collect_segments {
             }
             my $end = command_substitution_end($text, $i + 1);
             if (defined $end) {
-                $segment .= substitution($text, $i + 2, $end, $out, $scoped, $quote);
+                $segment .= substitution($text, $i + 2, $end, $out, $scoped, $quote, $segment);
                 $i = $end + 1;
                 next;
             }
@@ -85,7 +88,7 @@ sub collect_segments {
         if (!$quote && ($char eq '<' || $char eq '>') && $i + 1 < $length && substr($text, $i + 1, 1) eq '(') {
             my $end = command_substitution_end($text, $i + 1);
             if (defined $end) {
-                $segment .= substitution($text, $i + 2, $end, $out, $scoped, $quote);
+                $segment .= substitution($text, $i + 2, $end, $out, $scoped, $quote, $segment);
                 $i = $end + 1;
                 next;
             }
@@ -93,7 +96,7 @@ sub collect_segments {
         if ($char eq '`') {
             my $end = backtick_end($text, $i);
             if (defined $end) {
-                $segment .= substitution($text, $i + 1, $end, $out, $scoped, $quote);
+                $segment .= substitution($text, $i + 1, $end, $out, $scoped, $quote, $segment);
                 $i = $end + 1;
                 next;
             }
