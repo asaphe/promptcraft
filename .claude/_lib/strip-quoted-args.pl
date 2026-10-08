@@ -13,13 +13,13 @@ sub executable_string {
     return 0 unless @words;
     my $program = shift @words;
     # see: README.md § strip-quoted-args.pl — a wrapper execs its operands, so a shell or ssh after it still runs the string
-    if ($program =~ m{(?:^|/)(?:xargs|timeout|nice|nohup|sudo|doas|stdbuf|setsid|ionice|find)$}) {
+    if ($program =~ m{(?:^|/)(?:xargs|timeout|gtimeout|nice|nohup|sudo|doas|stdbuf|setsid|ionice|find|caffeinate|arch|script|runuser|chroot|unbuffer|chrt|taskset)$}) {
         shift @words while @words && $words[0] !~ m{(?:^|/)(?:ssh|bash|sh|zsh|ksh|dash|ash)$};
         return 0 unless @words;
         $program = shift @words;
     }
-    return 1 if $program =~ m{(?:^|/)(?:eval|ssh|watch)$};
-    return 1 if $program =~ m{(?:^|/)(?:su|flock)$} && @words && $words[-1] =~ /^(?:-[^-]*c|--command)$/;
+    return 1 if $program =~ m{(?:^|/)(?:eval|ssh|watch|parallel)$};
+    return 1 if $program =~ m{(?:^|/)(?:su|flock)$} && @words && $words[-1] =~ /^(?:-[^-]*c|--command=?)$/;
     return 0 unless $program =~ m{(?:^|/)(?:bash|sh|zsh|ksh|dash|ash)$};
     return @words && $words[-1] =~ /^-[^-]*c/ ? 1 : 0;
 }
@@ -139,6 +139,13 @@ sub expansion {
     return (($arithmetic ? '$((' : '$(') . $body . ($arithmetic ? '))' : ')'), $next);
 }
 
+# A chunk with no space or shell syntax cannot form a command phrase, so a path beside a substitution stays readable.
+sub masked {
+    my ($data, $keep) = @_;
+    return $data if $values || $keep || $data =~ /\A[^\s"'\\`;|&<>()\$]*\z/;
+    return length $data ? 'QUOTED_ARG' : '';
+}
+
 sub quoted {
     my ($text, $start, $keep, $ansi) = @_;
     my $quote = substr($text, $start, 1);
@@ -149,7 +156,7 @@ sub quoted {
             if (!$expanded && $data =~ /\A[^\s"'\\`;|&<>()]*\z/) {
                 return ($data, $i + 1);
             }
-            $rendered .= ($values || $keep) ? $data : (length $data ? 'QUOTED_ARG' : '');
+            $rendered .= masked($data, $keep);
             return ($quote . $rendered . $quote, $i + 1);
         }
         if ($ansi && $char eq '\\') {
@@ -164,7 +171,7 @@ sub quoted {
             next;
         }
         if ($quote eq '"' && ($char eq '`' || substr($text, $i, 2) eq '$(')) {
-            $rendered .= ($values || $keep) ? $data : (length $data ? 'QUOTED_ARG' : '');
+            $rendered .= masked($data, $keep);
             $data = '';
             my ($code, $next) = expansion($text, $i);
             $rendered .= $code;

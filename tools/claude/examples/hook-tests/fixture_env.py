@@ -114,7 +114,13 @@ def destructive_guard(tmp):
     spaced = _init(os.path.join(tmp, "push main wt"))
     # HOME is a checkout off the default branch, so `cd -P && git push` reads a branch no other repo here holds.
     env = dict(_grant_dir(tmp), HOME=_init(os.path.join(tmp, "home"), branch="home"))
+    # A linked worktree's `.git` is a file, not a directory, so GIT_DIR naming it needs its own case.
+    wt_base = _init(os.path.join(tmp, "push-wt-base"), branch="feature")
+    _base_commit(wt_base)
+    main_wt = os.path.join(tmp, "push-main-wt")
+    _git(wt_base, "worktree", "add", "-q", "-b", "main", main_wt)
     return {"cwd": feature, "env": env, "tokens": {
+        "push_main_wt": main_wt,
         "push_feature": feature,
         "push_main": _init(os.path.join(tmp, "push-main")),
         "push_master": _init(os.path.join(tmp, "push-master"), branch="master"),

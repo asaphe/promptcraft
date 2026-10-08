@@ -35,14 +35,19 @@ sub substitution {
     collect_segments($inner, $out, $scoped);
     emit_scope($out, 'X') if $scoped;
     # see: README.md § split-cmd-segments.pl — TOPLEVEL, and why a value after `=` or `:` keeps its word
-    my $word = $inner =~ /\A\s*git\s+rev-parse\s+--show-toplevel\s*\z/ ? 'TOPLEVEL' : 'SUBSTITUTION';
+    my $after = substr($text, $end + 1, 1);
+    my $starts = $before =~ ($quote eq '"' ? qr/(?:\A|[\s=])"\z/ : qr/(?:\A|[\s=])\z/);
+    my $word = $starts && $inner =~ /\A\s*git\s+rev-parse\s+--show-toplevel(?:\s+2>(?:\/dev\/null|&1))?\s*\z/
+        ? "\x01TOPLEVEL" : 'SUBSTITUTION';
     return $word if $scoped && $quote eq '"';
-    return $before =~ /[=:]\z/ ? "$word " : " $word ";
+    my $glued = $before =~ /(?:[=:]|(?:\A|\s)-[^\s-]*o)\z/;
+    my $tail = ($glued || $word ne 'SUBSTITUTION') && length($after) && $after !~ /[\s;&|)]/ ? '' : ' ';
+    return ($glued ? '' : ' ') . $word . $tail;
 }
 
 sub collect_segments {
     my ($text, $out, $scoped) = @_;
-    my ($segment, $quote, $i) = ('', '', 0);
+    my ($segment, $quote, $i, $test) = ('', '', 0, 0);
     my $length = length $text;
 
     while ($i < $length) {
@@ -110,7 +115,12 @@ sub collect_segments {
                 next;
             }
         }
-        if (!$quote && ($char eq ';' || $char eq '|' || $char eq '&' || $char eq "\n")) {
+        if (!$quote && substr($text, $i, 2) eq '[[' && $segment =~ /(?:\A|[\s;&|(!])\z/) {
+            $test = 1;
+        } elsif (!$quote && $test && substr($text, $i, 2) eq ']]') {
+            $test = 0;
+        }
+        if (!$quote && !$test && ($char eq ';' || $char eq '|' || $char eq '&' || $char eq "\n")) {
             emit_segment($out, $segment);
             $segment = '';
             $i++;

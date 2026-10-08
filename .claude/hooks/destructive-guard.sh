@@ -67,24 +67,53 @@ strip_redirs() {
   printf '%s' "$1" | perl -pe 's/(?:(?<=[\s;&|(])|^)\d+(?=[<>])//g; s/(?:&>>?|>\||>>?&?|<<<|<>|<&?)\s*[^\s;&|<>()]*/ /g'
 }
 
+# git's global options, so `git stash push` and `git -C <dir> grep checkout` are not read as a push or a switch.
+GIT_VAL_RE='("[^"]*"|'\''[^'\'']*'\''|[^[:space:]"'\''\\]|\\.)+'
+GIT_SUB_RE='git([[:space:]]+(-C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix)[[:space:]]+'"$GIT_VAL_RE"'|[[:space:]]+-[^[:space:]]+)*[[:space:]]+'
+
 # see: tools/claude/examples/hooks/destructive-guard/README.md § Parser hardening — token walk, and why separators are isolated first
-push_args() {
-  strip_redirs "$1" | sed 's/[;&|]/ & /g' | awk '{
-    out = ""; seen = 0
+git_sub_args() { # text, subcommand pattern, "keep" to print the subcommand first
+  strip_redirs "$1" | sed 's/[;&|]/ & /g' | awk -v want="$2" -v keep="${3:-}" '
+    function open_word(v,   s) { s = v; gsub(/\\./, "", s); return (gsub(/"/, "", s) % 2) || (gsub(/\047/, "", s) % 2) || v ~ /\\$/ }
+    {
+    out = ""; state = 0
     for (i = 1; i <= NF; i++) {
-      if (seen) { if ($i ~ /^[;&|]$/) break; out = out (out == "" ? "" : " ") $i }
-      else if ($i ~ /^push["\047]?$/) seen = 1
+      w = $i
+      if (state == 2) { if (w ~ /^[;&|]$/) break; out = out (out == "" ? "" : " ") w; continue }
+      if (state == 0) { if (w ~ /(^|[\/"\047])git$/) state = 1; continue }
+      if (w ~ /^[;&|]$/) { state = 0; continue }
+      if (w ~ /^(-C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix)$/) {
+        i++; v = $i
+        while (i < NF && open_word(v)) { i++; v = v " " $i }
+        continue
+      }
+      if (w ~ /^-/) continue
+      if (w ~ ("^(" want ")[\"\047]?$")) {
+        # A subcommand that closes its shell string has no arguments: the words after it are the shell positional parameters.
+        if (w ~ /["\047]$/) { if (keep) print substr(w, 1, length(w) - 1); else print ""; exit }
+        state = 2; if (keep) out = w; continue
+      }
+      state = 0
     }
     print out
   }'
 }
 
+push_args() { git_sub_args "$1" push; }
+
 # A path joined onto the directory it is relative to: "" is the session cwd, "?" a directory the text cannot name.
+TOPLEVEL_MARK=$'\001TOPLEVEL'
 join_dir() { # base, path
-  local p
+  local p top
   p=$(expand_path "$(unquote "$2")")
-  # `$(git rev-parse --show-toplevel)` with no -C names the checkout the command already runs in.
-  [ "$p" = TOPLEVEL ] && { printf '%s' "$1"; return; }
+  # A word starting with `$(git rev-parse --show-toplevel)` is that checkout's top plus the rest of the word.
+  case "$p" in "$TOPLEVEL_MARK"|"$TOPLEVEL_MARK"/*)
+    p=${p#"$TOPLEVEL_MARK"}
+    case "$1$p" in *'?'*|*QUOTED_ARG*|*SUBSTITUTION*|*TOPLEVEL*|*'$'*|*'`'*|*'\'*) printf '?'; return ;; esac
+    top=$(git -C "${1:-.}" rev-parse --show-toplevel 2>/dev/null) && [ -n "$top" ] || { printf '?'; return; }
+    printf '%s' "$top$p"
+    return ;;
+  esac
   case "$p" in
     -|*QUOTED_ARG*|*SUBSTITUTION*|*TOPLEVEL*|*'$'*|*'`'*|*'\'*) printf '?' ;;
     /*) printf '%s' "$p" ;;
@@ -96,22 +125,32 @@ join_dir() { # base, path
 _SEG_DIRS=()
 _SEG_TEXT=()
 _SEG_GITENV=()
-CASE_ARM_RE='^[(]?[^[:space:]()]+[)]'
-GITDIR_EXPORT_RE='^(export|declare +-x|typeset +-x)( +[^ ]+)* +GIT_DIR(=[^ ]*)?( |$)'
+CASE_ARM_RE='^[(]?[^[:space:]()]+[[:space:]]*[)]'
+GITDIR_EXPORT_RE='^(export|(declare|typeset|local) +-[a-zA-Z]*x[a-zA-Z]*)( +[^ ]+)* +GIT_DIR(=[^ ]*)?( |$)'
+BRANCH_MOVE_RE="${GIT_SUB_RE}(checkout|switch|branch|worktree)([[:space:]]|\$)"
+# Branch moves earlier in the command, so a bare push reads the branch it will run on: segment index, checkout, branch.
+_BR_AT=()
+_BR_KEY=()
+_BR_NAME=()
 GITDIR_ASSIGN_RE='^([A-Za-z_][A-Za-z0-9_]*=[^ ]* +)*GIT_DIR=[^ ]*( +[A-Za-z_][A-Za-z0-9_]*=[^ ]*)*$'
 GITDIR_UNSET_RE='^unset( +[^ ]+)* +GIT_DIR( |$)'
 resolve_segment_dirs() {
-  local i seg bare op cwd="" stack=() case_depth=() pops opens closes arm gitenv=""
+  local i seg bare op cwd="" stack=() envstack=() case_depth=() pops opens closes arm gitenv=""
   _SEG_DIRS=()
   _SEG_TEXT=()
   _SEG_GITENV=()
+  _BR_AT=()
+  _BR_KEY=()
+  _BR_NAME=()
   for ((i = 0; i < ${#_SCOPED_TYPES[@]}; i++)); do
     _SEG_DIRS[i]="$cwd"
     _SEG_TEXT[i]=""
     _SEG_GITENV[i]="$gitenv"
     case "${_SCOPED_TYPES[$i]}" in
-      E) stack[${#stack[@]}]="$cwd"; continue ;;
-      X) cwd="${stack[${#stack[@]}-1]}"; unset 'stack[${#stack[@]}-1]'; continue ;;
+      # A subshell gets a copy of the directory and the exported GIT_DIR, and the parent's come back at its end.
+      E) stack[${#stack[@]}]="$cwd"; envstack[${#envstack[@]}]="$gitenv"; continue ;;
+      X) cwd="${stack[${#stack[@]}-1]}"; unset 'stack[${#stack[@]}-1]'
+         gitenv="${envstack[${#envstack[@]}-1]}"; unset 'envstack[${#envstack[@]}-1]'; continue ;;
     esac
     seg="${_SCOPED_VALUES[$i]}"
     # A reserved word, a builtin prefix or a case pattern leaves the command after it in charge: `if cd <dir>` still moves.
@@ -123,7 +162,7 @@ resolve_segment_dirs() {
         arm=1; seg="${seg#*')'}"; continue
       fi
       case "$seg" in
-        '('*) stack[${#stack[@]}]="$cwd"; seg="${seg#?}" ;;
+        '('*) stack[${#stack[@]}]="$cwd"; envstack[${#envstack[@]}]="$gitenv"; seg="${seg#?}" ;;
         ' '*|'{'*) seg="${seg#?}" ;;
         'case '*' in'|'case '*' in '*) case_depth[${#case_depth[@]}]=${#stack[@]}; arm=""; seg="${seg#* in}" ;;
         'if '*|'then '*|'else '*|'elif '*|'do '*|'while '*|'until '*|'! '*|'time '*|'builtin '*|'command '*) seg="${seg#* }" ;;
@@ -133,6 +172,7 @@ resolve_segment_dirs() {
     case "$seg" in 'esac'|'esac '*|'esac)'*|'esac}'*) [ "${#case_depth[@]}" -eq 0 ] || unset 'case_depth[${#case_depth[@]}-1]' ;; esac
     # Only an unbalanced, unescaped `)` closes a subshell; the pair in `$((1+1))` and `echo \(` close nothing.
     bare=${seg//\\?/}
+    case "$bare" in *[\"\']*) bare=$(printf '%s' "$bare" | perl -pe 's/"[^"]*"|\x27[^\x27]*\x27//g') ;; esac
     opens=${bare//[!(]/}
     closes=${bare//[!)]/}
     pops=$((${#closes} - ${#opens}))
@@ -150,9 +190,14 @@ resolve_segment_dirs() {
     if [[ $seg =~ $GITDIR_EXPORT_RE ]]; then
       gitenv=${seg##* GIT_DIR}
       case "$gitenv" in =*) gitenv=${gitenv#=}; gitenv=${gitenv%% *} ;; *) gitenv='?' ;; esac
+      # The substitution runs at the export, so its directory is this one, not the later git's.
+      case "$gitenv" in "$TOPLEVEL_MARK"*) gitenv=$(join_dir "$cwd" "$gitenv") ;; esac
     elif [[ $seg =~ $GITDIR_ASSIGN_RE ]]; then gitenv='?'
     elif [[ $seg =~ $GITDIR_UNSET_RE ]]; then gitenv=""
     fi
+    # eval runs its string in this shell, so a cd or GIT_DIR in it moves later segments somewhere the text cannot follow.
+    case "$seg" in eval\ *) case "$seg" in *cd*|*pushd*|*popd*) cwd='?' ;; esac; case "$seg" in *GIT_DIR*) gitenv='?' ;; esac ;; esac
+    if [[ $seg =~ $BRANCH_MOVE_RE ]]; then record_branch "$i" "$seg" "$cwd" "${_SEG_GITENV[i]}"; fi
     case "$seg" in
       cd) cwd="$HOME" ;;
       pushd|popd|popd\ *|pushd\ [+-][0-9]*) cwd='?' ;;
@@ -167,6 +212,8 @@ resolve_segment_dirs() {
     while [ "$pops" -gt 0 ] && [ "${#stack[@]}" -gt 0 ]; do
       cwd="${stack[${#stack[@]}-1]}"
       unset 'stack[${#stack[@]}-1]'
+      gitenv="${envstack[${#envstack[@]}-1]}"
+      unset 'envstack[${#envstack[@]}-1]'
       pops=$((pops - 1))
     done
   done
@@ -174,10 +221,11 @@ resolve_segment_dirs() {
 
 # The directory a git segment acts on: each `-C` before the verb resolves against the one before it.
 segment_git_dir() { # segment, directory it runs in, verb pattern, GIT_DIR exported before it
-  local dir=$2 c head
+  local dir=$2 c head named=""
   head=$(printf '%s' "$1" | sed -E "s/[[:space:]]($3)([[:space:]].*)?\$//")
   while IFS= read -r c; do
-    [ -n "$c" ] && dir=$(join_dir "$dir" "$c")
+    # A substitution runs in the shell's directory, not in the -C chain before it.
+    case "$(unquote "$c")" in '') ;; "$TOPLEVEL_MARK"*) dir=$(join_dir "$2" "$c") ;; *) dir=$(join_dir "$dir" "$c") ;; esac
   done <<EOF
 $(printf '%s' "$head" | grep -oE '(^|[[:space:]])-C +[^[:space:]]+' | sed -E 's/^[[:space:]]*-C +//')
 EOF
@@ -185,7 +233,11 @@ EOF
   c=$(printf '%s' " $head" | grep -oE '[[:space:]](--git-dir|GIT_DIR)(=| +)[^[:space:]]+' | tail -1 | sed -E 's/^[[:space:]]*[^= ]+(=| +)//')
   # Without its own, an invocation takes the exported GIT_DIR, resolved where it runs as git resolves a relative one.
   [ -n "$c" ] || c=${4:-}
-  case "$c" in '') ;; '?') dir='?' ;; *) dir=$(join_dir "$dir" "$c") ;; esac
+  case "$c" in '') ;; '?') dir='?' ;; *) dir=$(join_dir "$dir" "$c"); named=1 ;; esac
+  # A linked worktree's .git is a file at its top; a named repository that is not there cannot be read.
+  if [ -n "$named" ] && [ "$dir" != '?' ]; then
+    if [ -f "$dir" ]; then dir=$(dirname "$dir"); elif [ ! -d "$dir" ]; then dir='?'; fi
+  fi
   printf '%s' "$dir"
 }
 
@@ -202,12 +254,109 @@ expand_push_option() { # --name[=value]
   printf '%s' "$1"
 }
 
+# The checkout a directory sits in, physical, so two spellings of one worktree compare equal; a path not created yet is itself.
+repo_key() {
+  local top
+  [ "$1" = '?' ] && { printf '?'; return; }
+  if top=$(git -C "${1:-.}" rev-parse --show-toplevel 2>/dev/null) && [ -n "$top" ]; then
+    (cd "$top" 2>/dev/null && pwd -P) || printf '%s' "$top"
+  else
+    printf '%s' "${1:-.}"
+  fi
+}
+
+# The branch a checkout, switch or rename leaves checked out: a name, `?` when the text cannot tell, nothing when unchanged.
+branch_after() { # directory, subcommand, its words...
+  local dir=$1 sub=$2 w new="" move="" pos=()
+  shift 2
+  while [ $# -gt 0 ]; do
+    w=$(unquote "$1"); shift
+    case "$sub:$w" in
+      checkout:-b|checkout:-B|checkout:--orphan|switch:-c|switch:-C|switch:--create|switch:--force-create|switch:--orphan)
+        new=$(unquote "${1:-?}"); [ $# -eq 0 ] || shift ;;
+      checkout:--detach|switch:--detach|switch:-d|*:-) printf '?'; return ;;
+      branch:-m|branch:-M|branch:--move) move=1 ;;
+      *:--) break ;;
+      *:-*) ;;
+      *) pos[${#pos[@]}]=$w ;;
+    esac
+  done
+  if [ "$sub" = branch ]; then
+    [ -n "$move" ] || return 0
+    case "${#pos[@]}:${pos[1]:-}" in 1:) new=${pos[0]} ;; 2:main|2:master) new='?' ;; *) return 0 ;; esac
+  elif [ -z "$new" ]; then
+    # A ref followed by paths, or a name that is no local branch (a file, a commit), leaves HEAD where it was.
+    [ "${#pos[@]}" -eq 1 ] || return 0
+    case "${pos[0]}" in
+      main|master) new=${pos[0]} ;;
+      *) [ "$dir" != '?' ] && git -C "${dir:-.}" rev-parse --verify --quiet "refs/heads/${pos[0]}" >/dev/null 2>&1 \
+           && new=${pos[0]} ;;
+    esac
+  fi
+  case "$new" in *SUBSTITUTION*|*TOPLEVEL*|*QUOTED_ARG*|*'$'*|*'`'*) new='?' ;; esac
+  printf '%s' "$new"
+}
+
+# A new worktree's path and branch: -b's name, a branch given as its commit-ish, or the path's last part when none is.
+worktree_after() { # directory, words after `add`...
+  local base=$1 w new="" detach="" pos=()
+  shift
+  while [ $# -gt 0 ]; do
+    w=$(unquote "$1"); shift
+    case "$w" in
+      -b|-B) new=$(unquote "${1:-?}"); [ $# -eq 0 ] || shift ;;
+      --reason) [ $# -eq 0 ] || shift ;;
+      --detach|-d) detach=1 ;;
+      -*) ;;
+      *) pos[${#pos[@]}]=$w ;;
+    esac
+  done
+  [ "${#pos[@]}" -gt 0 ] || return 0
+  if [ -n "$detach" ]; then new='?'
+  elif [ -z "$new" ]; then
+    case "${pos[1]:-}" in
+      '') new=${pos[0]##*/} ;;
+      main|master) new=${pos[1]} ;;
+      *) new='?'
+         [ "$base" != '?' ] && git -C "${base:-.}" rev-parse --verify --quiet "refs/heads/${pos[1]}" >/dev/null 2>&1 \
+           && new=${pos[1]} ;;
+    esac
+  fi
+  case "$new" in *SUBSTITUTION*|*TOPLEVEL*|*QUOTED_ARG*|*'$'*|*'`'*) new='?' ;; esac
+  printf '%s\t%s' "$(join_dir "$base" "${pos[0]}")" "$new"
+}
+
+record_branch() { # segment index, its text, directory it runs in, GIT_DIR exported before it
+  local words w=() dir key name rec
+  words=$(git_sub_args "$2" 'checkout|switch|branch|worktree' keep)
+  [ -n "$words" ] || return 0
+  read -r -a w <<<"$words"
+  dir=$(segment_git_dir "$2" "$3" "${w[0]}" "$4")
+  if [ "${w[0]}" = worktree ]; then
+    [ "${w[1]:-}" = add ] || return 0
+    rec=$(worktree_after "$dir" "${w[@]:2}")
+    [ -n "$rec" ] || return 0
+    key=$(repo_key "${rec%%$'\t'*}")
+    name=${rec#*$'\t'}
+  else
+    name=$(branch_after "$dir" "${w[@]}")
+    key=$(repo_key "$dir")
+  fi
+  [ -n "$name" ] || return 0
+  _BR_AT[${#_BR_AT[@]}]=$1
+  _BR_KEY[${#_BR_KEY[@]}]=$key
+  _BR_NAME[${#_BR_NAME[@]}]=$name
+}
+
+UNRESOLVED_PUSH="git push with no branch named, from a directory, repository or branch this guard cannot resolve (a variable, a substitution, a quoted or escaped path, an exported GIT_DIR, a shell string such as bash -c or eval, a checkout or worktree the command itself makes) — name it: git push origin <branch>."
+
 # Prints why a push segment lands on main or master and succeeds; quiet and false for any other push.
-push_hits_main() { # segment, directory it acts on
-  local toks tok skip="" remote="" force="" tags="" refs=() ref dst branch
+push_hits_main() { # segment, directory it acts on, its segment index (none inside a shell string)
+  local toks tok raw skip="" remote="" force="" tags="" refs=() ref dst branch k key
   read -r -a toks <<<"$(push_args "$1")"
   for tok in "${toks[@]}"; do
     [ -z "$skip" ] || { skip=""; continue; }
+    raw=$tok
     tok=$(unquote "$tok")
     case "$tok" in --?*) tok=$(expand_push_option "$tok") ;; esac
     case "$tok" in
@@ -219,30 +368,40 @@ push_hits_main() { # segment, directory it acts on
       --force|--force=*|--force-with-lease|--force-with-lease=*) force=1 ;;
       --*) ;;
       # In a bundle, the first `o` takes the rest of the word as its value, or the next word when it comes last.
-      -[!-]*o) skip=1; case "${tok%%o*}" in *f*) force=1 ;; esac ;;
+      -[!-]*o*) case "${tok#*o}" in '') skip=1 ;; esac; case "${tok%%o*}" in *f*) force=1 ;; esac ;;
       -*f*) force=1 ;;
       -*) ;;
       # An unquoted substitution can expand to no word at all, so the word after it may be the remote and the push bare.
-      *) if [ -z "$remote" ]; then remote=$tok; [ "$tok" != SUBSTITUTION ] || refs[${#refs[@]}]=HEAD
+      *) if [ -z "$remote" ]; then remote=$tok; [ "$raw" != SUBSTITUTION ] || refs[${#refs[@]}]=HEAD
          else refs[${#refs[@]}]="$tok"; fi ;;
     esac
   done
   # `--tags` alone pushes tags only, so no branch is defaulted in.
   [ "${#refs[@]}" -gt 0 ] || [ -n "$tags" ] || refs=(HEAD)
   for ref in "${refs[@]}"; do
+    case "$ref" in :|+:) printf '%s' "git push $ref — the matching refspec pushes every branch that exists on both sides, main included. Push the branch you mean by name."; return 0 ;; esac
     case "$ref" in +*) force=1; ref=${ref#+} ;; esac
     dst=${ref##*:}
     # see: tools/claude/examples/hooks/destructive-guard/README.md § Parser hardening — an unreadable destination is the checked-out branch
     case "$dst" in *SUBSTITUTION*|*TOPLEVEL*|*QUOTED_ARG*|*'$'*|*'`'*) dst=HEAD ;; esac
     if [ "$dst" = HEAD ] || [ "$dst" = @ ]; then
-      if [ "$2" = "?" ]; then
-        printf '%s' "git push with no branch named, from a directory or repository this guard cannot resolve (a variable, a substitution, a quoted or escaped path, an exported GIT_DIR, a shell string such as bash -c or eval) — name it: git push origin <branch>."
-        return 0
-      fi
-      # A failed cd does not stop a `;`-chained push — it runs in the session cwd, so an unusable directory falls back there.
+      [ "$2" != "?" ] || { printf '%s' "$UNRESOLVED_PUSH"; return 0; }
       branch=""
-      if [ -n "$2" ] && git -C "$2" rev-parse --git-dir >/dev/null 2>&1; then
-        branch=$(git -C "$2" branch --show-current 2>/dev/null)
+      if [ "${#_BR_AT[@]}" -gt 0 ] && [ -n "${3:-}" ]; then
+        key=$(repo_key "$2")
+        for ((k = ${#_BR_AT[@]} - 1; k >= 0; k--)); do
+          if [ "${_BR_AT[k]}" -lt "$3" ] && [ "${_BR_KEY[k]}" = "$key" ]; then branch=${_BR_NAME[k]}; break; fi
+        done
+      fi
+      [ "$branch" != "?" ] || { printf '%s' "$UNRESOLVED_PUSH"; return 0; }
+      # A failed cd does not stop a `;`-chained push, so an unusable directory falls back to the session's; a missing one was made by the command.
+      if [ -z "$branch" ] && [ -n "$2" ]; then
+        if git -C "$2" rev-parse --git-dir >/dev/null 2>&1; then
+          branch=$(git -C "$2" branch --show-current 2>/dev/null)
+        elif [ ! -e "$2" ]; then
+          printf '%s' "$UNRESOLVED_PUSH"
+          return 0
+        fi
       fi
       [ -n "$branch" ] || branch=$(git branch --show-current 2>/dev/null)
       dst=$branch
@@ -423,10 +582,14 @@ ALSO: $1"
 # Pattern allows flags between `git` and `push` (e.g., `git -C dir push`).
 PUSH_VIEW=$(strip_redirs "$CMD_MATCH" | sed 's/[;&|]/ & /g')
 # The quote helper keeps a shell string's code, so `bash -c "git push"` ends its push in a quote.
-PUSH_GATE_RE="git[[:space:]]([^|;&]* )?push([\"'[:space:]]|\$)"
+PUSH_GATE_RE="${GIT_SUB_RE}push([\"'[:space:]]|\$)"
 # True when no push in the segment survives removing its quoted strings: it runs inside bash -c, eval or ssh.
 push_in_shell_string() {
-  ! printf '%s' "$1" | perl -pe 's/"(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27/ Q /g' | grep -qE 'git[[:space:]]([^|;&]* )?push([[:space:]]|$)'
+  ! printf '%s' "$1" | perl -pe 's/"(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27/ Q /g' | grep -qE "${GIT_SUB_RE}push([[:space:]]|\$)"
+}
+# The commands in each quoted string of a segment, one per line, one level of escapes decoded: bash -c and eval run them.
+shell_string_cmds() {
+  printf '%s' "$1" | perl -0777 -ne 'while (/"((?:[^"\\]|\\.)*)"|\x27([^\x27]*)\x27/g) { my ($d, $s) = ($1, $2); $s = $d =~ s/\\(["\\\$`])/$1/gr if defined $d; print "$_\n" for split /&&|\|\||[;&|\n]/, $s }'
 }
 if echo "$PUSH_VIEW" | grep -qE 'git[[:space:]]([^|;&]* )?push(["'"'"'[:space:];&|)]|$)'; then
   if ! load_scoped_segments; then
@@ -441,10 +604,20 @@ if echo "$PUSH_VIEW" | grep -qE 'git[[:space:]]([^|;&]* )?push(["'"'"'[:space:];
       echo "$PUSH_SEGMENT" | grep -qE "$PUSH_GATE_RE" || continue
       PUSH_DIR=$(segment_git_dir "$PUSH_SEGMENT" "${_SEG_DIRS[$PUSH_INDEX]}" push "${_SEG_GITENV[$PUSH_INDEX]}")
       push_in_shell_string "$PUSH_SEGMENT" && PUSH_DIR='?'
-      if PUSH_HIT=$(push_hits_main "$PUSH_SEGMENT" "$PUSH_DIR"); then
+      # A refspec read from stdin, or a refspec or mode set with -c, decides what a bare push sends, so it must name its branch.
+      case "$PUSH_SEGMENT" in xargs\ *|*/xargs\ *|*' -c '*remote.*.push=*|*' -c '*push.default=matching*|*--config-env*) PUSH_DIR='?' ;; esac
+      if PUSH_HIT=$(push_hits_main "$PUSH_SEGMENT" "$PUSH_DIR" "$PUSH_INDEX"); then
         HARD_REASON=$PUSH_HIT
         break
       fi
+      # Every command in a shell string is checked, not only the first push, in a directory the text cannot name.
+      case "$PUSH_SEGMENT" in *[\"\']*)
+        while IFS= read -r PUSH_PIECE; do
+          printf '%s' "$PUSH_PIECE" | grep -qE "$PUSH_GATE_RE" || continue
+          if PUSH_HIT=$(push_hits_main "$PUSH_PIECE" '?'); then HARD_REASON=$PUSH_HIT; break; fi
+        done < <(shell_string_cmds "$PUSH_SEGMENT")
+        [ -z "$HARD_REASON" ] || break ;;
+      esac
     done
   fi
 fi
@@ -609,7 +782,7 @@ resolve_segment_dirs
 for ((CO_INDEX=0; CO_INDEX<${#_SCOPED_TYPES[@]}; CO_INDEX++)); do
   [ "${_SCOPED_TYPES[$CO_INDEX]}" = S ] || continue
   CO_SEG="${_SEG_TEXT[$CO_INDEX]}"
-  echo "$CO_SEG" | grep -qE 'git[[:space:]]([^|;&]* )?(checkout|switch)([[:space:]]|$)' || continue
+  echo "$CO_SEG" | grep -qE "${GIT_SUB_RE}(checkout|switch)([[:space:]]|\$)" || continue
   echo "$CO_SEG" | grep -qE 'git[[:space:]]([^|;&]* )?checkout +(-- |--$)' && continue
 
   # The -C belonging to THIS invocation, resolved against the directory its segment runs in.
@@ -677,7 +850,7 @@ if echo "$PUSH_VIEW" | grep -qE "${PUSH_SEG}\\+?:" \
 fi
 
 # `-f`, a bundled `-uf` and a `+refspec` are force-pushes too; matching only `--force` left them unguarded.
-if echo "$PUSH_VIEW" | grep -qE "${PUSH_SEG}(--force(-w[a-z-]*)?(=[^[:space:]]*)?|-[a-zA-Z]*f[a-zA-Z]*|\+[^[:space:]]+)([[:space:])]|\$)"; then
+if echo "$PUSH_VIEW" | grep -qE "${PUSH_SEG}(--force(-w[a-z-]*)?(=[^[:space:]]*)?|-[a-zA-Z46]*f[a-zA-Z46]*|\+[^[:space:]]+)([[:space:])]|\$)"; then
   own_pr_lease || add_soft "git push --force — rewrites remote history (also matches -f and +refspec). Confirm with the user first. On your own open PR, \`git push origin <branch> --force-with-lease=<branch>:<sha>\` over only your own commits runs without this prompt when it is the whole command: use \`git -C <dir> push …\`, not \`cd <dir> && git push …\`."
 fi
 
