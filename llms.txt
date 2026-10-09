@@ -1,12 +1,12 @@
 # promptcraft
 
-> Rules, agents, skills, and configs for AI coding assistants — Claude Code, Codex, Cursor, ChatGPT. Tool-agnostic universal content under `shared/`, tool-specific adaptations under `tools/`.
+> Rules, hooks, agents, skills, and configs for AI coding assistants — Claude Code, Codex, Cursor, ChatGPT. Tool-agnostic universal content under `shared/`, tool-specific adaptations under `tools/`.
 
 A reference library meant for humans and AI assistants to browse, copy, and adapt. Not a package or runtime — nothing is installed.
 
 ## Entry points
 
-- [README.md](README.md): human-facing entry point with persona-based routing.
+- [README.md](README.md): human-facing entry point, routed by assistant and by what you can take (guard hooks, a full config, guides, conventions), plus the plugins that grew out of the examples.
 - [AGENTS.md](AGENTS.md): contributor instructions per [agents.md](https://agents.md) convention — read this before editing the repo.
 - [ADOPTION.md](ADOPTION.md): step-by-step guide to copying content into your own assistant setup.
 - [CONTRIBUTING.md](CONTRIBUTING.md): how to open a PR against this repo.

@@ -18,7 +18,7 @@ PR Review Request
        └─── config-reviewer      (agent definitions, skills, commands, CLAUDE.md)
 ```
 
-The orchestrator (main Claude session or a `/pr-review` skill) examines the changed files, spawns only the relevant reviewer(s), collects findings, and presents them to the user before posting.
+The orchestrator (main Claude session or a review skill) examines the changed files, spawns only the relevant reviewer(s), collects findings, and presents them to the user before posting.
 
 ## Why Three?
 
@@ -117,9 +117,9 @@ System prompt includes:
 
 ## Orchestration
 
-### Via Skill (`/pr-review`)
+### Via Skill
 
-The most ergonomic approach is a skill that:
+[claude-reviewkit](https://github.com/asaphe/claude-reviewkit)'s `/reviewkit:review` is a packaged version of this skill with two domain-agnostic lenses (security and systemic patterns) that run on every PR in place of a routed domain trio; steps 4–6 below are what it does with their findings. To route to your own domain reviewers instead, write a skill that:
 
 1. Fetches the PR's changed files
 2. Classifies files by domain

@@ -50,6 +50,8 @@ For each PR, classify every check into one of:
 - **expected** — `status == "expected"` (check was never reported — likely a branch ruleset mismatch)
 - **action_required** — `conclusion == "action_required"` or `conclusion == "stale"` or `conclusion == "startup_failure"` (uncommon — surface explicitly)
 
+This classifies every check without knowing which ones the base branch requires, and counts `skipped` and `neutral` as passed. For a merge-readiness verdict, [claude-reviewkit](https://github.com/asaphe/claude-reviewkit)'s `scripts/pr-ci-verdict.sh <PR>` checks the head against the required contexts from rulesets and branch protection, and never reads a pending, unreported or skipped required check as green.
+
 ### 4. Present CI summary
 
 ```text

@@ -1,6 +1,6 @@
 # promptcraft
 
-Rules, agents, skills, and configs for AI coding assistants — Claude Code, Codex, Cursor, ChatGPT.
+Rules, hooks, agents, skills, and configs for AI coding assistants — Claude Code, Codex, Cursor, ChatGPT.
 
 Distilled from real production use. Copy what fits, ignore what doesn't, adapt to your stack.
 
@@ -15,11 +15,12 @@ Pick your assistant:
 
 The universal content — principles, language standards, infra patterns, CI/CD, quality — lives in [`shared/`](shared/) and is referenced by the tool directories.
 
-## Who this is for
+## What you can take from it
 
-- **DevOps / platform engineers** setting up Claude Code for infra work — `tools/claude/examples/config/global-CLAUDE.md` is the highest-leverage single file.
-- **Developers** tuning Cursor or ChatGPT to match their team's code style — `shared/languages/` + `tools/<tool>/` gets you 80% of the way.
-- **AI tooling tinkerers** wanting hook / agent / skill patterns to fork — `tools/claude/examples/hooks/` and `tools/claude/examples/agents/`.
+- **Guard hooks** — [`tools/claude/examples/hooks/`](tools/claude/examples/hooks/): PreToolUse hooks that block or confirm risky commands — a push to the default branch, destructive git and cloud operations, a PR opened before its branch is pushed — each with a README. The main guards ship fixture tests and a mutation suite in [`hook-tests/`](tools/claude/examples/hook-tests/).
+- **A complete Claude Code config** — global rules in [`global-CLAUDE.md`](tools/claude/examples/config/global-CLAUDE.md), the agents, skills, rules and on-demand docs around it in [`tools/claude/examples/`](tools/claude/examples/), and a per-repo `.claude/` in [`tools/claude/scaffolding/`](tools/claude/scaffolding/).
+- **Guides and templates** — how to write agents, skills, hooks and `CLAUDE.md` files, and what belongs in each: [`tools/claude/guides/`](tools/claude/guides/) and [`tools/claude/templates/`](tools/claude/templates/).
+- **Conventions for any assistant** — principles, language standards and infrastructure patterns in [`shared/`](shared/), with ready-to-paste forms for Cursor and ChatGPT under `tools/<tool>/`.
 
 ## Distinguishing patterns
 
@@ -79,10 +80,11 @@ for the path-by-path map.
 Claude Code plugins:
 
 - **[claude-secret-guard](https://github.com/asaphe/claude-secret-guard)** — keeps secrets out of context, transcripts, and files Claude writes. Narrow, near-zero-false-positive shape blocks plus masked cache wrappers for 1Password and Secrets Manager.
-- **[claude-reviewkit](https://github.com/asaphe/claude-reviewkit)** — portable evidence-based PR review: two-pass scan/verify, calibrated severity, a mandatory adversarial pass.
+- **[claude-reviewkit](https://github.com/asaphe/claude-reviewkit)** — portable evidence-based PR review and finalize: two-pass scan/verify, calibrated severity, a mandatory adversarial pass, re-reviews that re-check every earlier finding at the new head, a full comment inventory, and a CI verdict that never reads a pending or skipped required check as green.
 - **[claude-learning-loop](https://github.com/asaphe/claude-learning-loop)** — the self-improvement feedback loop: capture friction at session end, gate it, codify the survivors as principles.
 - **[claude-intent-router](https://github.com/asaphe/claude-intent-router)** — a UserPromptSubmit hook that routes short free-text intents to the right skill.
 - **[claude-planning](https://github.com/asaphe/claude-planning)** — the phase-gated planning/RFC workflow: research before solving, an open-questions gate, an approval gate before execution.
+- **[ghostty-agent-status](https://github.com/asaphe/ghostty-agent-status)** — working, waiting and idle status for Claude Code and Codex sessions in Ghostty tab titles, a colored repo-and-branch marker per tab, and a sidebar that jumps to each session. [`hooks/iterm2-session/`](tools/claude/examples/hooks/iterm2-session/) marks iTerm2 tabs by repo and branch.
 
 Standalone tools:
 

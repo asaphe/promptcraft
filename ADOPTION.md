@@ -4,7 +4,7 @@ How to start using promptcraft content in your own AI assistant setup. Each tool
 
 Nothing here is installed — you copy, paste, edit, commit. The repo is source material, not a dependency.
 
-## Quickstart by persona
+## Quickstart by goal
 
 Pick the closest match and start there. Each starter set is a minimal viable adoption — copy these and you have something useful in <15 minutes; expand later.
 
@@ -28,9 +28,9 @@ cp tools/claude/examples/hooks/_lib/*.sh tools/claude/examples/hooks/_lib/*.pl ~
 
 Then register each hook in `~/.claude/settings.json` per its README. You're done.
 
-### Bootstrap a Claude Code DevOps setup from scratch
+### Bootstrap a full Claude Code setup from scratch
 
-You have no `~/.claude/CLAUDE.md` and want a complete DevOps-flavored setup.
+You have no `~/.claude/CLAUDE.md` and want the complete example: global rules, safety hooks, and a per-repo `.claude/`.
 
 ```bash
 # 1. Global config
@@ -46,11 +46,9 @@ cp -r tools/claude/scaffolding/.claude/ /path/to/your-project/.claude/
 
 Then read [`tools/claude/guides/claude-best-practices.md`](tools/claude/guides/claude-best-practices.md) for the why behind the patterns.
 
-### Bootstrap a Claude Code setup (general developer, not DevOps)
+### Assemble a smaller Claude Code setup
 
-The DevOps-flavored `global-CLAUDE.md` is heavy on AWS, Terraform, EKS. For a general dev setup, do the same as DevOps but treat `global-CLAUDE.md` as a starting frame: keep the universal sections (working style, communication, scope discipline) and prune the AWS / TF / K8s / Datadog blocks.
-
-The principles under [`shared/principles/`](shared/principles/) are language- and stack-agnostic — pull from `tone-and-style.md`, `tool-safety.md`, `operational-safety-patterns.md`, `modular-composition.md` to assemble a personal CLAUDE.md without DevOps clutter.
+The example `global-CLAUDE.md` keeps stack-specific rules out of the global file: cloud authentication, Kubernetes contexts and Terraform discipline belong in a project's `.claude/`. To start smaller than the full example, build a personal CLAUDE.md from the stack-agnostic principles under [`shared/principles/`](shared/principles/) — `tone-and-style.md`, `tool-safety.md`, `operational-safety-patterns.md`, `modular-composition.md` — and add stack-specific rules per project from `tools/claude/examples/rules/`.
 
 ### Cursor starter pack
 
@@ -79,7 +77,7 @@ You only use ChatGPT (no Claude Code, no Cursor) and want sensible defaults.
 # Open ChatGPT → Settings → Personalization → Custom Instructions.
 # Paste the two code blocks from one of:
 cat tools/chatgpt/global/general-instructions.md       # multi-stack default
-cat tools/chatgpt/global/professional-instructions.md  # DevOps-leaning
+cat tools/chatgpt/global/professional-instructions.md  # infrastructure focus
 ```
 
 Each file has two code blocks for the two text fields. **Budget: 1500 chars per field** — don't extend without counting.
@@ -92,7 +90,7 @@ The full per-tool sections below cover the same paths plus the rest of the optio
 
 ### 1. Fastest path: grab the global CLAUDE.md template
 
-The single highest-leverage file for a DevOps-oriented Claude Code setup:
+The single highest-leverage file:
 
 ```bash
 cp tools/claude/examples/config/global-CLAUDE.md ~/.claude/CLAUDE.md
@@ -161,7 +159,7 @@ If you use Cursor's MCP support, `tools/cursor/mcp/` has a reference configurati
 Pick the profile that matches your work:
 
 - `tools/chatgpt/global/general-instructions.md` — multi-stack development (Python, TS, Bash, infra).
-- `tools/chatgpt/global/professional-instructions.md` — primarily DevOps / platform engineering.
+- `tools/chatgpt/global/professional-instructions.md` — infrastructure and automation: Terraform, Kubernetes, Docker, AWS, CI/CD.
 
 Each file has two code blocks — copy them into the matching fields under Settings → Personalization → Custom Instructions.
 

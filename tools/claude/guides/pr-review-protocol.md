@@ -2,6 +2,8 @@
 
 Structured protocol for AI-assisted PR reviews — routing, posting, severity classification, and finding verification.
 
+To install this rather than build it, [claude-reviewkit](https://github.com/asaphe/claude-reviewkit)'s `/reviewkit:review` packages the authorship gate, verification, severity and posting steps below as one skill. In place of routing by file scope, it runs two fixed lenses (security and systemic patterns) on every PR.
+
 ## Authorship Gate — resolve this first
 
 **Before routing by file type, establish whether you authored the PR.** It decides what the review is allowed to do, and getting it wrong in either direction wastes the review:

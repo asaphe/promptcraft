@@ -2,6 +2,8 @@
 
 Shared reference for review agents that need to post structured findings as GitHub PR reviews.
 
+[claude-reviewkit](https://github.com/asaphe/claude-reviewkit)'s `/reviewkit:review` posts the same way — one inline comment per finding through the pull-request comments endpoint, anchored by `path`, `line` and `commit_id`, never the diff `position` — once you confirm. Use this file when your own reviewers post.
+
 ## Prerequisites
 
 - PR number must be known (passed as context or resolved via `gh pr view`)

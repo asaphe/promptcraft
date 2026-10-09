@@ -2,6 +2,8 @@
 
 Mandatory verification steps by finding type. Every finding must include an **Evidence** block showing what was checked and what was found. Findings without evidence are dropped before presentation.
 
+[claude-reviewkit](https://github.com/asaphe/claude-reviewkit)'s `/reviewkit:review` carries a shorter form of this checklist — the Evidence block and a check per finding type — inside its skill; this file is the full version for reviewer agents of your own.
+
 This file is a kernel: the verification rules here apply to every reviewer agent. Per-repo overlays may add domain-specific verification rows that extend it (e.g. a `pr-review-verification.md` next to this file in a downstream repo). Keep the kernel and its overlays in sync; byte-equality is a convention until a CI drift check lands.
 
 ## Evidence Block Format
