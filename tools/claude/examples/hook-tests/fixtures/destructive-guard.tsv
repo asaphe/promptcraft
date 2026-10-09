@@ -404,6 +404,66 @@ allow	cat <<EOF | sh\ngit push origin feature/my-branch\nEOF
 allow	cat <<'EOF' | git commit -F -\ndocs: never git push origin main\nEOF
 allow	cat <<'EOF' | sh inert-script\ngit push origin main\nEOF
 allow	cat <<'EOF' || sh\ngit push origin main\nEOF
+# WHY: an exec wrapper hands its stdin to the interpreter it runs.
+hard	cat <<'EOF' | sudo sh\ngit push origin main\nEOF
+hard	cat <<'EOF' | timeout 5 bash\ngit push origin main\nEOF
+hard	cat <<'EOF' | nohup sh\ngit push origin main\nEOF
+hard	sudo -u builder bash <<'EOF'\ngit push origin main\nEOF
+allow	cat <<'EOF' | sudo tee motd.txt\ngit push origin main\nEOF
+# WHY: a group's stdin reaches every command in it, so an interpreter anywhere inside runs the body.
+hard	cat <<'EOF' | (sh)\ngit push origin main\nEOF
+hard	cat <<'EOF' | ( cd sub; sh )\ngit push origin main\nEOF
+hard	cat <<'EOF' | { cd sub; sh; }\ngit push origin main\nEOF
+allow	cat <<'EOF' | { read x; echo "$x"; }\ngit push origin main\nEOF
+# WHY: a pipeline continues past the newline after `|` and past the bodies it starts.
+hard	cat <<'EOF' |\ngit push origin main\nEOF\nsh
+# WHY: a group's output is every command's in it, so piping the group pipes the body.
+hard	(cat <<'EOF') | sh\ngit push origin main\nEOF
+hard	{ cat <<'EOF'; } | sh\ngit push origin main\nEOF
+hard	{ echo x; cat <<'EOF'; } | bash\ngit push origin main\nEOF
+allow	(cat <<'EOF') > notes.md\ngit push origin main\nEOF
+allow	{ cat <<'EOF'; } > notes.md\ngit push origin main\nEOF
+allow	( cat <<'EOF' ) | grep push\ngit push origin main\nEOF
+# WHY: a substitution's output is code under eval, source, sh -c, at command position, or piped into an interpreter.
+hard	eval "$(cat <<'EOF'\ngit push origin main\nEOF\n)"
+hard	eval $(cat <<'EOF'\ngit push origin main\nEOF\n)
+hard	sh -c "$(cat <<'EOF'\ngit push origin main\nEOF\n)"
+hard	$(cat <<'EOF'\ngit push origin main\nEOF\n)
+hard	`cat <<'EOF'\ngit push origin main\nEOF\n`
+hard	source <(cat <<'EOF'\ngit push origin main\nEOF\n)
+hard	. <(cat <<'EOF'\ngit push origin main\nEOF\n)
+hard	bash <(cat <<'EOF'\ngit push origin main\nEOF\n)
+hard	echo "$(cat <<'EOF'\ngit push origin main\nEOF\n)" | sh
+allow	MSG=$(cat <<'EOF'\ngit push origin main\nEOF\n)
+allow	X=`cat <<'EOF'\ngit push origin main\nEOF\n`
+allow	git commit -m "$(cat <<'EOF'\ndocs: never git push origin main\nEOF\n)"
+allow	diff <(cat <<'EOF'\ngit push origin main\nEOF\n) other.txt
+allow	echo "$(cat <<'EOF'\ngit push origin main\nEOF\n)" > notes.md
+# WHY: a here-string fed to an interpreter is its code.
+hard	bash <<< 'git push origin main'
+hard	sudo bash <<< $'git push origin main'
+hard	x=$(bash <<< "git push origin main")
+allow	grep -c push <<< "git push origin main"
+# WHY: csh, tcsh and the ksh family run a -c string and read stdin like any other shell.
+hard	csh -c 'git push origin main'
+hard	tcsh -c 'git push origin main'
+hard	mksh -c 'git push origin main'
+hard	cat <<'EOF' | mksh\ngit push origin main\nEOF
+hard	csh <<'EOF'\ngit push origin main\nEOF
+# WHY: a Python, Perl, Ruby or Node body is not shell: a stray quote in it is no parse error, and its exec calls are read.
+allow	python3 - <<'EOF'\nprint('''it's''')\nEOF
+allow	perl - <<'EOF'\nprint q{it's};\nEOF
+allow	python3 - <<'EOF'\nprint('git push origin main')\nEOF
+allow	python3 - <<'EOF'\nimport os\nos.system(cmd)\nEOF
+hard	python3 - <<'EOF'\nimport os\nos.system('git push origin main')\nEOF
+hard	python3 - <<'EOF'\nimport subprocess\nsubprocess.run(["git", "push", "origin", "main"], check=True)\nEOF
+hard	perl - <<'EOF'\nsystem("git", "push", "origin", "main");\nEOF
+hard	perl - <<'EOF'\nmy $o = qx(git push origin main); # it's\nEOF
+hard	perl - <<'EOF'\nmy $x = `git push origin main`; # it's\nEOF
+hard	perl - <<'EOF'\nprint q(it's); my $o = `git push origin main`;\nEOF
+hard	ruby - <<'EOF'\nsystem 'git push origin main'\nEOF
+hard	node - <<'EOF'\nrequire('child_process').execSync('git push origin main')\nEOF
+allow	python3 script.py <<'EOF'\nos.system('git push origin main')\nEOF
 # WHY: wrappers pass a static -c payload to Bash for execution.
 #!oracle	env-bash-c	env:bash,-c,git push origin main|bash:-c,git push origin main|git:push,origin,main
 hard	env bash -c 'git push origin main'
