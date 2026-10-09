@@ -1,5 +1,4 @@
 # Pre-existing files with lint violations — fix separately
-tools/claude/templates/agents/review-agent-trio.md
 tools/claude/guides/mcp-management-guide.md
 tools/claude/specs/ci-cd-specification.md
 tools/claude/examples/evals/README.md
