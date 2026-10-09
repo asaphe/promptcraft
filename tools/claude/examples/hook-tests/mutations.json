@@ -103,14 +103,14 @@
     {
       "why": "a verb directly before PRs arms at once again, so `open PRs?` arms the pr grant",
       "replace": {
-        "from": "{ pending = 1; pr_verb = 0 }",
+        "from": "{ if (held_open) pending = 1; else tent = 1; pr_verb = 0 }",
         "to": "{ found = 1 }"
       }
     },
     {
       "why": "a comma stops ending the verb's reach, so \"Leave it open, the PR needs another review\" arms the pr grant",
       "replace": {
-        "from": "$0 == \",\" || $0 == \":\" { if (label != \"\" && pending) found = 1; if ($0 == \":\") tent = 0; pr_verb = 0; opening = 0; fresh = 0; pending = 0;",
+        "from": "$0 == \",\" || $0 == \":\" { if (label == \"answer\" && pending) found = 1; if ($0 == \":\" && label != \"answer\") tent = 0; pr_verb = 0; opening = 0; fresh = 0; pending = 0;",
         "to": "$0 == \",\" || $0 == \":\" {"
       }
     },
@@ -152,8 +152,8 @@
     {
       "why": "every verb holds before PR again, so a terse `create PR` arms nothing",
       "replace": {
-        "from": "fresh = ($0 == \"open\")",
-        "to": "fresh = 1"
+        "from": "held_open = ($0 == \"open\")",
+        "to": "held_open = 1"
       }
     },
     {
@@ -166,7 +166,7 @@
     {
       "why": "a menu label is read as a heading, so the pick `Open PRs` arms nothing",
       "replace": {
-        "from": "asks_for pr \"$answer\" label",
+        "from": "asks_for pr \"$answer\" \"$alabel\"",
         "to": "asks_for pr \"$answer\""
       }
     },
@@ -201,7 +201,7 @@
     {
       "why": "a later colon stops cancelling a held `open PRs`, so `Open PRs for review: 3` arms the pr grant",
       "replace": {
-        "from": "if ($0 == \":\") tent = 0; ",
+        "from": "if ($0 == \":\" && label != \"answer\") tent = 0; ",
         "to": ""
       }
     },
@@ -210,6 +210,41 @@
       "replace": {
         "from": "s/\\([^a-z]\\)prs* *[#-]* *",
         "to": "s/\\([^a-z]\\)prs* *#* *"
+      }
+    },
+    {
+      "why": "a question's colon commits a held `open PRs`, so `Open PRs: 3 need review. Merge them?` answered Yes arms the pr grant",
+      "replace": {
+        "from": "if (label == \"answer\" && pending) found = 1;",
+        "to": "if (label != \"\" && pending) found = 1;"
+      }
+    },
+    {
+      "why": "a pick among PRs the question names arms, so `Which PRs should I summarize?` answered `Open PRs` arms the pr grant",
+      "replace": {
+        "from": " && alabel=\"\"",
+        "to": ""
+      }
+    },
+    {
+      "why": "any `did` makes a question, so `I did the rebase, now open a PR` arms nothing",
+      "replace": {
+        "from": " && ($0 in subj)",
+        "to": ""
+      }
+    },
+    {
+      "why": "a colon after `create PR` stops cancelling it, so a pasted `create PR: failed` report line arms the pr grant",
+      "replace": {
+        "from": "else tent = 1;",
+        "to": "else found = 1;"
+      }
+    },
+    {
+      "why": "a colon in a picked label cancels it, so the pick `Open PRs for both: services and infra` arms nothing",
+      "replace": {
+        "from": " && label != \"answer\") tent = 0",
+        "to": ") tent = 0"
       }
     }
   ],
@@ -349,13 +384,6 @@
       }
     },
     {
-      "why": "a push inside a shell string reads the segment's directory again, so `sh -c \"cd <main> && git push\"` from a feature checkout passes",
-      "replace": {
-        "from": "push_in_shell_string \"$PUSH_SEGMENT\" && PUSH_DIR='?'",
-        "to": ":"
-      }
-    },
-    {
       "why": "an abbreviated long option stops naming its option, so `git push --recu check origin` from main reads `check` as the remote",
       "replace": {
         "from": "case \"$tok\" in --?*) tok=$(expand_push_option \"$tok\") ;; esac",
@@ -477,8 +505,8 @@
     {
       "why": "a substitution's export leaks again, so `x=$(export GIT_DIR=<feature>/.git); git push` passes",
       "replace": {
-        "from": "         gitenv=\"${envstack[${#envstack[@]}-1]}\"; unset 'envstack[${#envstack[@]}-1]'; continue ;;",
-        "to": "continue ;;"
+        "from": "         gitenv=\"${envstack[${#envstack[@]}-1]}\"; unset 'envstack[${#envstack[@]}-1]'\n",
+        "to": ""
       }
     },
     {
@@ -603,15 +631,15 @@
     {
       "why": "`|| exit` stops holding the chain, so `git checkout -b topic-9 || exit 1; git push -u origin HEAD` from main hard-blocks",
       "replace": {
-        "from": "    case \"$last_op:$seg\" in '||:exit'|'||:exit '*|'||:return'|'||:return '*) held=1 ;; esac\n",
-        "to": ""
+        "from": "'||:exit'|'||:exit '*) [ \"${#stack[@]}\" -gt 0 ] || held=1 ;; ",
+        "to": "'||:exit'|'||:exit '*) ;; "
       }
     },
     {
       "why": "a negated if condition is trusted, so `if ! git checkout -b feature; then git push` from main passes",
       "replace": {
-        "from": "'if !'*|'elif !'*|'while !'*) cond=\"\" ;; ",
-        "to": ""
+        "from": "[[ $seg =~ ^[a-z]+[[:space:]]+! ]] || cond=1",
+        "to": "cond=1"
       }
     },
     {
@@ -815,6 +843,55 @@
       "replace": {
         "from": "case \"$(unquote \"$gitenv\")\" in \"$TOPLEVEL_MARK\"*)",
         "to": "case \"$gitenv\" in \"$TOPLEVEL_MARK\"*)"
+      }
+    },
+    {
+      "why": "a substitution splits its command's chain again, so `git checkout -b topic-1 && git commit -qm \"$(date)\" && git push -u origin HEAD` from main hard-blocks",
+      "replace": {
+        "from": "         last_op=${saved%%|*}; saved=${saved#*|}; chain=${saved%%|*}; saved=${saved#*|}; held=${saved%%|*}; cond=${saved#*|}\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "an `|| exit` inside a subshell holds the chain, so `(git checkout -b feature || exit ); git push -u origin HEAD` from main passes",
+      "replace": {
+        "from": "[ \"${#stack[@]}\" -gt 0 ] || held=1",
+        "to": "held=1"
+      }
+    },
+    {
+      "why": "a negated move keeps its chain, so `! git checkout -b feature && git push -u origin HEAD` from main passes",
+      "replace": {
+        "from": "    [ -z \"$neg\" ] || chain=$((chain + 1))\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a create-or-exit group stops returning to the move's chain, so `git checkout -b topic-1 || { echo exists; exit 1; }; git push -u origin HEAD` from main hard-blocks",
+      "replace": {
+        "from": "[ -z \"$grp_exit\" ] || { chain=$grp_chain; held=1; }; ",
+        "to": ""
+      }
+    },
+    {
+      "why": "a branch an earlier move creates is not a branch yet, so `git checkout -b topic-1 || git checkout topic-1 && git push -u origin HEAD` from main hard-blocks",
+      "replace": {
+        "from": "          case \" ${_BR_NAME[*]:-} \" in *\" ${pos[0]} \"*) new=${pos[0]} ;; esac\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a short-option bundle hides its create letter, so `git checkout -qb topic-1 && git push -u origin HEAD` from main hard-blocks",
+      "replace": {
+        "from": "    case \"$sub:$w\" in checkout:-[!-bB]*[bB]|switch:-[!-cC]*[cC]) w=-${w#\"${w%?}\"} ;; esac\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "an unquoted substitution ends an option value at its space, so `git -C $(git rev-parse --show-toplevel) push -f origin topic-1` runs unprompted",
+      "replace": {
+        "from": "|\\$\\([^()]*\\)|",
+        "to": "|"
       }
     }
   ],
