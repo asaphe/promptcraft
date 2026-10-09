@@ -925,6 +925,13 @@
         "from": "|\\$\\([^()]*\\)|",
         "to": "|"
       }
+    },
+    {
+      "why": "the push gate stops reading a backslash after the verb, so `bash -c \"git push\\\"\\\" origin main\"` skips every push check",
+      "replace": {
+        "from": "push([\"'\"'\"'\\\\[:space:];&|)]|$)",
+        "to": "push([\"'\"'\"'[:space:];&|)]|$)"
+      }
     }
   ],
   "pr-create-guard": [

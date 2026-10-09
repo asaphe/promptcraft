@@ -659,6 +659,9 @@ hard	bash -c "git -c \"user.name=A B\" push origin main"
 hard	eval "git -C \"my dir\" push origin main"
 hard	ssh host "git -C \"srv/my app\" push origin main"
 allow	bash -c "git -C \"my dir\" push origin feature/my-branch"
+# WHY: an escaped quote glued to the verb still opens the push check; `push""` is not read as git's subcommand, so any refspec blocks as unresolved.
+hard	bash -c "git push\"\" origin main"
+hard	bash -c "git push\"\" origin feature/my-branch"
 # WHY: a cd in a pipeline component or a background job runs in a subshell.
 hard	cd {push_main} && cd {push_feature} | true; git push
 allow	cd {push_main} | true; git push

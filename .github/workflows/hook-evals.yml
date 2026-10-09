@@ -66,7 +66,7 @@ jobs:
   # Every mutation reruns a whole suite, so they get their own sharded job instead of the evals budget.
   mutations:
     runs-on: ubuntu-latest
-    # A destructive-guard shard holds at most 13 mutations, each rerunning at most 489 cases at about 0.17 s a case on CI: about 18 minutes.
+    # A destructive-guard shard holds at most 13 mutations, each rerunning at most 491 cases at about 0.17 s a case on CI: about 18 minutes.
     timeout-minutes: 25
     strategy:
       fail-fast: false
