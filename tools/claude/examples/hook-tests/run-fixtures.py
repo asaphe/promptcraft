@@ -226,7 +226,8 @@ def resolve_hook(hooks_dir, name):
     sys.exit("no hook %r under %s (tried both flat and <name>/<name>.sh)" % (name, hooks_dir))
 
 
-def parse_fixture(path):
+def parse_fixture(path, raws=None):
+    """`raws`, when given, receives each case's column 2 as written: the text a mutation's witness names."""
     cases = []
     event, tool, escapes, setup_name = "PreToolUse", "Bash", False, ""
     for raw in path.read_text().splitlines():
@@ -254,6 +255,8 @@ def parse_fixture(path):
         # A doubled tab empties column 2, and an empty command passes while testing nothing.
         if cmd != ABSENT and not cmd.strip():
             sys.exit("empty command in fixture line (a stray extra TAB?): %r" % raw)
+        if raws is not None:
+            raws.append(cmd)
         if escapes and cmd != ABSENT:
             cmd = unescape_cmd(cmd)
         # Bound per case: a mid-file directive must not apply to earlier cases too.
@@ -337,9 +340,13 @@ def run_case(index, case, cwd, env, args, hook_path, tmp):
     return expected, got, cmd, proc.stderr
 
 
-def run_cases(cases, tokens, cwd, env, args, hook_path, failures, tmp):
+def run_cases(cases, tokens, cwd, env, args, hook_path, failures, tmp, raws=None):
     """Returns how many cases ran: --fail-fast stops at the first mismatch that is not a TIMEOUT."""
     cases = [substitute_case(case, tokens) for case in cases]
+    # see: README.md § Mutation witnesses — the cases a mutation's witness names run first; the order is otherwise the file's
+    if raws and args.first:
+        order = sorted(range(len(cases)), key=lambda i: raws[i] not in args.first)
+        cases, raws = [cases[i] for i in order], [raws[i] for i in order]
     # Results are read in file order, so output and the fail-fast stop match a serial run.
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs)
     try:
@@ -354,6 +361,9 @@ def run_cases(cases, tokens, cwd, env, args, hook_path, failures, tmp):
             if got == "error" and expected != "error":
                 print("       stderr: %s" % " ".join(stderr.split())[:150])
             if args.fail_fast and got != expected and got != "TIMEOUT":
+                # Column 2 as written is one line, so mutate-fixtures.py can record it as this break's witness.
+                if raws:
+                    print("first failure: %s" % raws[ran - 1])
                 return ran
         return len(cases)
     finally:
@@ -374,6 +384,8 @@ def main():
     # Each case is its own hook process, so N can run at once; a hook whose verdict reads state an earlier case left must stay at 1.
     ap.add_argument("--jobs", type=int, default=1,
                     help="cases to run at once (default 1); results still print in file order")
+    ap.add_argument("--first", action="append", default=[], metavar="COLUMN2",
+                    help="run the cases whose column 2, as written, equals this first (repeatable; mutation witnesses)")
     args = ap.parse_args()
     if args.jobs < 1:
         sys.exit("--jobs must be 1 or more: %d" % args.jobs)
@@ -383,7 +395,8 @@ def main():
     if not fixture_path.is_file():
         sys.exit("missing fixture: %s" % fixture_path)
 
-    cases, setup_name = parse_fixture(fixture_path)
+    raws = []
+    cases, setup_name = parse_fixture(fixture_path, raws)
 
     # Redirected, or fixture runs land in the live corpus and inflate its counts.
     tmp = tempfile.mkdtemp(prefix="fixture-diag-")
@@ -408,7 +421,7 @@ def main():
 
     failures = []
     try:
-        ran = run_cases(cases, tokens, cwd, env, args, hook_path, failures, tmp)
+        ran = run_cases(cases, tokens, cwd, env, args, hook_path, failures, tmp, raws)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

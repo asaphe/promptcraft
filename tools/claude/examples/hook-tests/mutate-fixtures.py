@@ -35,6 +35,12 @@ mutation stops at its first real failure instead of running every remaining case
 
 `--shard K/N` runs every Nth mutation starting at the Kth, so CI can split one long run.
 
+A mutation's optional `witness` lists fixture rows, by column 2 as written, that caught it before;
+they run first, so a caught mutation costs a case or two instead of every case ahead of its catch.
+A witness that no longer catches costs nothing but time: the rest of the suite still runs, and
+the run says the witness missed. `--record-witnesses OUT.json` writes each caught mutation's
+first failing row, and `--apply-witnesses OUT.json ...` merges such files into the manifest.
+
 The copy is a whole tree under a temp dir, so the live hooks are never edited.
 """
 
@@ -52,6 +58,21 @@ HERE = pathlib.Path(__file__).resolve().parent
 MANIFEST = HERE / "mutations.json"
 # run-fixtures.py's summary row for one mismatched case.
 FAILURE_LINE = re.compile(r"^  want=[^\t\n]*\tgot=([^\t\n]*)\t", re.M)
+# run-fixtures.py's --fail-fast stop row: the failing case's column 2 as written.
+FIRST_FAILURE = re.compile(r"^first failure: (.*)$", re.M)
+
+
+def apply_witnesses(manifest_path, recorded_paths):
+    """Merges --record-witnesses files into the manifest, replacing each recorded mutation's witness."""
+    manifest = json.loads(pathlib.Path(manifest_path).read_text())
+    count = 0
+    for path in recorded_paths:
+        for hook, entries in json.loads(pathlib.Path(path).read_text()).items():
+            for index, row in entries.items():
+                manifest[hook][int(index)]["witness"] = [row]
+                count += 1
+    pathlib.Path(manifest_path).write_text(json.dumps(manifest, indent=2) + "\n")
+    print("%d witnesses written to %s" % (count, manifest_path))
 
 
 def apply_mutation(text, mutation):
@@ -87,7 +108,14 @@ def main():
     ap.add_argument("--shard", default="1/1", help="K/N: run every Nth mutation, starting at the Kth")
     ap.add_argument("--jobs", help="cases each suite runs at once, passed to run-fixtures.py")
     ap.add_argument("--manifest", default=str(MANIFEST))
+    ap.add_argument("--record-witnesses", metavar="OUT.json",
+                    help="write each caught mutation's first failing row here, for --apply-witnesses")
+    ap.add_argument("--apply-witnesses", nargs="+", metavar="OUT.json",
+                    help="merge recorded witness files into --manifest and exit")
     args = ap.parse_args()
+    if args.apply_witnesses:
+        apply_witnesses(args.manifest, args.apply_witnesses)
+        return
     shard = re.fullmatch(r"([1-9][0-9]*)/([1-9][0-9]*)", args.shard)
     if not shard or int(shard.group(1)) > int(shard.group(2)):
         sys.exit("--shard must be K/N with 1 <= K <= N: %r" % args.shard)
@@ -105,11 +133,11 @@ def main():
     tree = tmp / "hooks"
     shutil.copytree(src, tree)
 
-    failures, total, position = [], 0, -1
+    failures, total, position, missed, recorded = [], 0, -1, 0, {}
     for hook in wanted:
         target = resolve_target(tree, hook)
         pristine = target.read_text()
-        for mutation in manifest[hook]:
+        for index, mutation in enumerate(manifest[hook]):
             position += 1
             if position % shard_n != shard_k:
                 continue
@@ -129,15 +157,25 @@ def main():
                 cmd += ["--timeout", args.timeout]
             if args.jobs:
                 cmd += ["--jobs", args.jobs]
+            witness = mutation.get("witness", [])
+            for row in witness:
+                cmd += ["--first", row]
             started = time.monotonic()
             proc = subprocess.run(cmd, capture_output=True, text=True)
             took = time.monotonic() - started
             target.write_text(pristine)
             got = [m.group(1) for m in FAILURE_LINE.finditer(proc.stdout)]
             caught = proc.returncode != 0 and any(g != "TIMEOUT" for g in got)
+            first = FIRST_FAILURE.search(proc.stdout)
+            stale = ""
+            if caught and first:
+                recorded.setdefault(hook, {})[str(index)] = first.group(1)
+                if witness and first.group(1) not in witness:
+                    missed += 1
+                    stale = ", witness missed"
             tally = next((ln for ln in proc.stdout.splitlines() if "passed" in ln), "?")
             label = "ok  " if caught else ("FAIL" if proc.returncode == 0 else "INCONCLUSIVE")
-            print("%s %s: %s  [%s, %.0fs]" % (label, hook, mutation["why"], tally.strip(), took),
+            print("%s %s: %s  [%s, %.0fs%s]" % (label, hook, mutation["why"], tally.strip(), took, stale),
                   flush=True)
             if proc.returncode == 0:
                 failures.append((hook, mutation["why"], "suite still passed with the hook broken"))
@@ -148,7 +186,11 @@ def main():
                                  % proc.returncode))
 
     shutil.rmtree(tmp, ignore_errors=True)
+    if args.record_witnesses:
+        pathlib.Path(args.record_witnesses).write_text(json.dumps(recorded, indent=2) + "\n")
     print("\n%d/%d mutations caught" % (total - len(failures), total))
+    if missed:
+        print("%d witness(es) missed: the suite still caught them; refresh with --record-witnesses" % missed)
     if failures:
         print("\nNOT CAUGHT:")
         for hook, why, how in failures:
