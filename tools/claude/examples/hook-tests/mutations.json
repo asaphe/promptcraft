@@ -412,7 +412,7 @@
       }
     },
     {
-      "why": "a push that closes its shell string stops counting, so `cd {push_main} && bash -c \"git push\"` reads no push",
+      "why": "a quote glued to the verb stops counting it, so `bash -c 'git push\"\" origin main'` reads no push",
       "replace": {
         "from": "PUSH_GATE_RE=\"${GIT_SUB_RE}push([\\\"'[:space:]]|\\$)\"",
         "to": "PUSH_GATE_RE=\"${GIT_SUB_RE}push([[:space:]]|\\$)\""
@@ -615,7 +615,7 @@
       }
     },
     {
-      "why": "a negated condition counts as its then, so `if ! git checkout -b feature; then git push` from main passes",
+      "why": "a `then` keeps the chain of any command before it, so `if git pull || git checkout -b feature; then git push` from main passes",
       "replace": {
         "from": "'&&:'*|*:1:'then '*|*:1:then|",
         "to": "'&&:'*|*:'then '*|*:then|"
