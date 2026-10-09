@@ -1,6 +1,6 @@
 # promptcraft
 
-> Rules, hooks, agents, skills, and configs for AI coding assistants — Claude Code, Codex, Cursor, ChatGPT. Tool-agnostic universal content under `shared/`, tool-specific adaptations under `tools/`.
+> Rules, hooks, agents, skills, and configs for AI coding assistants — Claude Code, Codex, Cursor, ChatGPT. Cross-tool source material under `shared/`, tool-specific adaptations under `tools/`.
 
 A reference library meant for humans and AI assistants to browse, copy, and adapt. Not a package or runtime — nothing is installed.
 
@@ -15,7 +15,7 @@ A reference library meant for humans and AI assistants to browse, copy, and adap
 
 ## Universal content (shared/)
 
-Tool-agnostic — applies to any AI coding assistant.
+Tool-agnostic source material; select relevant guidance and adapt project conventions to their actual contracts.
 
 - [shared/principles/](shared/principles/): development principles, modular composition (the Lego principle), tone & style, tool safety, operational safety, agent design, prompting examples, CLI design, personal conventions.
 - [shared/languages/](shared/languages/): TypeScript, Python, Bash, Java, Go, general cross-language standards.
@@ -45,6 +45,7 @@ Tool-agnostic — applies to any AI coding assistant.
 
 - [tools/cursor/rules/user/](tools/cursor/rules/user/): markdown for Cursor's User Rules UI (Settings → Rules).
 - [tools/cursor/rules/mdc/](tools/cursor/rules/mdc/): `.mdc` files for `.cursor/rules/` project-rule directories.
+- [tools/cursor/rules/mdc-templates/](tools/cursor/rules/mdc-templates/): structured JSON references requiring conversion to MDC; source identifier guidance excludes configuration/resource schemas.
 - [tools/cursor/mcp/](tools/cursor/mcp/): MCP server configuration for Cursor.
 - [tools/cursor/recovery/](tools/cursor/recovery/): utility to recover conversation history across workspaces.
 

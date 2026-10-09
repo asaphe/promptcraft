@@ -66,9 +66,9 @@ gh api POST /repos/{owner}/{repo}/pulls/{number}/comments \
 gh pr review {number} --request-changes --body "2 blocking, 4 suggestions"
 ```
 
-**Do not use `POST /pulls/{n}/reviews` with a `comments[]` array for interactive review.** That bulk path is known to silently drop inline comments — the API returns 201 and the comments never appear on the PR, which reads as a successful post. It remains reasonable in CI, where a single atomic call is worth the risk, or when posting a summary with no inline comments at all. Details and the full per-comment field set: [`../examples/docs/pr-review-posting.md`](../examples/docs/pr-review-posting.md).
+The [GitHub create-review API](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request) supports a `comments` array. Per-comment posting is this workflow's choice, allowing each response to be checked independently; bulk review creation is also supported. Read back the created comments and review to verify paths, lines, bodies and review state. Details: [`../examples/docs/pr-review-posting.md`](../examples/docs/pr-review-posting.md).
 
-The review submitted in step 2 is what groups the inline comments under a review event and sets the state visible on the PR page; without it they sit as loose comments.
+The review submitted in step 2 sets the state visible on the PR page. Previously posted standalone comments remain separate; use the create-review `comments` array if they should belong to one review.
 
 **The review state is a merge authorization, not a tone — pick it from your findings.** The example above uses `--request-changes` for illustration; it is not a default. Choose from what you want to happen, never by looking up the highest severity present:
 

@@ -173,7 +173,7 @@ When a system has **two configuration surfaces that must agree** (e.g., a pod's 
 When you need an isolated copy of a repo to do safe rebase or branch work:
 
 - **Use `git worktree add /tmp/wt-name branch-name`** — creates a fully functional working tree sharing the same git object store
-- **Never use `cp -r`** — silently skips hidden directories (`.git`, `.claude`, `.github`, `.env`), and fails or hangs on deeply nested `node_modules`
+- **Prefer a worktree to copying the directory** — `cp -r source destination` includes hidden entries when `source` is a directory. Shell wildcards such as `source/*` commonly omit dotfiles before `cp` runs. A full directory copy also duplicates Git metadata and potentially large dependencies; a worktree avoids those unnecessary copies.
 
 If the branch is already checked out in the main worktree, worktree add will fail. In that case, the remote branch itself is the backup — proceed with `git reset --soft` or rebase in the main tree, knowing `git reset --hard origin/<branch>` restores everything.
 

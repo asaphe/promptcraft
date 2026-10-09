@@ -1,6 +1,6 @@
 # tools/claude/
 
-Claude Code configurations, guides, templates, and production examples.
+Claude Code configurations, guides, templates, and examples drawn from production use. The collection is broad; harness tests cover the documented adoption recipes and named guard contracts, not every example or live Claude client behavior.
 
 ## What's here
 

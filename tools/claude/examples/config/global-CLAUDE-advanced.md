@@ -265,7 +265,7 @@ _Scope: universal._
 - **Adversarial pass on every review** — challenge your findings ("would I stake credibility on this?") and their absence ("what did I miss?"). Verify author rebuttals.
 - **Self-verify every finding before presenting** — wrong findings destroy credibility; when in doubt, downgrade or drop.
 - **Assume zero-trust** — verify that code does what its comments, names, and PR description claim; don't take it on faith.
-- **All findings as inline diff comments** — `POST /pulls/{n}/comments` per finding with `commit_id`, `path`, `line`, `side: "RIGHT"`; body text is summary only. The review creation endpoint with `comments[]` silently drops inline comments.
+- **All findings as inline diff comments** — `POST /pulls/{n}/comments` per finding with `commit_id`, `path`, `line`, `side: "RIGHT"`; body text is summary only. The [review creation endpoint](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request) also supports `comments[]`; per-comment posting is a workflow choice. Inspect responses and read back comments to verify publication.
 - **Review every file in the diff** — CI workflows, Dockerfiles, lockfiles, and config get the same pass as application code.
 - **Verify findings against `main` before posting** — coordinated changes from prior PRs won't appear in the diff alone.
 - **Fix all actionable findings regardless of severity** — a PR with open linter or tool findings is not merge-ready.

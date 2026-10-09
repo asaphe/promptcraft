@@ -1,12 +1,12 @@
 # Cursor `.mdc` Rule Templates (JSON → MDC)
 
-JSON-encoded rule templates that need conversion to Cursor's official `.mdc` format before use. Each JSON file describes a rule's intent, file globs, and individual checks in structured form — useful as a starting point for writing a real `.mdc` rule.
+JSON-encoded rule templates that need conversion to Cursor's official `.mdc` format before use. Each JSON file describes a rule's intent, file globs, and individual guidance entries in structured form — useful as a starting point for writing a real `.mdc` rule.
 
 > **These JSON files are NOT directly loadable by Cursor.** Cursor Project Rules use `.mdc` (Markdown with YAML frontmatter), not JSON. See [`../mdc/`](../mdc/) for ready-to-use `.mdc` files.
 
 ## Why both formats coexist
 
-The JSON templates were authored as structured rule data — each rule carries `name`, `description`, `filePattern`, and a `rules[]` array of pattern/message/severity triples. Cursor's actual format is Markdown prose with frontmatter. The conversion is mechanical for simple rules, judgment-heavy for complex ones; the JSON is preserved here as raw material for that conversion.
+The JSON templates were authored as structured rule data — each rule carries `name`, `description`, `filePattern`, and a `rules[]` array with messages, severity and optional illustrative patterns. Cursor's actual format is Markdown prose with frontmatter. The conversion is mechanical for simple rules, judgment-heavy for complex ones; the JSON is preserved here as raw material for that conversion.
 
 ## Layout
 
@@ -37,11 +37,12 @@ mdc-templates/
 
 ```json
 {
-  "name": "Universal Naming Conventions",
-  "description": "Enforces safe, portable identifier naming",
+  "name": "Source Identifier Conventions",
+  "description": "Language-specific naming guidance; patterns are illustrative",
   "filePattern": "*.{ts,tsx,js,jsx,py}",
   "rules": [
-    { "pattern": "^[a-z][a-zA-Z0-9_]*$", "message": "Use camelCase or snake_case", "severity": "error" }
+    { "filePattern": "*.{ts,tsx,js,jsx}", "message": "Prefer camelCase variables and functions", "severity": "warning" },
+    { "filePattern": "*.py", "message": "Prefer snake_case variables and functions", "severity": "warning" }
   ]
 }
 ```
@@ -50,7 +51,7 @@ mdc-templates/
 
 ```markdown
 ---
-description: Universal naming conventions — safe, portable identifiers
+description: Source identifier conventions for JavaScript, TypeScript and Python
 globs:
   - "**/*.ts"
   - "**/*.tsx"
@@ -60,20 +61,21 @@ globs:
 alwaysApply: false
 ---
 
-# Universal Naming Conventions
+# Source Identifier Conventions
 
-Enforces safe, portable identifier naming across all languages.
+Follow language and project conventions. Validate syntax and reserved names with the language parser or linter.
 
 ## Rules
 
-- Identifiers: alphanumeric + underscores only.
-- Must start with a letter (not a number).
-- Never use hyphens, dots, or spaces in identifiers.
-- Valid: `deployment_name`, `userId`, `max_retry_count`.
-- Invalid: `deployment-name`, `user.id`, `max retries`.
+- JavaScript/TypeScript: prefer camelCase variables and functions.
+- Python: prefer snake_case variables and functions.
+- Both: prefer PascalCase classes.
+- Configuration keys and resource names follow their own schemas.
 ```
 
 Save as `.cursor/rules/<rule-name>.mdc` in your project, then restart Cursor.
+
+The legacy `naming/universal-naming.json` path now contains source-language guidance only. Its regexes illustrate text patterns; they do not enforce syntax or detect reserved words. YAML, JSON and Terraform are deliberately outside its file scope.
 
 ## Severity levels
 
@@ -87,7 +89,7 @@ JSON `severity` field maps to how strictly the rule should be enforced in prose:
 
 - **TypeScript/JS**: `naming/universal-naming`, `naming/file-naming`, `formatting/code-formatting`, `language-specific/typescript-javascript`, `documentation/code-documentation`.
 - **Python**: same as TS but swap `language-specific/python`.
-- **Terraform**: `terraform/terraform-standards`, `structure/terraform-structure`, `naming/universal-naming`.
+- **Terraform**: `terraform/terraform-standards`, `structure/terraform-structure`; use Terraform/provider schemas for configuration and resource names.
 - **Bash**: `language-specific/bash`, `naming/file-naming`.
 
 ## See also

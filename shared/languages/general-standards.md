@@ -12,10 +12,11 @@
 
 ## Naming Conventions
 
-- **camelCase**: for variables, functions, and method names
-- **PascalCase**: for class names
-- **kebab-case**: for file names and directory structures (matches `CONVENTIONS.md`)
-- **UPPER_CASE**: for environment variables
+- Follow the target language and project conventions: for example, camelCase functions in JavaScript/TypeScript and snake_case functions in Python.
+- Use each language's type and constant conventions; in Go, capitalization also controls export visibility.
+- Follow project file/directory conventions; promptcraft uses kebab-case as described in `CONVENTIONS.md`.
+- Use conventional UPPER_CASE shell environment variables where appropriate.
+- Configuration keys and resource names follow their consuming schema, not a source-identifier regex. Check reserved words with the language parser or linter.
 
 ## Environment Awareness
 
