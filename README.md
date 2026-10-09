@@ -18,7 +18,7 @@ The universal content — principles, language standards, infra patterns, CI/CD,
 ## What you can take from it
 
 - **Guard hooks** — [`tools/claude/examples/hooks/`](tools/claude/examples/hooks/): PreToolUse hooks that block or confirm risky commands — a push to the default branch, destructive git and cloud operations, a PR opened before its branch is pushed — each with a README. The main guards ship fixture tests and a mutation suite in [`hook-tests/`](tools/claude/examples/hook-tests/).
-- **A complete Claude Code config** — global rules in [`global-CLAUDE.md`](tools/claude/examples/config/global-CLAUDE.md), the agents, skills, rules and on-demand docs around it in [`tools/claude/examples/`](tools/claude/examples/), and a per-repo `.claude/` in [`tools/claude/scaffolding/`](tools/claude/scaffolding/).
+- **A standalone Claude baseline** — [`global-CLAUDE.md`](tools/claude/examples/config/global-CLAUDE.md), with separate opt-in [operations rules](tools/claude/examples/profiles/README.md), core hooks and project scaffold. The [advanced author profile](tools/claude/examples/config/global-CLAUDE-advanced.md) is reference-only. Use the four guarded recipes in [`ADOPTION.md`](ADOPTION.md).
 - **Guides and templates** — how to write agents, skills, hooks and `CLAUDE.md` files, and what belongs in each: [`tools/claude/guides/`](tools/claude/guides/) and [`tools/claude/templates/`](tools/claude/templates/).
 - **Conventions for any assistant** — principles, language standards and infrastructure patterns in [`shared/`](shared/), with ready-to-paste forms for Cursor and ChatGPT under `tools/<tool>/`.
 
@@ -66,7 +66,7 @@ See [`ADOPTION.md`](ADOPTION.md) for step-by-step per-tool setup.
 
 TL;DR:
 
-- **Claude Code:** drop files from `tools/claude/examples/` into your own `.claude/` directory and edit to taste.
+- **Claude Code:** start with the standalone global baseline; select operations rules, core hooks or the infrastructure scaffold separately through the guarded recipes in `ADOPTION.md`. Other examples are browse/adapt references.
 - **Codex:** map your `.claude/` setup with `tools/codex/claude-code-translation.md`; run your Claude Code Bash hooks through `tools/codex/bash-hook-dispatcher.sh`.
 - **Cursor:** copy `tools/cursor/rules/user/*.md` into Settings → Rules → User Rules; drop `tools/cursor/rules/mdc/*.mdc` into your repo's `.cursor/rules/`.
 - **ChatGPT:** paste `tools/chatgpt/global/*.md` into Settings → Custom Instructions; paste `tools/chatgpt/projects/*.md` into a Project's instructions.

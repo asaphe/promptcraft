@@ -53,7 +53,7 @@ Each second-level directory has a `README.md` that lists contents and routing ru
 
 ## Cross-links
 
-- Always relative, never absolute URLs for intra-repo links.
+- Ordinary intra-repo links stay relative. Portable copy-ready artifacts may use public upstream browsing URLs for optional source-documentation links; these are help/provenance, never required runtime dependencies.
 - Verify resolution at authoring time — `ls path/to/target` from the file's directory.
 - When you move a file, grep the repo for its old path and update every referrer:
 

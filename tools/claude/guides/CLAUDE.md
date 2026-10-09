@@ -96,7 +96,8 @@ Don't update it just because time passed. Stale rules are worse than absent ones
 ## Examples in this repo
 
 - [`../scaffolding/.claude/CLAUDE.md`](../scaffolding/.claude/CLAUDE.md) — a starter project `CLAUDE.md` you can copy and edit.
-- [`../examples/config/global-CLAUDE.md`](../examples/config/global-CLAUDE.md) — the *global* flavor for comparison; note the different tone and scope.
+- [`../examples/config/global-CLAUDE.md`](../examples/config/global-CLAUDE.md) — standalone global baseline; no companion rules or hooks.
+- [`../examples/config/global-CLAUDE-advanced.md`](../examples/config/global-CLAUDE-advanced.md) — reference-only author profile for comparison.
 
 ## See also
 

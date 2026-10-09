@@ -12,6 +12,8 @@ Claude Code configurations, guides, templates, and production examples.
 
 ## When to read
 
+For first adoption, use the [standalone baseline](examples/config/global-CLAUDE.md) and the four guarded recipes in [ADOPTION.md](../../ADOPTION.md). The [operations profile](examples/profiles/README.md), hooks and infrastructure scaffold are separate opt-in additions. The [advanced global profile](examples/config/global-CLAUDE-advanced.md) and specialized rules are reference-only; do not bulk activate examples.
+
 - Setting up Claude Code in a new repo → `scaffolding/` + `guides/`.
 - Adding a new agent/skill/hook → `templates/` + `guides/`.
 - Looking for a proven pattern → `examples/`.

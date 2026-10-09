@@ -25,6 +25,11 @@ jobs:
       # Printed rather than assumed: runner.py's annotations need 3.10+, and a failure here should name the reason.
       - run: python3 --version
 
+      - name: Check documented adoption recipes and checker failure controls
+        run: |
+          python3 .claude/scripts/check-adoption.py
+          python3 .claude/scripts/test-check-adoption.py
+
       # Before the suite: it only exercises the .claude/ copy, so drift in the published example is invisible to it.
       - name: Check dogfooded copies match the published examples
         run: python3 .claude/scripts/check-mirrors.py

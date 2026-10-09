@@ -188,12 +188,9 @@ Control where generated docs go:
 
 ## Template
 
-Don't copy a template from this guide — use the maintained one. The flagship example lives at [`../examples/config/global-CLAUDE.md`](../examples/config/global-CLAUDE.md), and it is the file the rest of this guide describes.
+Use the [standalone baseline](../examples/config/global-CLAUDE.md) and guarded [basic recipe](../../../ADOPTION.md#standalone-global-baseline). It contains no companion-file dependency, domain machinery, or TODOs.
 
-It carries two things worth lifting even if you write your own from scratch:
-
-- **A scope marker on every `##` section** — `universal` / `opinionated` / `author-specific` — so an adopter can tell at a glance which sections to keep, which to adapt, and which to delete.
-- **A leading always-on checklist** of the eight rules most often violated, each one a single-line restatement of a rule detailed further down. The repetition is deliberate: a rule stated once, twelve sections in, does not fire.
+The [advanced author profile](../examples/config/global-CLAUDE-advanced.md) preserves the fuller checklist and scope-tagged preferences this guide discusses. It is reference-only: adapt selected sections in their original source layout, reviewing all references and assumptions. The [operations profile](../examples/profiles/README.md) is a separate, copy-ready project rule for stateful work; specialized examples are not bulk-installable defaults.
 
 ## Anti-Patterns
 

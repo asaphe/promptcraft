@@ -6,7 +6,7 @@ A reference library meant for humans and AI assistants to browse, copy, and adap
 
 ## Entry points
 
-- [README.md](README.md): human-facing entry point, routed by assistant and by what you can take (guard hooks, a full config, guides, conventions), plus the plugins that grew out of the examples.
+- [README.md](README.md): human-facing entry point, routed by assistant and by what you can take (guard hooks, a standalone baseline, opt-in routes, guides, conventions), plus the plugins that grew out of the examples.
 - [AGENTS.md](AGENTS.md): contributor instructions per [agents.md](https://agents.md) convention — read this before editing the repo.
 - [ADOPTION.md](ADOPTION.md): step-by-step guide to copying content into your own assistant setup.
 - [CONTRIBUTING.md](CONTRIBUTING.md): how to open a PR against this repo.
@@ -29,7 +29,10 @@ Tool-agnostic — applies to any AI coding assistant.
 - [tools/claude/templates/](tools/claude/templates/): starter files — agent templates, skill templates, rule file templates, project-level doc templates.
 - [tools/claude/examples/](tools/claude/examples/): complete reference `.claude/` directory — hooks, agents, rules, skills, evals, config, docs. [RETIRED.md](tools/claude/examples/RETIRED.md) maps examples that moved into maintained plugins and withdrawn executables, with migration stubs.
 - [tools/claude/examples/hook-tests/](tools/claude/examples/hook-tests/): fixture, delivery, event-output contract, metadata-only diagnostic and mutation checks; harness validation rather than live client integration.
-- [tools/claude/scaffolding/](tools/claude/scaffolding/): ready-to-copy `.claude/` skeleton for a new repo.
+- [tools/claude/examples/config/global-CLAUDE.md](tools/claude/examples/config/global-CLAUDE.md): standalone global baseline; no companion rules or hooks.
+- [tools/claude/examples/config/global-CLAUDE-advanced.md](tools/claude/examples/config/global-CLAUDE-advanced.md): reference-only opinionated author profile; adapt sections in the source layout.
+- [tools/claude/examples/profiles/](tools/claude/examples/profiles/): optional project-only operations rules for stateful infrastructure work.
+- [tools/claude/scaffolding/](tools/claude/scaffolding/): optional infrastructure starter with guarded copy recipe and portable help links.
 - [tools/claude/specs/](tools/claude/specs/): RFC-style specifications (CI/CD standard).
 
 ## Codex (tools/codex/)
@@ -57,7 +60,9 @@ Tool-agnostic — applies to any AI coding assistant.
 - [.claude/CLAUDE.md](.claude/CLAUDE.md): project instructions loaded when editing promptcraft itself.
 - [.claude/rules/](.claude/rules/): contributor rules (PII, git, content quality, operational).
 - [.claude/hooks/](.claude/hooks/): live safety hooks dogfooded from `tools/claude/examples/hooks/`, kept byte-identical to them by CI.
-- [.claude/scripts/](.claude/scripts/): the CI checkers that enforce that (`check-mirrors.py`, `check-guard-gate.py`).
+- [.claude/scripts/](.claude/scripts/): mirror, guard-gate, adoption-recipe and tracked-Markdown input checkers with focused self-tests.
+
+- [.claude/evals/adoption-manifest.json](.claude/evals/adoption-manifest.json): four copy-ready artifact inventories, runtime paths and upstream help targets.
 
 ## Optional
 

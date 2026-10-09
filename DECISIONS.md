@@ -144,3 +144,13 @@ A `.claude/README.md` disambiguates the two for anyone who lands there by accide
 2. Repurpose `docs/` for new restructure docs.
 
 **Why this one:** Inspecting the file revealed it's a complete landing page (hero, branding, styling) that would be served at `<user>.github.io/promptcraft/` *if* Pages were enabled from the `docs/` folder. Keeping it costs nothing and preserves that option; moving or repurposing `docs/` would throw the work away and would silently decide the question. Fresh documentation goes to the repo root where it's easier to find.
+
+---
+
+## D10 — Standalone baseline and four verified copy routes
+
+**Decision:** Keep one canonical Claude global baseline without companion dependencies. Preserve the full author profile as reference-only. Offer a project-only operations profile, an explicit core-hook dependency bundle, and a separate infrastructure scaffold through guarded recipes in ADOPTION.
+
+**Why this one:** File-only adoption should work without a transitive configuration package. Explicit artifact inventories and collision checks keep users in control. Relocation checks execute the documented snippets; public browsing links preserve scaffold help without copying whole guide trees. Tracked Markdown selection includes hidden paths and translates the nine existing exclusions into literal pinned-linter inputs.
+
+**Alternatives considered:** Patching every competing copy route retains ambiguous dependencies; packaging all examples adds an installer and support burden unsuitable for a reference collection.
