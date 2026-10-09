@@ -1134,23 +1134,23 @@
       "why": "an ordinary heredoc loses its executable expansions",
       "suite": "destructive-guard",
       "replace": {
-        "from": "$out .= interpolations($body) . \"\\n\";",
-        "to": "$out .= \"\\n\";"
+        "from": "return $doc->{quoted} ? '' : interpolations($body) . \"\\n\";",
+        "to": "return \"\\n\";"
       }
     },
     {
       "why": "quoted heredoc delimiters stop suppressing literal body text",
       "suite": "destructive-guard",
       "replace": {
-        "from": "} elsif (!$doc->{quoted}) {",
-        "to": "} else {"
+        "from": "return $doc->{quoted} ? '' : interpolations($body) . \"\\n\";",
+        "to": "return interpolations($body) . \"\\n\";"
       }
     },
     {
       "why": "a wrapper hides the shell after it, so `printf a | xargs -I{} sh -c 'git push origin main'` reads the push as data",
       "suite": "destructive-guard",
       "replace": {
-        "from": "if ($program =~ m{(?:^|/)(?:xargs|timeout|gtimeout|nice|nohup|sudo|doas|stdbuf|setsid|ionice|find|caffeinate|arch|script|runuser|chroot|unbuffer|chrt|taskset|busybox)$}) {",
+        "from": "if ($program =~ m{(?:^|/)(?:xargs|find|script)$} || $program =~ $STDIN_WRAPPER) {",
         "to": "if (0) {"
       }
     },
@@ -1181,7 +1181,7 @@
     {
       "why": "macOS and Linux exec wrappers stop being looked through, so `caffeinate -i bash -c 'git push origin main'` passes",
       "replace": {
-        "from": "|caffeinate|arch|script|runuser|chroot|unbuffer|chrt|taskset",
+        "from": "|caffeinate|arch|runuser|chroot|unbuffer|chrt|taskset",
         "to": ""
       },
       "suite": "destructive-guard"
@@ -1205,8 +1205,8 @@
     {
       "why": "fish stops being a shell, so `fish -c 'git push origin main'` passes",
       "replace": {
-        "from": "dash|ash|fish)$};\n    # `-c -- '<code>'`",
-        "to": "dash|ash)$};\n    # `-c -- '<code>'`"
+        "from": "|csh|tcsh|fish)$}",
+        "to": "|csh|tcsh)$}"
       },
       "suite": "destructive-guard"
     },
@@ -1214,24 +1214,24 @@
       "why": "a heredoc piped into a shell stays data, so `cat <<EOF | sh` hides the push to main in its body",
       "suite": "destructive-guard",
       "replace": {
-        "from": "$_->{executed} ||= $executed for @$piped;",
-        "to": "$_->{executed} ||= 0 for @$piped;"
+        "from": "        mark($kind, @command_docs, @piped_docs, map { @{$_->{stdin}} } @frames) if $kind;\n",
+        "to": "        mark($kind, @command_docs, map { @{$_->{stdin}} } @frames) if $kind;\n"
       }
     },
     {
       "why": "a pipe into a non-interpreter undoes a body's own interpreter, so `bash <<'EOF' 2>&1 | tail -5` hides the push to main",
       "suite": "destructive-guard",
       "replace": {
-        "from": "$_->{executed} ||= $executed for @$piped;",
-        "to": "$_->{executed} = $executed for @$piped;"
+        "from": "        mark($kind, @command_docs, @piped_docs, map { @{$_->{stdin}} } @frames) if $kind;\n",
+        "to": "        $_->{executed} = $kind for @piped_docs;\n        mark($kind, @command_docs, @piped_docs, map { @{$_->{stdin}} } @frames) if $kind;\n"
       }
     },
     {
       "why": "a heredoc is carried through one pipe only, so `cat <<EOF | tee run.log | sh` hides the push to main",
       "suite": "destructive-guard",
       "replace": {
-        "from": "@$piped = $pipe ? (@$piped, @$docs) : ();",
-        "to": "@$piped = $pipe ? @$docs : ();"
+        "from": "@piped_docs = $pipe ? (@piped_docs, @command_docs) : ();",
+        "to": "@piped_docs = $pipe ? @command_docs : ();"
       }
     },
     {
@@ -1248,6 +1248,166 @@
       "replace": {
         "from": "if ($pipe && substr($text, $i + 1, 1) eq '&') {",
         "to": "if (0) {"
+      }
+    },
+    {
+      "why": "an exec wrapper hides the interpreter reading stdin, so `cat <<'EOF' | sudo sh` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "if ($words[0] =~ $STDIN_WRAPPER) {",
+        "to": "if (0) {"
+      }
+    },
+    {
+      "why": "the ksh family stops being a shell, so `mksh -c 'git push origin main'` passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "ksh|mksh|pdksh|oksh|loksh|lksh|dash",
+        "to": "ksh|dash"
+      }
+    },
+    {
+      "why": "csh and tcsh stop being shells, so `csh -c 'git push origin main'` passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "|posh|yash|csh|tcsh|fish",
+        "to": "|posh|yash|fish"
+      }
+    },
+    {
+      "why": "a group's stdin stops reaching the commands in it, so `cat <<'EOF' | ( cd /tmp; sh )` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "        mark($kind, @command_docs, @piped_docs, map { @{$_->{stdin}} } @frames) if $kind;\n",
+        "to": "        mark($kind, @command_docs, @piped_docs) if $kind;\n"
+      }
+    },
+    {
+      "why": "a subshell's output stops carrying its heredocs, so `(cat <<'EOF') | sh` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "                    push @command_docs, @{$frame->{out}};",
+        "to": "                    1;"
+      }
+    },
+    {
+      "why": "a brace group's output stops carrying its heredocs, so `{ cat <<'EOF'; } | sh` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "push @command_docs, @{(pop @frames)->{out}};",
+        "to": "pop @frames;"
+      }
+    },
+    {
+      "why": "a subshell drops the pipe it opens on, so `cat <<'EOF' | (sh)` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "push @frames, {kind => 'sub', depth => $depth, stdin => [@piped_docs], out => []};",
+        "to": "$finish->($simple, 0);"
+      }
+    },
+    {
+      "why": "a newline after `|` ends the pipeline, so `cat <<'EOF' |`, the body, then `sh` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "my $continues = $pipe_pending && $simple !~ /\\S/;",
+        "to": "my $continues = 0;"
+      }
+    },
+    {
+      "why": "a heredoc found to be code after its body was rendered stays data, so `echo \"$(cat <<'EOF' \u2026)\" | sh` passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "    last unless %LATE;\n",
+        "to": "    last;\n"
+      }
+    },
+    {
+      "why": "a substitution's heredoc stays data under eval, so `eval \"$(cat <<'EOF' \u2026)\"` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "if ($code) { mark(2, @$docs); }",
+        "to": "if (0) { mark(2, @$docs); }"
+      }
+    },
+    {
+      "why": "a substitution at command position stops running its output, so `$(cat <<'EOF' \u2026)` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "return $simple !~ /\\S/ || $simple =~ /\\s\\z/;",
+        "to": "return 0;"
+      }
+    },
+    {
+      "why": "an argument's substitution counts as command position, so `git commit -m \"$(cat <<'EOF' \u2026)\"` blocks on its message",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "    return 0 if command_words($simple);\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a process substitution read as a script stays data, so `source <(cat <<'EOF' \u2026)` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "mark(file_reader($frame->{reader}), @{$frame->{out}});",
+        "to": "1;"
+      }
+    },
+    {
+      "why": "every process substitution counts as a script, so `diff <(cat <<'EOF' \u2026) other.txt` blocks on its body",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "return 2 if $words[0] =~ m{^(?:source|\\.)$} || $words[0] =~ $SHELL;",
+        "to": "return 2;"
+      }
+    },
+    {
+      "why": "a here-string stays data, so `bash <<< 'git push origin main'` passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "if ($simple =~ /<<<\\s*\\z/ && !$arithmetic) {",
+        "to": "if (0) {"
+      }
+    },
+    {
+      "why": "every here-string counts as code, so `grep -c push <<< \"git push origin main\"` blocks",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "if (my $kind = interpreter($reader)) {",
+        "to": "if (my $kind = 2) {"
+      }
+    },
+    {
+      "why": "a non-shell body that does not parse as shell fails closed, so `python3 - <<'EOF'` with `'''it's'''` blocks",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "my $code = eval { (scan($body, 0, '', 0))[0] };",
+        "to": "my ($code) = scan($body, 0, '', 0);"
+      }
+    },
+    {
+      "why": "an exec call's string stops being read, so `os.system('git push origin main')` in a Python body passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "my $code = eval { (scan(join(' ', @parts), 0, '', 0))[0] };",
+        "to": "my $code = undef;"
+      }
+    },
+    {
+      "why": "an exec call reads only its first string, so `subprocess.run([\"git\", \"push\", \"origin\", \"main\"])` passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "            $body =~ /\\G\\s*,?\\s*/gc;\n",
+        "to": "            last;\n"
+      }
+    },
+    {
+      "why": "a backtick in a non-shell body that does not parse as shell stays data, so Perl's `q(it's)` beside a backtick push passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "$out .= \"\\n\\$($inner)\" if defined $inner;",
+        "to": "1;"
       }
     }
   ]

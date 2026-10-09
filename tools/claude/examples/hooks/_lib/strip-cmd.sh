@@ -13,7 +13,7 @@
 # POSIX ERE only — no \b, \s or \d; macOS grep -E rejects them.
 _heredoc_is_executed() {
   printf '%s' "$1" \
-    | grep -qE '(^|[;&|(]|\$\()[[:space:]]*(bash|sh|zsh|ksh|dash|eval|ssh|python3?|perl|ruby|node)[[:space:]][^;&|]*<<'
+    | grep -qE '(^|[;&|(]|\$\()[[:space:]]*(bash|sh|zsh|ksh|mksh|pdksh|oksh|loksh|lksh|dash|ash|posh|yash|csh|tcsh|fish|eval|ssh|python3?|perl|ruby|node)[[:space:]][^;&|]*<<'
 }
 
 strip_cmd() {
@@ -28,8 +28,10 @@ strip_cmd() {
       's/<<-?["\x27]?([A-Za-z_][A-Za-z0-9_]*)["\x27]?[^\n;&|(`]*\n.*?\n[ \t]*\1\b/<<STRIPPED_HEREDOC>>/gs')
   fi
   # index(), not a match: a m{} in the replacement would reset $1..$3. see: README.md
+  # An escaped \` or \$( in double quotes is literal text; live() matches in its own scope, so $1..$3 survive.
   printf '%s' "$cmd" | perl -0777 -pe '
-    s/(-m|--message)([ =]+)"((?:\\.|[^"\\])*)"/index($3, q{$(}) >= 0 || index($3, chr(96)) >= 0 ? qq{$1$2"$3"} : qq{$1$2"STRIPPED_MSG"}/ge;
+    BEGIN { sub live { (my $s = shift) =~ s/\\.//gs; return index($s, q{$(}) >= 0 || index($s, chr(96)) >= 0 } }
+    s/(-m|--message)([ =]+)"((?:\\.|[^"\\])*)"/live($3) ? qq{$1$2"$3"} : qq{$1$2"STRIPPED_MSG"}/ge;
     s/(-m|--message)([ =]+)\x27([^\x27]*)\x27/index($3, q{$(}) >= 0 || index($3, chr(96)) >= 0 ? qq{$1$2\x27$3\x27} : qq{$1$2\x27STRIPPED_MSG\x27}/ge;
   '
 }
