@@ -33,24 +33,26 @@ grant_file() { # action
 }
 
 # see: tools/claude/examples/hooks/merge-grant/README.md § What arms it
-asks_for() { # action, text
+asks_for() { # action, text, "label" when the text is a menu option a user picked
   printf '%s' "$2" | LC_ALL=C sed -e "s/’/'/g" -e "s/‘/'/g" -e "s/\`/'/g" | LC_ALL=C tr '[:upper:]' '[:lower:]' \
-    | LC_ALL=C tr '\t\n' ' .' | LC_ALL=C sed -e "s/[.;!?]/ . /g" -e "s/[,:()]/ , /g" \
-      -e "s/pull[^a-z]*requests*/ pr /g" -e "s/^prs* *#* *[0-9][0-9]*/ prref /" -e "s/\([^a-z]\)prs* *#* *[0-9][0-9]*/\1 prref /g" \
-      -e "s/[^a-z'., ]/ /g" \
-    | LC_ALL=C tr -s ' ' '\n' | awk -v q="'" -v act="$1" '
+    | LC_ALL=C tr '\t\n' ' .' | LC_ALL=C sed -e "s/[.;!?]/ . /g" -e "s/[,()]/ , /g" -e "s/:/ : /g" \
+      -e "s/pull[^a-z]*requests*/ pr /g" -e "s/^prs* *[#-]* *[0-9][0-9]*/ prref /" -e "s/\([^a-z]\)prs* *[#-]* *[0-9][0-9]*/\1 prref /g" \
+      -e "s/[^a-z'.,: ]/ /g" \
+    | LC_ALL=C tr -s ' ' '\n' | awk -v q="'" -v act="$1" -v label="${3:-}" '
       BEGIN { n = split("dont not never without cannot cant wont shouldnt couldnt wouldnt", w, " "); for (i = 1; i <= n; i++) neg[w[i]] = 1
               n = split("a an the this that these those my our your its their both another separate", w, " "); for (i = 1; i <= n; i++) det[w[i]] = 1
               n = split("ok okay yes yeah yep no sure great good fine thanks please alright cool perfect lgtm", w, " "); for (i = 1; i <= n; i++) intj[w[i]] = 1
               n = split("keep keeps kept leave leaves left", w, " "); for (i = 1; i <= n; i++) hold[w[i]] = 1
-              n = split("of on about from with by per in into", w, " "); for (i = 1; i <= n; i++) stop[w[i]] = 1
+              n = split("of on about from with by per in into for to at when after before across over under", w, " "); for (i = 1; i <= n; i++) stop[w[i]] = 1
+              n = split("is are was were need needs look looks have has", w, " "); for (i = 1; i <= n; i++) cop[w[i]] = 1
               seg_intj = 1; clause_intj = 1 }
       { gsub("^" q "+|" q "+$", "") }
       $0 == "" { next }
-      $0 == "." || $0 == "but" { negated = 0; prev = ""; lead_ok = 0; seg_intj = 1; seg_n = 0; clause_intj = 1; pr_verb = 0; opening = 0; fresh = 0; pending = 0; next }
-      $0 == "," { pr_verb = 0; opening = 0; fresh = 0; pending = 0; if (seg_n > 0) lead_ok = seg_intj; seg_intj = 1; seg_n = 0; prev = ","; next }
+      $0 == "." || $0 == "but" { if (tent || (label != "" && pending)) found = 1; tent = 0; asked = 0; negated = 0; prev = ""; lead_ok = 0; seg_intj = 1; seg_n = 0; clause_intj = 1; pr_verb = 0; opening = 0; fresh = 0; pending = 0; next }
+      $0 == "," || $0 == ":" { if (label != "" && pending) found = 1; if ($0 == ":") tent = 0; pr_verb = 0; opening = 0; fresh = 0; pending = 0; if (seg_n > 0) lead_ok = seg_intj; seg_intj = 1; seg_n = 0; prev = ","; next }
       { seg_n++; lead_intj = clause_intj; if (!($0 in intj)) { seg_intj = 0; clause_intj = 0 } }
-      act == "pr" && pending { found = 1; pending = 0 }
+      act == "pr" && pending { if (!(($0 in neg) || $0 ~ ("n" q "t$") || ($0 in cop))) tent = 1; pending = 0 }
+      $0 == "did" { asked = 1 }
       $0 in neg || $0 ~ ("n" q "t$") { negated = 1 }
       act == "merge" && $0 == "merge" && !negated && prev != "no" { found = 1 }
       act == "pr" && pr_verb > 0 && ($0 in stop) { pr_verb = 0; opening = 0 }
@@ -59,9 +61,9 @@ asks_for() { # action, text
       act == "pr" && pr_verb > 0 && ($0 == "pr" || $0 == "prs") { found = 1 }
       act == "pr" && pr_verb > 0 { pr_verb-- }
       { fresh = 0 }
-      act == "pr" && ($0 == "open" || $0 == "create" || $0 == "raise") && !negated && prev != "no" && !($0 == "open" && (prev in hold)) { pr_verb = 4; fresh = 1; opening = ($0 == "open" && prev != "" && !lead_intj && !(prev == "," && lead_ok)) }
+      act == "pr" && ($0 == "open" || $0 == "create" || $0 == "raise") && !negated && !asked && prev != "no" && !($0 == "open" && (prev in hold)) { pr_verb = 4; fresh = ($0 == "open"); opening = ($0 == "open" && prev != "" && !lead_intj && !(prev == "," && lead_ok)) }
       { prev = $0 }
-      END { exit !found }'
+      END { if (tent || (label != "" && pending)) found = 1; exit !found }'
 }
 
 # see: tools/claude/examples/hooks/merge-grant/README.md § Menu answers
@@ -106,7 +108,7 @@ if [ "$EVENT" = "PostToolUse" ]; then
     | to_entries[] | [.key, (.value | tostring)] | @tsv' 2>/dev/null) || exit 0
   while IFS=$'\t' read -r question answer; do
     [ -n "$answer" ] || continue
-    if asks_for pr "$answer" || { asks_for pr "$question" && answer_consents "$answer"; }; then
+    if asks_for pr "$answer" label || { asks_for pr "$question" label && answer_consents "$answer"; }; then
       arm pr "menu: ${question} -> ${answer}" && CONTEXT=$(grant_context pr)
       break
     fi

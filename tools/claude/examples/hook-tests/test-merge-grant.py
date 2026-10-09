@@ -226,6 +226,20 @@ class MergeGrantTest(unittest.TestCase):
         self.assertEqual(self.answer({"Anything else?": "go ahead and open the PR"}), "ctx")
         self.assert_verdict(PR_CREATE, "allow")
 
+    def test_a_terse_menu_label_arms_pr(self):
+        for answers in ({"How should I proceed?": "Create PR (Recommended)"}, {"How should I proceed?": "Open PR"},
+                        {"How should I proceed?": "Open PRs"}, {"How should I proceed?": "Raise PR"},
+                        {"How should I proceed?": "Commit and create PR"}, {"Open PR?": "Yes"}):
+            self.assertEqual(self.answer(answers), "ctx", answers)
+            self.assert_verdict(PR_CREATE, "allow")
+            self.assertEqual(self.prompt("thanks"), "allow")
+            self.assert_verdict(PR_CREATE, "ask")
+
+    def test_a_held_open_prs_drops_at_a_comma_but_the_merge_still_arms(self):
+        self.assertEqual(self.prompt("open PRs, then merge them"), "ctx")
+        self.assert_verdict(MERGE, "ask")
+        self.assert_verdict(PR_CREATE, "ask")
+
     def test_only_a_bare_affirmation_consents_to_a_question_that_proposed_a_pr(self):
         for question, answer in (
                 ("Open the PR now, or go back and add tests first?", "Go back and add tests first"),

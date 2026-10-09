@@ -76,7 +76,7 @@ File directives, each on its own line:
 | Directive | Effect |
 |---|---|
 | `#!event <name>` | `PreToolUse` (default), `PostToolUse`, `UserPromptSubmit`, `Stop` |
-| `#!tool <name>` | `Bash` (default), `Write`, `Edit`, `MultiEdit` |
+| `#!tool <name>` | `Bash` (default), `Write`, `Edit`, `MultiEdit`, `AskUserQuestion` (column 2 is the question, column 3 the answer picked, sent as `tool_response.answers` on PostToolUse) |
 | `#!escapes` | column 2 honours `\n`, `\t` and `\xHH` |
 | `#!setup <name>` | build live state from `fixture_env.py` before the cases run |
 

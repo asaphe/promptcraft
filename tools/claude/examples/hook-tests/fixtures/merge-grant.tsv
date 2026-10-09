@@ -111,7 +111,7 @@ allow	don‘t open a PR
 allow	<absent>
 
 # --- third review: what counts as asking for a PR ---
-# WHY: a line break ends a clause, so a heading or bullet starting `open PRs` is a list, not a request.
+# WHY: a heading or bullet that is just `open PRs`, or labels a count with a colon, is a list, not a request.
 allow	Status report\nopen PRs, failing CI, stale branches
 allow	Here is the dashboard:\n- open PRs: 4\n- failing CI: 2\nwhat should I look at first?
 allow	Open PRs: 3, failing CI: 1
@@ -136,3 +136,54 @@ ctx	create PRs in both repos
 # WHY: a number after PR names one that exists, so opening it is reading it.
 allow	open PR 17 in the browser
 allow	open PR #1234 and read the review comments
+
+# --- fourth review: terse requests, statements about open PRs, questions and line breaks ---
+# WHY: only `open` is also an adjective, so a terse `create PR` or `raise PR` arms at once.
+ctx	create PR
+ctx	raise PR
+ctx	create PRs
+ctx	create PR.
+ctx	commit and push, then create PR
+ctx	looks good, raise PR
+ctx	please create PR
+ctx	create PRs, one per repo
+# WHY: `for`, `to`, `when` and the other prepositions end the verb's reach, as `of` does.
+allow	create a report for PRs merged this week
+allow	create a dashboard for PRs and their CI state
+allow	open an issue for PRs touching auth
+allow	raise an alert when PRs fail
+ctx	create a PR for this, then merge it
+ctx	create a new draft PR
+# WHY: a colon later in the clause makes a held `open PRs` a heading, not a request.
+allow	Open PRs by repo:\n- services: 3\n- infra: 1
+allow	Here's the status:\n- open PRs awaiting review: 4\n- failing CI: 2
+allow	Open PRs for review: 3
+# WHY: a negation or a copula after a held `open PRs` makes it a statement about them.
+allow	Open PRs don't need a rebase
+allow	No, open PRs aren't blocking the release
+allow	Yes, open PRs need review
+allow	CI: fine, open PRs need review
+ctx	open PRs and merge them
+# WHY: `did` asks about the past, so a question whether a PR was opened asks for nothing.
+allow	Did you open a PR for this?
+allow	did you create the PR yet?
+ctx	can you open a PR for this?
+# WHY: a hyphenated PR number names one that exists.
+allow	open PR-17 in the browser
+# WHY: only a line break ends these clauses, so a newline that stopped ending one would leave them unarmed.
+ctx	looks good\nopen PRs for both branches
+ctx	don't close 19\nmerge 17
+
+# --- menu answers: PostToolUse on AskUserQuestion, the question and the label picked ---
+#!event PostToolUse
+#!tool AskUserQuestion
+# WHY: a label is a pick, not a heading, so a terse one arms pr on its own.
+ctx	How should I proceed?	Create PR (Recommended)
+ctx	How should I proceed?	Open PR
+ctx	How should I proceed?	Open PRs
+ctx	Open PR?	Yes
+ctx	Open the PR as drafted?	Yes (Recommended)
+# WHY: a menu answer never arms merge, and a qualified answer is not consent.
+allow	Merge #17 now?	Yes
+allow	Open the PR now?	Yes, but only after CI
+allow	Which shape?	One PR per change

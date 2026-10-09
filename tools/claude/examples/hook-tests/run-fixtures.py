@@ -41,7 +41,7 @@ can tell them apart. `block` exists for the same reason on the Stop event.
 File directives, each on its own line:
 
     #!event <name>     PreToolUse (default), PostToolUse, UserPromptSubmit, Stop
-    #!tool <name>      Bash (default), Write, Edit, MultiEdit
+    #!tool <name>      Bash (default), Write, Edit, MultiEdit, AskUserQuestion (question, then the answer picked)
     #!escapes          column 2 honours \n, \t and \xHH
     #!setup <name>     build live state from fixture_env.py before the cases run
 
@@ -100,6 +100,7 @@ TOOL_INPUT = {
         **({"old_string": prev} if prev else {}),
     },
     "MultiEdit": lambda path, body, prev="": {"file_path": path, "edits": [{"new_string": body}]},
+    "AskUserQuestion": lambda question, answer, prev="": {"questions": [{"question": question}]},
 }
 # A rewrite hook emits allow either way, so outcome alone cannot see a bad rewrite.
 REWRITE = "="
@@ -260,7 +261,10 @@ def build_payload(cmd, output, flags, tool, event, cwd, tmp):
             }) + "\n")
         payload["transcript_path"] = transcript
         payload["stop_hook_active"] = output.strip().lower() == "true"
-    if event == "PostToolUse":
+    if event == "PostToolUse" and tool == "AskUserQuestion":
+        # A menu result maps each question to the label picked, so column 3 is the answer.
+        payload["tool_response"] = {"answers": {} if cmd == ABSENT else {cmd: output}}
+    elif event == "PostToolUse":
         flagset = {f.strip() for f in flags.split(",") if f.strip()}
         # tool_response, not tool_result: a hook reading the latter gets "" for every command.
         payload["tool_response"] = {
@@ -363,7 +367,8 @@ def main():
     if failures:
         print("\n%d FAILURES:" % len(failures))
         for expected, got, cmd in failures:
-            print("  want=%s got=%s  %s" % (expected, got, cmd))
+            # Tab-separated: a rewrite outcome is a command with spaces, which a space-delimited row cannot carry.
+            print("  want=%s\tgot=%s\t%s" % (expected, got, cmd))
         sys.exit(1)
 
 
