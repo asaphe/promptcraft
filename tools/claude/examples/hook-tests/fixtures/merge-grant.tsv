@@ -174,6 +174,13 @@ allow	open PR-17 in the browser
 ctx	looks good\nopen PRs for both branches
 ctx	don't close 19\nmerge 17
 
+# --- fifth review: `did` only as a question, and a named step before a colon ---
+# WHY: `did` is a question only when a subject follows it.
+ctx	I did the rebase, now open a PR
+ctx	the build did pass, so open a PR
+# WHY: a `create PR` that a later colon labels is a report line, not a request.
+allow	Report:\n- create PR: failed\n- ok
+
 # --- menu answers: PostToolUse on AskUserQuestion, the question and the label picked ---
 #!event PostToolUse
 #!tool AskUserQuestion
@@ -187,3 +194,12 @@ ctx	Open the PR as drafted?	Yes (Recommended)
 allow	Merge #17 now?	Yes
 allow	Open the PR now?	Yes, but only after CI
 allow	Which shape?	One PR per change
+# WHY: a question is the agent's own text, so a heading in it is still a heading.
+allow	Open PRs: 3 need review. Merge them?	Yes
+allow	Open PRs (2): should I rebase them?	Yes
+# WHY: a pick among PRs the question names is a filter, not an action.
+allow	Which PRs should I summarize?	Open PRs
+# WHY: a menu question proposing a PR is not a question about the past.
+ctx	Did you want me to open a PR?	Yes
+# WHY: a picked label is never a heading, so a colon in it does not cancel the pick.
+ctx	How should I proceed?	Open PRs for both: services and infra

@@ -45,23 +45,25 @@ asks_for() { # action, text, "label" when the text is a menu option a user picke
               n = split("keep keeps kept leave leaves left", w, " "); for (i = 1; i <= n; i++) hold[w[i]] = 1
               n = split("of on about from with by per in into for to at when after before across over under", w, " "); for (i = 1; i <= n; i++) stop[w[i]] = 1
               n = split("is are was were need needs look looks have has", w, " "); for (i = 1; i <= n; i++) cop[w[i]] = 1
+              n = split("you we i they he she someone anyone somebody anybody", w, " "); for (i = 1; i <= n; i++) subj[w[i]] = 1
               seg_intj = 1; clause_intj = 1 }
       { gsub("^" q "+|" q "+$", "") }
       $0 == "" { next }
       $0 == "." || $0 == "but" { if (tent || (label != "" && pending)) found = 1; tent = 0; asked = 0; negated = 0; prev = ""; lead_ok = 0; seg_intj = 1; seg_n = 0; clause_intj = 1; pr_verb = 0; opening = 0; fresh = 0; pending = 0; next }
-      $0 == "," || $0 == ":" { if (label != "" && pending) found = 1; if ($0 == ":") tent = 0; pr_verb = 0; opening = 0; fresh = 0; pending = 0; if (seg_n > 0) lead_ok = seg_intj; seg_intj = 1; seg_n = 0; prev = ","; next }
+      $0 == "," || $0 == ":" { if (label == "answer" && pending) found = 1; if ($0 == ":" && label != "answer") tent = 0; pr_verb = 0; opening = 0; fresh = 0; pending = 0; if (seg_n > 0) lead_ok = seg_intj; seg_intj = 1; seg_n = 0; prev = ","; next }
       { seg_n++; lead_intj = clause_intj; if (!($0 in intj)) { seg_intj = 0; clause_intj = 0 } }
       act == "pr" && pending { if (!(($0 in neg) || $0 ~ ("n" q "t$") || ($0 in cop))) tent = 1; pending = 0 }
-      $0 == "did" { asked = 1 }
+      after_did && ($0 in subj) && label == "" { asked = 1 }
+      { after_did = ($0 == "did") }
       $0 in neg || $0 ~ ("n" q "t$") { negated = 1 }
       act == "merge" && $0 == "merge" && !negated && prev != "no" { found = 1 }
       act == "pr" && pr_verb > 0 && ($0 in stop) { pr_verb = 0; opening = 0 }
       act == "pr" && opening { if (!($0 in det)) pr_verb = 0; opening = 0 }
-      act == "pr" && fresh && pr_verb > 0 && ($0 == "pr" || $0 == "prs") { pending = 1; pr_verb = 0 }
+      act == "pr" && fresh && pr_verb > 0 && ($0 == "pr" || $0 == "prs") { if (held_open) pending = 1; else tent = 1; pr_verb = 0 }
       act == "pr" && pr_verb > 0 && ($0 == "pr" || $0 == "prs") { found = 1 }
       act == "pr" && pr_verb > 0 { pr_verb-- }
       { fresh = 0 }
-      act == "pr" && ($0 == "open" || $0 == "create" || $0 == "raise") && !negated && !asked && prev != "no" && !($0 == "open" && (prev in hold)) { pr_verb = 4; fresh = ($0 == "open"); opening = ($0 == "open" && prev != "" && !lead_intj && !(prev == "," && lead_ok)) }
+      act == "pr" && ($0 == "open" || $0 == "create" || $0 == "raise") && !negated && !asked && prev != "no" && !($0 == "open" && (prev in hold)) { pr_verb = 4; fresh = 1; held_open = ($0 == "open"); opening = ($0 == "open" && prev != "" && !lead_intj && !(prev == "," && lead_ok)) }
       { prev = $0 }
       END { if (tent || (label != "" && pending)) found = 1; exit !found }'
 }
@@ -108,7 +110,8 @@ if [ "$EVENT" = "PostToolUse" ]; then
     | to_entries[] | [.key, (.value | tostring)] | @tsv' 2>/dev/null) || exit 0
   while IFS=$'\t' read -r question answer; do
     [ -n "$answer" ] || continue
-    if asks_for pr "$answer" label || { asks_for pr "$question" label && answer_consents "$answer"; }; then
+    alabel=answer; printf '%s' "$question" | LC_ALL=C grep -qiE '(^|[^a-z])(prs|pull requests)([^a-z]|$)' && alabel=""
+    if asks_for pr "$answer" "$alabel" || { asks_for pr "$question" question && answer_consents "$answer"; }; then
       arm pr "menu: ${question} -> ${answer}" && CONTEXT=$(grant_context pr)
       break
     fi
