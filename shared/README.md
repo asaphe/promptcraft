@@ -15,11 +15,6 @@ Tool-agnostic content — applies to any AI assistant (Claude Code, Cursor, Chat
 - Before writing tool-specific rules — `shared/` is the baseline, tool dirs layer on top.
 - When a rule applies everywhere, edit it here. Tool-specific files should link to `shared/`, not duplicate it.
 
-## Audience
-
-- Engineers adopting promptcraft patterns into their own AI assistant configs.
-- Contributors editing universal rules.
-
 ## Not here
 
 - Tool-specific operational rules → `tools/<tool>/`.

@@ -2,6 +2,8 @@
 
 Detailed rules for conducting PR reviews. Read this file when performing a review — it covers diff scope, finding quality, severity classification, GitHub API usage, and common pitfalls.
 
+Packaged: [claude-reviewkit](https://github.com/asaphe/claude-reviewkit)'s `/reviewkit:review` ships this methodology — two passes, Evidence blocks, severity grades, the steelman and the adversarial pass — as an installable skill with its own reviewer lenses. Keep this file for reviewer agents of your own.
+
 This file is a kernel: the rules here apply to every reviewer agent. Per-repo overlays may add domain-specific verification rows that extend it (e.g. a `pr-review-rules.md` next to this file in a downstream repo). Keep the kernel and its overlays in sync; byte-equality is a convention until a CI drift check lands.
 
 ## Diff Scope Enforcement

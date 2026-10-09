@@ -18,7 +18,7 @@ PR Review Request
        └─── config-reviewer      (agent definitions, skills, commands, CLAUDE.md)
 ```
 
-The orchestrator (main Claude session or a `/pr-review` skill) examines the changed files, spawns only the relevant reviewer(s), collects findings, and presents them to the user before posting.
+The orchestrator (main Claude session or a review skill) examines the changed files, spawns only the relevant reviewer(s), collects findings, and presents them to the user before posting.
 
 ## Why Three?
 
@@ -26,7 +26,7 @@ The split follows **correction frequency domains** — areas where the most mist
 
 | Domain | Why It's Separate | Typical Findings |
 |--------|------------------|------------------|
-| Infrastructure/DevOps | Broad scope, many file types, security implications | Missing `|| true` in pipelines, wrong workspace, unvalidated plans |
+| Infrastructure/DevOps | Broad scope, many file types, security implications | Missing `\|\| true` in pipelines, wrong workspace, unvalidated plans |
 | Secrets/Config | Highest-frequency correction domain, subtle format mismatches | Wrong secret path, missing tenant, template syntax mismatch |
 | Agent/Tool Config | Self-referential (agents reviewing agent changes), unique validation | Missing sibling deferral, stale roster, invalid frontmatter |
 
@@ -47,6 +47,7 @@ maxTurns: 25
 ```
 
 Key design choices:
+
 - **Read-only tools** — reviewers should never modify code
 - **`Bash(gh *)`** — needed to fetch PR diffs, comments, review threads
 - **Sonnet model** — sufficient for pattern matching and checklist validation; saves cost vs opus
@@ -68,6 +69,7 @@ maxTurns: 25
 ```
 
 System prompt includes:
+
 - **File-type checklist** — what to verify for each file type (HCL, YAML, Dockerfile, .sh)
 - **Severity classification** — blocking vs suggestion vs nitpick
 - **Common anti-patterns table** — 20-30 rows of known bad patterns with examples
@@ -89,6 +91,7 @@ maxTurns: 25
 ```
 
 System prompt includes:
+
 - **Secret naming convention** — expected path formats by scope (global, per-tenant, per-app)
 - **Format validation table** — which apps expect which JSON structure
 - **Template syntax rules** — `.tfvars` uses `<TOKEN>`, `.yaml.tftpl` uses `${variable}`
@@ -110,6 +113,7 @@ maxTurns: 25
 ```
 
 System prompt includes:
+
 - **Frontmatter schema** — required fields for agents, skills, commands
 - **Section checklist** — expected sections per agent (role, references, triage table, rules, scope, siblings)
 - **Roster sync validation** — new agent ↔ roster ↔ CLAUDE.md consistency
@@ -117,9 +121,9 @@ System prompt includes:
 
 ## Orchestration
 
-### Via Skill (`/pr-review`)
+### Via Skill
 
-The most ergonomic approach is a skill that:
+[claude-reviewkit](https://github.com/asaphe/claude-reviewkit)'s `/reviewkit:review` is a packaged version of this skill with two domain-agnostic lenses (security and systemic patterns) that run on every PR in place of a routed domain trio; steps 4–6 below are what it does with their findings. To route to your own domain reviewers instead, write a skill that:
 
 1. Fetches the PR's changed files
 2. Classifies files by domain
@@ -143,7 +147,7 @@ The most ergonomic approach is a skill that:
 
 For smaller PRs, the orchestrator can spawn reviewers directly:
 
-```
+```text
 User: review PR #1234
 Claude: [reads changed files, spawns devops-reviewer for the .tf changes]
 ```
@@ -197,6 +201,7 @@ When a new correction domain emerges (e.g., frontend components, database migrat
 ### When NOT to Split
 
 Don't create a new reviewer unless:
+
 - The domain has **5+ distinct check types** that require specialized knowledge
 - Mistakes in this domain are **frequent enough** to justify the agent's context cost
 - The domain's checks are **different enough** from existing reviewers to avoid overlap

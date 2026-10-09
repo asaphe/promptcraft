@@ -7,7 +7,7 @@ description: >-
   from the task or specified explicitly. Use for design docs, incident RCA,
   cross-cutting refactors, vendor selection, migrations, hard debugs, security
   reviews, ADRs — any load-bearing decision where orthogonal perspectives
-  beat single-context reasoning. Distinct from /pr-review (post-code).
+  beat single-context reasoning. Distinct from /reviewkit:review (post-code).
   Usage - /council [input] or /council with <roster> [input]
 user-invocable: true
 allowed-tools: Agent, Read, Glob, Grep, Bash(gh issue view*), Bash(gh api*), Bash(cat*), Bash(ls*), Bash(mkdir*), AskUserQuestion, Write
@@ -35,7 +35,7 @@ Council is gated on **load-bearing decisions where orthogonal perspectives beat 
 
 - Routine code edits, single-file refactors, doc tweaks
 - Quick bug fixes with clear root cause
-- PR reviews → use `/pr-review`
+- PR reviews → use `/reviewkit:review` from [claude-reviewkit](https://github.com/asaphe/claude-reviewkit)
 - Verifying a finished implementation → that's `verify` or `/code-review`
 - Inputs <5KB with no explicit "council this" signal — too little material for orthogonal perspectives
 

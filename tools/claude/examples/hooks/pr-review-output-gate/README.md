@@ -2,7 +2,7 @@
 
 A PreToolUse hook + validator that gates PR-review submission on a **structured dismissal log** — every review finding you drop must record evidence, reasoning, and confidence before you're allowed to post the review.
 
-> **When this fits:** you run a `/pr-review` flow (specialist reviewer agents, optionally a bot reviewer) and want a mechanical guard that stops findings from being silently dropped. If your reviews are lightweight, this is more machinery than you need.
+> **When this fits:** you run your own `/pr-review` flow (specialist reviewer agents, optionally a bot reviewer) and want a mechanical guard that stops findings from being silently dropped. If your reviews are lightweight, this is more machinery than you need. [claude-reviewkit](https://github.com/asaphe/claude-reviewkit)'s `/reviewkit:review` lists its dropped findings in its output and writes no dismissal log, so this gate warns on every review it posts and blocks it on security-sensitive PRs; pair the gate with a skill that writes the log.
 
 ## Why
 

@@ -16,10 +16,6 @@ Claude Code configurations, guides, templates, and production examples.
 - Adding a new agent/skill/hook → `templates/` + `guides/`.
 - Looking for a proven pattern → `examples/`.
 
-## Audience
-
-- Developers adopting Claude Code patterns into their own repos.
-
 ## Not here
 
 - Claude Code contributor config for *this* repo → `.claude/` at repo root.

@@ -2,7 +2,7 @@
 
 > **GitHub-specific:** uses the `gh` CLI and GitHub's GraphQL `reviewThreads` / `resolveReviewThread` / `minimizeComment` / `dismissPullRequestReview` mutations. Adapt for GitLab / Bitbucket / Gerrit by mapping each step to their thread-resolution APIs (note that some platforms don't expose a programmatic equivalent of GitHub's `minimizeComment`).
 
-Shared procedure for triaging and resolving PR review comments. Referenced by `/pr-check` and `/pr-resolver` here, and by `/reviewkit:finalize` in [claude-reviewkit](https://github.com/asaphe/claude-reviewkit).
+Shared procedure for triaging and resolving PR review comments. Referenced by `/pr-check` and `/pr-resolver` here. [claude-reviewkit](https://github.com/asaphe/claude-reviewkit)'s `/reviewkit:finalize` reports on comments without resolving them; its `scripts/pr-comment-state.sh <PR> --full` is a fuller form of step 1 — every inline thread, review body and conversation comment, replies included, paginated, with invisible characters scrubbed.
 
 ## 1. Fetch unresolved threads
 
