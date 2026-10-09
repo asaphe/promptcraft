@@ -12,7 +12,7 @@ for my $record (@records) {
     my ($type, $segment) = @$record;
     if ($scoped) {
         print "$type\0";
-        print "$segment\0" if $type eq 'S';
+        print "$segment\0" if $type eq 'S' || $type eq 'O';
     } elsif ($type eq 'S') {
         print "$segment\0";
     }
@@ -37,7 +37,7 @@ sub substitution {
     # see: README.md § split-cmd-segments.pl — TOPLEVEL, and why a value after `=` or `:` keeps its word
     my $after = substr($text, $end + 1, 1);
     my $starts = $before =~ ($quote eq '"' ? qr/(?:\A|[\s=])"\z/ : qr/(?:\A|[\s=])\z/);
-    my $word = $starts && $inner =~ /\A\s*git\s+rev-parse\s+--show-toplevel(?:\s+2>(?:\/dev\/null|&1))?\s*\z/
+    my $word = $starts && $inner =~ /\A\s*git\s+rev-parse\s+--show-toplevel(?:\s+2>\s*(?:\/dev\/null|&1))?\s*\z/
         ? "\x01TOPLEVEL" : 'SUBSTITUTION';
     return $word if $scoped && $quote eq '"';
     my $glued = $before =~ /(?:[=:]|(?:\A|\s)-[^\s-]*o)\z/;
@@ -115,7 +115,9 @@ sub collect_segments {
                 next;
             }
         }
-        if (!$quote && substr($text, $i, 2) eq '[[' && $segment =~ /(?:\A|[\s;&|(!])\z/) {
+        # Only a `[[` closed later is a test: an unmatched one would merge every segment after it.
+        if (!$quote && substr($text, $i, 2) eq '[[' && $segment =~ /(?:\A|[\s;&|(!])\z/
+            && substr($text, $i + 2) =~ /\s\]\](?:[\s;&|)]|\z)/) {
             $test = 1;
         } elsif (!$quote && $test && substr($text, $i, 2) eq ']]') {
             $test = 0;
@@ -123,7 +125,11 @@ sub collect_segments {
         if (!$quote && !$test && ($char eq ';' || $char eq '|' || $char eq '&' || $char eq "\n")) {
             emit_segment($out, $segment);
             $segment = '';
-            $i++;
+            # see: README.md § split-cmd-segments.pl — the operator after a segment decides whether a later one runs only after it succeeded
+            my $op = substr($text, $i, 2);
+            $op = $char unless $op eq '&&' || $op eq '||' || $op eq ';;' || $op eq '|&';
+            push @$out, ['O', $op] if $scoped;
+            $i += length $op;
             next;
         }
         $segment .= $char;

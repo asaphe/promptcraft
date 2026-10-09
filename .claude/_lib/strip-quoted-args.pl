@@ -13,14 +13,16 @@ sub executable_string {
     return 0 unless @words;
     my $program = shift @words;
     # see: README.md § strip-quoted-args.pl — a wrapper execs its operands, so a shell or ssh after it still runs the string
-    if ($program =~ m{(?:^|/)(?:xargs|timeout|gtimeout|nice|nohup|sudo|doas|stdbuf|setsid|ionice|find|caffeinate|arch|script|runuser|chroot|unbuffer|chrt|taskset)$}) {
-        shift @words while @words && $words[0] !~ m{(?:^|/)(?:ssh|bash|sh|zsh|ksh|dash|ash)$};
+    if ($program =~ m{(?:^|/)(?:xargs|timeout|gtimeout|nice|nohup|sudo|doas|stdbuf|setsid|ionice|find|caffeinate|arch|script|runuser|chroot|unbuffer|chrt|taskset|busybox)$}) {
+        shift @words while @words && $words[0] !~ m{(?:^|/)(?:ssh|bash|sh|zsh|ksh|dash|ash|fish)$};
         return 0 unless @words;
         $program = shift @words;
     }
     return 1 if $program =~ m{(?:^|/)(?:eval|ssh|watch|parallel)$};
     return 1 if $program =~ m{(?:^|/)(?:su|flock)$} && @words && $words[-1] =~ /^(?:-[^-]*c|--command=?)$/;
-    return 0 unless $program =~ m{(?:^|/)(?:bash|sh|zsh|ksh|dash|ash)$};
+    return 0 unless $program =~ m{(?:^|/)(?:bash|sh|zsh|ksh|dash|ash|fish)$};
+    # `-c -- '<code>'` ends the options before the string, which is still the code.
+    pop @words if @words > 1 && $words[-1] eq '--';
     return @words && $words[-1] =~ /^-[^-]*c/ ? 1 : 0;
 }
 
@@ -84,7 +86,7 @@ sub interpreter {
         }
         return 1;
     }
-    return 0 unless $program =~ m{(?:^|/)(?:bash|sh|zsh|ksh|dash|ash)$};
+    return 0 unless $program =~ m{(?:^|/)(?:bash|sh|zsh|ksh|dash|ash|fish)$};
     my $stdin = 0;
     while (@words) {
         my $word = shift @words;
@@ -309,6 +311,8 @@ sub interpolations {
 sub scan {
     my ($text, $start, $stop, $arithmetic) = @_;
     my ($out, $simple, $i, $depth) = ('', '', $start, 0);
+    # The chunks of one word share its verdict: `'a '\''b'\'' c'` is one shell string, not a string and then data.
+    my $word_keep = 0;
     my (@docs, @command_docs);
     while ($i < length $text) {
         my $char = substr($text, $i, 1);
@@ -331,7 +335,9 @@ sub scan {
             $ansi = $char eq "'";
         }
         if ($char eq '"' || $char eq "'") {
-            my ($rendered, $next) = quoted($text, $i, executable_string($simple), $ansi);
+            my $keep = $word_keep || executable_string($simple);
+            $word_keep = $keep;
+            my ($rendered, $next) = quoted($text, $i, $keep, $ansi);
             $out .= $rendered;
             $simple .= $rendered;
             $i = $next;
@@ -392,8 +398,10 @@ sub scan {
         if ($char =~ /[;|()\n]/ || ($char eq '&' && substr($text, $i - 1, 1) !~ /[<>]/ && substr($text, $i + 1, 1) ne '>')) {
             finish_command($simple, \@command_docs);
             $simple = '';
+            $word_keep = 0;
         } else {
             $simple .= $char eq "\t" ? ' ' : $char;
+            $word_keep = 0 if $char =~ /\s/;
         }
         $out .= $char eq "\t" ? ' ' : $char;
         $i++;

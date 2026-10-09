@@ -111,6 +111,10 @@ def _grant_dir(tmp):
 
 def destructive_guard(tmp):
     feature = _init(os.path.join(tmp, "push-feature"), branch="feature")
+    # A linked worktree on main of the session's own repo, so a branch move there is not a cross-repo switch.
+    _base_commit(feature)
+    same_repo_main = os.path.join(tmp, "push-feature-main")
+    _git(feature, "worktree", "add", "-q", "-b", "main", same_repo_main)
     spaced = _init(os.path.join(tmp, "push main wt"))
     # HOME is a checkout off the default branch, so `cd -P && git push` reads a branch no other repo here holds.
     env = dict(_grant_dir(tmp), HOME=_init(os.path.join(tmp, "home"), branch="home"))
@@ -122,6 +126,7 @@ def destructive_guard(tmp):
     return {"cwd": feature, "env": env, "tokens": {
         "push_main_wt": main_wt,
         "push_feature": feature,
+        "same_repo_main": same_repo_main,
         "push_main": _init(os.path.join(tmp, "push-main")),
         "push_master": _init(os.path.join(tmp, "push-master"), branch="master"),
         "push_main_esc": spaced.replace(" ", "\\ "),

@@ -21,7 +21,7 @@ DESTRUCTIVE_FILESYSTEM = re.compile(
     r"\b(?:rm\s+(?:-[A-Za-z]*[rf]|--(?:force|recursive))|rmdir\s|unlink\s|find\b[^\n]*\s-delete)"
 )
 # A path after the toplevel idiom is relative to the checkout, so only that substitution is spared the corpus scan.
-TOPLEVEL_PATH = re.compile(r"\$\(git rev-parse --show-toplevel(?: 2>(?:/dev/null|&1))?\)/")
+TOPLEVEL_PATH = re.compile(r"\$\(git rev-parse --show-toplevel(?: 2> ?(?:/dev/null|&1))?\)\"?/?")
 ORACLE_ESCAPE = re.compile(
     r"(?:^|[\s;|&])(?:PATH|BASH_ENV|ENV|ORACLE_BASH|ORACLE_PYTHON|TRACE_FILE)=[^\s;|&]*"
     r"|(?:^|[\s;|&])command[ \t]+-p(?:[ \t]|$)"
@@ -84,8 +84,11 @@ class ExpansionSemanticsTest(unittest.TestCase):
         self.assertIsNotNone(ABSOLUTE_EXECUTABLE.search("/usr/local/bin/tool"))
         self.assertIsNotNone(ABSOLUTE_EXECUTABLE.search("/opt/homebrew/bin/tool"))
         self.assertIsNone(ABSOLUTE_EXECUTABLE.search("cd /"))
-        for other in ("$(true)/bin/tool", "$(git rev-parse --git-dir)/x", "$(git rev-parse --show-toplevel; true)/x"):
+        for other in ("$(true)/bin/tool", "$(git rev-parse --git-dir)/x", "$(git rev-parse --show-toplevel; true)/x",
+                      '"$(true)"/x', "$(git rev-parse --show-toplevel 2>  /dev/null)/x"):
             self.assertIsNotNone(ABSOLUTE_EXECUTABLE.search(TOPLEVEL_PATH.sub("TOP/", other)), other)
+        for spared in ('cd "$(git rev-parse --show-toplevel)"/x', 'cd "$(git rev-parse --show-toplevel 2> /dev/null)"/x'):
+            self.assertIsNone(ABSOLUTE_EXECUTABLE.search(TOPLEVEL_PATH.sub("TOP/", spared)), spared)
 
     def test_oracle_fixtures_keep_probe_env_hermetic(self):
         cases = oracle_cases()
