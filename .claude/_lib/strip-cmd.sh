@@ -10,8 +10,6 @@
 
 # see: README.md § strip-cmd.sh — why the marker-line class excludes command boundaries
 # A heredoc fed to an interpreter is CODE, not data: blanking it hides a real invocation.
-# see: README.md § strip-cmd.sh
-# A heredoc fed to an interpreter is CODE: blanking it hides a real invocation.
 # POSIX ERE only — no \b, \s or \d; macOS grep -E rejects them.
 _heredoc_is_executed() {
   printf '%s' "$1" \
@@ -44,7 +42,8 @@ strip_quoted_args() {
   helper="$(dirname "${BASH_SOURCE[0]}")/strip-quoted-args.pl"
   # Unreadable helper passes the command through UNCHANGED — over-firing beats going quiet.
   if [ -r "$helper" ]; then
-    printf '%s' "$1" | perl "$helper"
+    # strip_cmd's placeholder reads as a heredoc opener to the helper, which then swallows every later line.
+    printf '%s' "${1//<<STRIPPED_HEREDOC>>/STRIPPED_HEREDOC}" | perl "$helper"
   else
     printf '%s' "$1"
   fi

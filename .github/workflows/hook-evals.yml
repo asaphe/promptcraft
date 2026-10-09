@@ -36,9 +36,13 @@ jobs:
       - name: Run hook evals
         run: python3 .claude/evals/runner.py
 
+      # Every suite a mutation runs must also pass unmutated in this job: the scorer counts a red suite as a catch.
       - name: Check Bash expansion semantics and published guard fixtures
         run: |
           python3 tools/claude/examples/hook-tests/run-fixtures.py destructive-guard --hooks-dir tools/claude/examples/hooks
+          python3 tools/claude/examples/hook-tests/run-fixtures.py pr-create-guard --hooks-dir tools/claude/examples/hooks
+          python3 tools/claude/examples/hook-tests/run-fixtures.py stateful-op-reminder --hooks-dir tools/claude/examples/hooks
+          python3 tools/claude/examples/hook-tests/run-fixtures.py null-result-probe --hooks-dir tools/claude/examples/hooks
           python3 tools/claude/examples/hook-tests/test-expansion-semantics.py
 
       # The grant is a contract between two hooks, so neither hook's own suite can see it break.
@@ -62,7 +66,7 @@ jobs:
   # Every mutation reruns a whole suite, so they get their own sharded job instead of the evals budget.
   mutations:
     runs-on: ubuntu-latest
-    # A destructive-guard shard holds at most 12 mutations, each rerunning at most 477 cases at about 0.17 s a case on CI: about 16 minutes.
+    # A destructive-guard shard holds at most 13 mutations, each rerunning at most 489 cases at about 0.17 s a case on CI: about 18 minutes.
     timeout-minutes: 25
     strategy:
       fail-fast: false

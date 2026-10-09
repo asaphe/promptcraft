@@ -393,6 +393,17 @@ allow	python -c 'pass' <<'EOF'\ngit push origin main\nEOF
 allow	python inert-python-script <<'EOF'\ngit push origin main\nEOF
 #!oracle	eval-literal	-
 allow	eval <<'EOF'\ngit push origin main\nEOF
+# WHY: a heredoc piped into an interpreter that reads standard input is its code, through every pipe in between.
+hard	cat <<EOF | sh\ngit push origin main\nEOF
+hard	cat <<'EOF' | bash\ngit push origin main\nEOF
+hard	cat <<EOF | sh -s\ngit push origin main\nEOF
+hard	cat <<EOF |& env bash\ngit push origin main\nEOF
+hard	cat <<EOF | tee run.log | sh\ngit push origin main\nEOF
+hard	bash <<'EOF' 2>&1 | tail -5\ngit push origin main\nEOF
+allow	cat <<EOF | sh\ngit push origin feature/my-branch\nEOF
+allow	cat <<'EOF' | git commit -F -\ndocs: never git push origin main\nEOF
+allow	cat <<'EOF' | sh inert-script\ngit push origin main\nEOF
+allow	cat <<'EOF' || sh\ngit push origin main\nEOF
 # WHY: wrappers pass a static -c payload to Bash for execution.
 #!oracle	env-bash-c	env:bash,-c,git push origin main|bash:-c,git push origin main|git:push,origin,main
 hard	env bash -c 'git push origin main'
