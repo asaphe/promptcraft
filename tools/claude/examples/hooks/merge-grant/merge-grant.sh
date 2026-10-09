@@ -37,10 +37,13 @@ asks_for() { # action, text, "label" when the text is a menu option a user picke
   printf '%s' "$2" | LC_ALL=C sed -e "s/’/'/g" -e "s/‘/'/g" -e "s/\`/'/g" | LC_ALL=C tr '[:upper:]' '[:lower:]' \
     | LC_ALL=C tr '\t\n' ' .' | LC_ALL=C sed -e "s/[.;!?]/ . /g" -e "s/[,()]/ , /g" -e "s/:/ : /g" \
       -e "s/pull[^a-z]*requests*/ pr /g" -e "s/^prs* *[#-]* *[0-9][0-9]*/ prref /" -e "s/\([^a-z]\)prs* *[#-]* *[0-9][0-9]*/\1 prref /g" \
+      -e "s/merge[-_]\([a-z]\)/mergename\1/g" \
       -e "s/[^a-z'.,: ]/ /g" \
     | LC_ALL=C tr -s ' ' '\n' | awk -v q="'" -v act="$1" -v label="${3:-}" '
       BEGIN { n = split("dont not never without cannot cant wont shouldnt couldnt wouldnt", w, " "); for (i = 1; i <= n; i++) neg[w[i]] = 1
               n = split("a an the this that these those my our your its their both another separate", w, " "); for (i = 1; i <= n; i++) det[w[i]] = 1
+              n = split("a an the this that these those my our your its their another any each every", w, " "); for (i = 1; i <= n; i++) ndet[w[i]] = 1
+              n = split("do finish complete perform run start", w, " "); for (i = 1; i <= n; i++) doer[w[i]] = 1
               n = split("ok okay yes yeah yep no sure great good fine thanks please alright cool perfect lgtm", w, " "); for (i = 1; i <= n; i++) intj[w[i]] = 1
               n = split("keep keeps kept leave leaves left", w, " "); for (i = 1; i <= n; i++) hold[w[i]] = 1
               n = split("of on about from with by per in into for to at when after before across over under", w, " "); for (i = 1; i <= n; i++) stop[w[i]] = 1
@@ -56,7 +59,7 @@ asks_for() { # action, text, "label" when the text is a menu option a user picke
       after_did && ($0 in subj) && label == "" { asked = 1 }
       { after_did = ($0 == "did") }
       $0 in neg || $0 ~ ("n" q "t$") { negated = 1 }
-      act == "merge" && $0 == "merge" && !negated && prev != "no" { found = 1 }
+      act == "merge" && $0 == "merge" && !negated && prev != "no" && !asked && !((prev in ndet) && !(prev2 in doer)) && !(prev == "to" && prev2 == "ready") { found = 1 }
       act == "pr" && pr_verb > 0 && ($0 in stop) { pr_verb = 0; opening = 0 }
       act == "pr" && opening { if (!($0 in det)) pr_verb = 0; opening = 0 }
       act == "pr" && fresh && pr_verb > 0 && ($0 == "pr" || $0 == "prs") { if (held_open) pending = 1; else tent = 1; pr_verb = 0 }
@@ -64,7 +67,7 @@ asks_for() { # action, text, "label" when the text is a menu option a user picke
       act == "pr" && pr_verb > 0 { pr_verb-- }
       { fresh = 0 }
       act == "pr" && ($0 == "open" || $0 == "create" || $0 == "raise") && !negated && !asked && prev != "no" && !($0 == "open" && (prev in hold)) { pr_verb = 4; fresh = 1; held_open = ($0 == "open"); opening = ($0 == "open" && prev != "" && !lead_intj && !(prev == "," && lead_ok)) }
-      { prev = $0 }
+      { prev2 = prev; prev = $0 }
       END { if (tent || (label != "" && pending)) found = 1; exit !found }'
 }
 

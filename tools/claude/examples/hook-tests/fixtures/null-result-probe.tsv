@@ -1,0 +1,19 @@
+# null-result-probe — a nudge, never a block, so every case is `ctx` or `allow`. Column 3 is the
+# command's stdout: empty unless given. This file pins how the hook reads the command through
+# _lib/strip-cmd.sh, the half it shares with the guards; the hook's README covers the rest.
+
+#!escapes
+#!event PostToolUse
+
+# --- ctx: an empty result from a command that could have collapsed to nothing ---
+ctx	git diff -- missing/path
+
+# --- allow: output came back, or nothing in the command could have collapsed ---
+allow	git diff -- missing/path	diff --git a/x b/x
+allow	git diff missing/path
+
+# WHY: strip_cmd's heredoc placeholder must not read as a new heredoc that swallows every later line.
+ctx	read -r X <<EOF\nvalue\nEOF\ngit diff -- missing/path
+
+# --- input unavailable ---
+allow	<absent>

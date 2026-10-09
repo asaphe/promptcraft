@@ -4,8 +4,8 @@
     {
       "why": "a negated request arms the grant, so \"don't merge yet\" makes a merge approvable",
       "replace": {
-        "from": "$0 == \"merge\" && !negated && prev != \"no\" { found = 1 }",
-        "to": "$0 == \"merge\" { found = 1 }"
+        "from": "$0 == \"merge\" && !negated && prev != \"no\" &&",
+        "to": "$0 == \"merge\" &&"
       }
     },
     {
@@ -245,6 +245,45 @@
       "replace": {
         "from": " && label != \"answer\") tent = 0",
         "to": ") tent = 0"
+      }
+    },
+    {
+      "why": "a `-` or `_` compound stops being a name, so `merge-grant` in a prompt arms the merge grant",
+      "delete_matching": "mergename"
+    },
+    {
+      "why": "a determiner stops making merge a noun, so \"an `eval` or a merge command\" arms the merge grant",
+      "replace": {
+        "from": " && !((prev in ndet) && !(prev2 in doer))",
+        "to": ""
+      }
+    },
+    {
+      "why": "a verb before the determiner stops counting, so \"do the merge\" arms nothing",
+      "replace": {
+        "from": " && !(prev2 in doer))",
+        "to": ")"
+      }
+    },
+    {
+      "why": "a status reads as a request, so \"the PR is ready to merge\" arms the merge grant",
+      "replace": {
+        "from": " && !(prev == \"to\" && prev2 == \"ready\")",
+        "to": ""
+      }
+    },
+    {
+      "why": "a question about the past asks for a merge, so \"did you merge 17?\" arms the merge grant",
+      "replace": {
+        "from": "prev != \"no\" && !asked && !((prev",
+        "to": "prev != \"no\" && !((prev"
+      }
+    },
+    {
+      "why": "the word two back is never recorded, so \"do the merge\" arms nothing and \"ready to merge\" arms",
+      "replace": {
+        "from": "{ prev2 = prev; prev = $0 }",
+        "to": "{ prev = $0 }"
       }
     }
   ],
@@ -886,6 +925,13 @@
         "from": "|\\$\\([^()]*\\)|",
         "to": "|"
       }
+    },
+    {
+      "why": "the push gate stops reading a backslash after the verb, so `bash -c \"git push\\\"\\\" origin main\"` skips every push check",
+      "replace": {
+        "from": "push([\"'\"'\"'\\\\[:space:];&|)]|$)",
+        "to": "push([\"'\"'\"'[:space:];&|)]|$)"
+      }
     }
   ],
   "pr-create-guard": [
@@ -948,6 +994,14 @@
       "replace": {
         "from": "  if ! _heredoc_is_executed \"$cmd\"; then",
         "to": "  if true; then"
+      }
+    },
+    {
+      "why": "strip_cmd's placeholder reaches the quote helper as a heredoc opener, which swallows every command after it",
+      "suite": "null-result-probe",
+      "replace": {
+        "from": "\"${1//<<STRIPPED_HEREDOC>>/STRIPPED_HEREDOC}\"",
+        "to": "\"$1\""
       }
     }
   ],
@@ -1155,6 +1209,46 @@
         "to": "dash|ash)$};\n    # `-c -- '<code>'`"
       },
       "suite": "destructive-guard"
+    },
+    {
+      "why": "a heredoc piped into a shell stays data, so `cat <<EOF | sh` hides the push to main in its body",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "$_->{executed} ||= $executed for @$piped;",
+        "to": "$_->{executed} ||= 0 for @$piped;"
+      }
+    },
+    {
+      "why": "a pipe into a non-interpreter undoes a body's own interpreter, so `bash <<'EOF' 2>&1 | tail -5` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "$_->{executed} ||= $executed for @$piped;",
+        "to": "$_->{executed} = $executed for @$piped;"
+      }
+    },
+    {
+      "why": "a heredoc is carried through one pipe only, so `cat <<EOF | tee run.log | sh` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "@$piped = $pipe ? (@$piped, @$docs) : ();",
+        "to": "@$piped = $pipe ? @$docs : ();"
+      }
+    },
+    {
+      "why": "`||` reads as a pipe, so `cat <<'EOF' || sh` turns a literal body into code and hard-blocks",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "my $pipe = $char eq '|' && substr($text, $i - 1, 1) ne '|';",
+        "to": "my $pipe = $char eq '|';"
+      }
+    },
+    {
+      "why": "the `&` of `|&` ends the pipeline, so `cat <<EOF |& env bash` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "if ($pipe && substr($text, $i + 1, 1) eq '&') {",
+        "to": "if (0) {"
+      }
     }
   ]
 }

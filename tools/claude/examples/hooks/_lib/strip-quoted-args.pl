@@ -100,12 +100,15 @@ sub interpreter {
 }
 
 sub finish_command {
-    my ($prefix, $docs) = @_;
-    if (@$docs) {
+    my ($prefix, $docs, $piped, $pipe) = @_;
+    if (@$docs || @$piped) {
         my $executed = interpreter($prefix);
         $_->{executed} = $executed for @$docs;
-        @$docs = ();
+        # A heredoc whose output is piped into an interpreter is that interpreter's code: `cat <<EOF | sh`.
+        $_->{executed} ||= $executed for @$piped;
     }
+    @$piped = $pipe ? (@$piped, @$docs) : ();
+    @$docs = ();
 }
 
 sub backtick {
@@ -313,7 +316,7 @@ sub scan {
     my ($out, $simple, $i, $depth) = ('', '', $start, 0);
     # The chunks of one word share its verdict: `'a '\''b'\'' c'` is one shell string, not a string and then data.
     my $word_keep = 0;
-    my (@docs, @command_docs);
+    my (@docs, @command_docs, @piped_docs);
     while ($i < length $text) {
         my $char = substr($text, $i, 1);
         if ($stop && !$depth && substr($text, $i, length $stop) eq $stop) {
@@ -376,7 +379,7 @@ sub scan {
             next;
         }
         if ($char eq "\n" && @docs) {
-            finish_command($simple, \@command_docs);
+            finish_command($simple, \@command_docs, \@piped_docs, 0);
             $simple = '';
             $i++;
             $out .= "\n";
@@ -396,9 +399,16 @@ sub scan {
         $depth++ if $char eq '(';
         $depth-- if $char eq ')' && $depth;
         if ($char =~ /[;|()\n]/ || ($char eq '&' && substr($text, $i - 1, 1) !~ /[<>]/ && substr($text, $i + 1, 1) ne '>')) {
-            finish_command($simple, \@command_docs);
+            # `|` and `|&` feed this command's output to the next; the second bar of `||` ends the pipeline.
+            my $pipe = $char eq '|' && substr($text, $i - 1, 1) ne '|';
+            finish_command($simple, \@command_docs, \@piped_docs, $pipe);
             $simple = '';
             $word_keep = 0;
+            if ($pipe && substr($text, $i + 1, 1) eq '&') {
+                $out .= '|&';
+                $i += 2;
+                next;
+            }
         } else {
             $simple .= $char eq "\t" ? ' ' : $char;
             $word_keep = 0 if $char =~ /\s/;

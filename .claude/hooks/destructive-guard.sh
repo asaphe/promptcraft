@@ -723,7 +723,7 @@ xargs_replace() { # segment
   }'
 }
 # Continuations joined first: `git \<newline> push` is one command to the shell that runs it.
-if printf '%s' "$PUSH_VIEW" | perl -0777 -pe 's/\\\n//g' | grep -qE 'git[[:space:]]([^|;&]* )?push(["'"'"'[:space:];&|)]|$)'; then
+if printf '%s' "$PUSH_VIEW" | perl -0777 -pe 's/\\\n//g' | grep -qE 'git[[:space:]]([^|;&]* )?push(["'"'"'\\[:space:];&|)]|$)'; then
   if ! load_scoped_segments; then
     HARD_REASON="destructive-guard: scoped command parser failed while checking a push."
   else

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 r"""Assert a hook produces the expected OUTCOME for each fixture command.
 
-Usage: run-fixtures.py <hook-name> [--hooks-dir DIR] [--cwd PATH] [--timeout S] [--fail-fast]
+Usage: run-fixtures.py <hook-name> [--hooks-dir DIR] [--cwd PATH] [--timeout S] [--fail-fast] [--jobs N]
 
 Fixtures live in fixtures/<hook-name>.tsv as `expected <TAB> command`, with `#`
 comments. Exits non-zero if any case mismatches, so it works as a pre-commit gate.
@@ -72,6 +72,7 @@ flip a considered fail-open into an unconsidered one in silence.
 """
 
 import argparse
+import concurrent.futures
 import json
 import os
 import pathlib
@@ -237,7 +238,7 @@ def parse_fixture(path):
     return cases, setup_name
 
 
-def build_payload(cmd, output, flags, tool, event, cwd, tmp):
+def build_payload(cmd, output, flags, tool, event, cwd, tmp, index=0):
     payload = {
         "session_id": "fixture",
         "cwd": cwd,
@@ -253,7 +254,8 @@ def build_payload(cmd, output, flags, tool, event, cwd, tmp):
             payload["transcript_path"] = output
     if event == "Stop":
         # Stop hooks read a transcript, never tool_input, so one has to be materialised.
-        transcript = os.path.join(tmp, "fixture-stop-transcript.jsonl")
+        # One file per case: under --jobs, cases sharing a name would read each other's transcript.
+        transcript = os.path.join(tmp, "fixture-stop-transcript-%d.jsonl" % index)
         with open(transcript, "w", encoding="utf-8") as fh:
             fh.write(json.dumps({
                 "type": "assistant",
@@ -278,40 +280,61 @@ def build_payload(cmd, output, flags, tool, event, cwd, tmp):
     return payload
 
 
+def substitute_case(case, tokens):
+    """Expands tokens in one case, exiting on an unknown one before any case has run."""
+    expected, cmd, output, flags, tool, event = case
+    if cmd != ABSENT:
+        cmd = substitute(cmd, tokens)
+    output = substitute(output, tokens)
+    if tokens:
+        left = TOKEN_RE.findall(cmd) + TOKEN_RE.findall(output)
+        if left:
+            sys.exit("unknown token(s) %s in %r\n  known: %s"
+                     % (", ".join(sorted(set(left))), cmd, ", ".join(sorted(tokens))))
+    return expected, cmd, output, flags, tool, event
+
+
+def run_case(index, case, cwd, env, args, hook_path, tmp):
+    """Runs one case in its own hook process; returns (expected, got, cmd, stderr)."""
+    expected, cmd, output, flags, tool, event = case
+    payload = build_payload(cmd, output, flags, tool, event, cwd, tmp, index)
+    try:
+        proc = subprocess.run(
+            ["bash", str(hook_path)],
+            input=json.dumps(payload),
+            capture_output=True, text=True, cwd=cwd,
+            timeout=args.timeout, env=env,
+        )
+    except subprocess.TimeoutExpired:
+        return expected, "TIMEOUT", cmd, ""
+    if expected == "raw" or expected.startswith(REWRITE):
+        got = rewritten(proc.returncode, proc.stdout)
+    else:
+        got = classify(proc.returncode, proc.stdout, proc.stderr)
+    return expected, got, cmd, proc.stderr
+
+
 def run_cases(cases, tokens, cwd, env, args, hook_path, failures, tmp):
     """Returns how many cases ran: --fail-fast stops at the first mismatch that is not a TIMEOUT."""
-    for ran, (expected, cmd, output, flags, tool, event) in enumerate(cases, 1):
-        if cmd != ABSENT:
-            cmd = substitute(cmd, tokens)
-        output = substitute(output, tokens)
-        if tokens:
-            left = TOKEN_RE.findall(cmd) + TOKEN_RE.findall(output)
-            if left:
-                sys.exit("unknown token(s) %s in %r\n  known: %s"
-                         % (", ".join(sorted(set(left))), cmd, ", ".join(sorted(tokens))))
-        payload = build_payload(cmd, output, flags, tool, event, cwd, tmp)
-        try:
-            proc = subprocess.run(
-                ["bash", str(hook_path)],
-                input=json.dumps(payload),
-                capture_output=True, text=True, cwd=cwd,
-                timeout=args.timeout, env=env,
-            )
-            if expected == "raw" or expected.startswith(REWRITE):
-                got = rewritten(proc.returncode, proc.stdout)
-            else:
-                got = classify(proc.returncode, proc.stdout, proc.stderr)
-        except subprocess.TimeoutExpired:
-            got = "TIMEOUT"
-        if got != expected:
-            failures.append((expected, got, cmd))
-        print("%s want=%-7s got=%-7s %s"
-              % ("ok  " if got == expected else "FAIL", expected, got, cmd[:78]))
-        if got == "error" and expected != "error":
-            print("       stderr: %s" % " ".join(proc.stderr.split())[:150])
-        if args.fail_fast and got != expected and got != "TIMEOUT":
-            return ran
-    return len(cases)
+    cases = [substitute_case(case, tokens) for case in cases]
+    # Results are read in file order, so output and the fail-fast stop match a serial run.
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs)
+    try:
+        futures = [pool.submit(run_case, i, case, cwd, env, args, hook_path, tmp)
+                   for i, case in enumerate(cases)]
+        for ran, future in enumerate(futures, 1):
+            expected, got, cmd, stderr = future.result()
+            if got != expected:
+                failures.append((expected, got, cmd))
+            print("%s want=%-7s got=%-7s %s"
+                  % ("ok  " if got == expected else "FAIL", expected, got, cmd[:78]))
+            if got == "error" and expected != "error":
+                print("       stderr: %s" % " ".join(stderr.split())[:150])
+            if args.fail_fast and got != expected and got != "TIMEOUT":
+                return ran
+        return len(cases)
+    finally:
+        pool.shutdown(wait=True, cancel_futures=True)
 
 
 def main():
@@ -325,7 +348,12 @@ def main():
     # A timeout says the host was slow, not that the hook is wrong, so it never stops the run.
     ap.add_argument("--fail-fast", action="store_true",
                     help="stop at the first mismatch that is not a TIMEOUT (mutation runs)")
+    # Each case is its own hook process, so N can run at once; a hook whose verdict reads state an earlier case left must stay at 1.
+    ap.add_argument("--jobs", type=int, default=1,
+                    help="cases to run at once (default 1); results still print in file order")
     args = ap.parse_args()
+    if args.jobs < 1:
+        sys.exit("--jobs must be 1 or more: %d" % args.jobs)
 
     hook_path = resolve_hook(pathlib.Path(args.hooks_dir).expanduser().resolve(), args.hook)
     fixture_path = here / "fixtures" / ("%s.tsv" % args.hook)
