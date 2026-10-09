@@ -51,7 +51,7 @@ import time
 HERE = pathlib.Path(__file__).resolve().parent
 MANIFEST = HERE / "mutations.json"
 # run-fixtures.py's summary row for one mismatched case.
-FAILURE_LINE = re.compile(r"^  want=\S+ got=(\S+)  ", re.M)
+FAILURE_LINE = re.compile(r"^  want=[^\t\n]*\tgot=([^\t\n]*)\t", re.M)
 
 
 def apply_mutation(text, mutation):

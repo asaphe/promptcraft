@@ -62,25 +62,34 @@ jobs:
   # Every mutation reruns a whole suite, so they get their own sharded job instead of the evals budget.
   mutations:
     runs-on: ubuntu-latest
+    # A destructive-guard shard holds at most 12 mutations, each rerunning at most 459 cases at about 0.17 s a case on CI: about 16 minutes.
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         include:
-          - suite: destructive-guard 1/6
-            args: --shard 1/6 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 2/6
-            args: --shard 2/6 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 3/6
-            args: --shard 3/6 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 4/6
-            args: --shard 4/6 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 5/6
-            args: --shard 5/6 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 6/6
-            args: --shard 6/6 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: merge-grant and strip-cmd
-            args: merge-grant _lib/strip-cmd
+          - suite: destructive-guard 1/10
+            args: --shard 1/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 2/10
+            args: --shard 2/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 3/10
+            args: --shard 3/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 4/10
+            args: --shard 4/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 5/10
+            args: --shard 5/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 6/10
+            args: --shard 6/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 7/10
+            args: --shard 7/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 8/10
+            args: --shard 8/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 9/10
+            args: --shard 9/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 10/10
+            args: --shard 10/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: merge-grant, pr-create-guard, stateful-op-reminder and strip-cmd
+            args: merge-grant _lib/strip-cmd pr-create-guard stateful-op-reminder
     name: mutations (${{ matrix.suite }})
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
