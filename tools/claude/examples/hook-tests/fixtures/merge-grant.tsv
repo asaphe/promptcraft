@@ -1,8 +1,10 @@
-# merge-grant — which prompts arm a one-turn merge grant. `ctx` means the grant was armed and
-# the hook told the model so; `allow` means no grant, and destructive-guard keeps every merge a
-# hard block for the turn. Over-arming costs one permission prompt the user can refuse;
-# under-arming costs a re-phrase. Both directions are pinned here.
+# merge-grant — which prompts arm a one-turn grant. `ctx` means a grant was armed and the hook
+# told the model so; `allow` means none, and destructive-guard keeps every merge a hard block and
+# every `gh pr create` a prompt for the turn. Over-arming costs one permission prompt the user can
+# refuse (merge) or one skipped prompt pr-create-guard still backs (pr); under-arming costs a
+# re-phrase. Both directions are pinned here; test-merge-grant.py checks WHICH grant each arms.
 
+#!escapes
 #!event UserPromptSubmit
 #!setup merge-grant
 
@@ -36,8 +38,171 @@ allow	don't squash-merge 17
 allow	do not *merge*
 allow	don't `merge` it
 
+# --- allow: a comma, colon or parenthesis is an aside, not the end of the clause a negation governs ---
+allow	Don't, please, merge this
+allow	Do not, under any circumstances, merge 17
+allow	never (ever) merge without me
+ctx	no, merge it
+ctx	ok: merge 17
+
 # --- a notification is not the user speaking; text around a pasted one is ---
 allow	<task-notification>agent finished: ready to merge</task-notification>
 ctx	<task-notification>x</task-notification> looks good, merge 17
 allow	<task-notification>ready to merge</task-notification> actually, do NOT merge anything
+allow	<agent-message from="worker">all green, open the PR</agent-message>
+ctx	<agent-message from="worker">done</agent-message> thanks, open the PR
+allow	<agent-message from="worker">it strips </agent-message> blocks; open the PR</agent-message>
+
+# --- ctx: a request to open a PR — open/create/raise, then PR/PRs/pull within the next four words ---
+ctx	looks good, open the PR
+ctx	create a PR for this
+ctx	raise PRs for both branches
+ctx	open a pull request against main
+ctx	open PRs for both branches
+ctx	please open a PR for this
+ctx	can you open a pull-request?
+
+# --- allow: a PR is mentioned, but nobody asked to open one ---
+allow	don't open a PR yet
+allow	never create PRs without asking
+allow	the PR is open, what's its CI state?
+allow	reopen the PR
+allow	open the file and tell me what the function does before we talk about the PR
+
+# --- allow: `open` right before PR is an adjective, and `pull` is a PR only as `pull request` ---
+allow	list my open PRs
+allow	how many open PRs do we have?
+allow	close the stale open PRs
+allow	list the open draft PRs
+allow	close the open stale PRs
+allow	how many open dependabot PRs are there?
+allow	review the open/draft PRs
+allow	summarize my open draft pull requests
+allow	any open renovate PRs I should look at?
+allow	show the open, stale PRs
+allow	which of the open (draft) PRs are mine?
+ctx	go ahead and open the PR
+ctx	then open a new PR for the fix
+ctx	open a draft PR
+ctx	ok, open the two PRs
+ctx	ok, open PRs for both branches
+ctx	Yes, open draft PRs
+allow	Status report: open PRs, failing CI, stale branches
+allow	Weekly summary: open PRs and their CI state
+allow	list everything still in flight (open PRs, issues)
+allow	can you check: open PRs older than a week?
+allow	for each repo, open PRs count and review status
+allow	review the open new PRs from today
+allow	list the open two PRs that touch auth
+allow	keep open the PRs from dependabot, close the rest
+allow	open the terminal and pull main
+allow	create a pull-down menu in the settings page
+
+# --- allow: every way people spell the negation ---
+allow	Do not, under any circumstances, open a PR.
+allow	Don't (yet) open a PR
+allow	Never, ever open a PR for this
+allow	we shouldn't open a PR yet
+allow	you can't open a PR until CI passes
+allow	I won't need you to open a PR
+allow	you cannot open a PR here
+allow	don`t open a PR
+allow	don‘t open a PR
 allow	<absent>
+
+# --- third review: what counts as asking for a PR ---
+# WHY: a heading or bullet that is just `open PRs`, or labels a count with a colon, is a list, not a request.
+allow	Status report\nopen PRs, failing CI, stale branches
+allow	Here is the dashboard:\n- open PRs: 4\n- failing CI: 2\nwhat should I look at first?
+allow	Open PRs: 3, failing CI: 1
+allow	open PRs?
+# WHY: a comma ends the verb's reach, so `open, the PR` is a state and a comma, not a request.
+allow	Leave it open, the PR needs another review
+allow	keep them open, the PRs from dependabot can wait
+allow	List PRs by how long they've been open, the oldest PRs first
+# WHY: only a clause of interjections leads into the verb, not a status that ends in `fine` or `ok`.
+allow	CI is fine, open PRs need review though
+allow	Build: ok, open PRs: 3, failing: 0
+ctx	ok great, open PRs for both
+ctx	the build is red, ok, open PRs for both
+ctx	no, open PRs for both
+ctx	yes, please open PRs for both branches
+ctx	please open PRs for both branches
+# WHY: a preposition ends the verb's reach, so a report about PRs is not a request to create one.
+allow	create a list of PRs older than a week
+allow	Create a table: PRs, owners, CI state
+allow	raise the priority of PRs from security
+ctx	create PRs in both repos
+# WHY: a number after PR names one that exists, so opening it is reading it.
+allow	open PR 17 in the browser
+allow	open PR #1234 and read the review comments
+
+# --- fourth review: terse requests, statements about open PRs, questions and line breaks ---
+# WHY: only `open` is also an adjective, so a terse `create PR` or `raise PR` arms at once.
+ctx	create PR
+ctx	raise PR
+ctx	create PRs
+ctx	create PR.
+ctx	commit and push, then create PR
+ctx	looks good, raise PR
+ctx	please create PR
+ctx	create PRs, one per repo
+# WHY: `for`, `to`, `when` and the other prepositions end the verb's reach, as `of` does.
+allow	create a report for PRs merged this week
+allow	create a dashboard for PRs and their CI state
+allow	open an issue for PRs touching auth
+allow	raise an alert when PRs fail
+ctx	create a PR for this, then merge it
+ctx	create a new draft PR
+# WHY: a colon later in the clause makes a held `open PRs` a heading, not a request.
+allow	Open PRs by repo:\n- services: 3\n- infra: 1
+allow	Here's the status:\n- open PRs awaiting review: 4\n- failing CI: 2
+allow	Open PRs for review: 3
+# WHY: a negation or a copula after a held `open PRs` makes it a statement about them.
+allow	Open PRs don't need a rebase
+allow	No, open PRs aren't blocking the release
+allow	Yes, open PRs need review
+allow	CI: fine, open PRs need review
+ctx	open PRs and merge them
+# WHY: `did` asks about the past, so a question whether a PR was opened asks for nothing.
+allow	Did you open a PR for this?
+allow	did you create the PR yet?
+ctx	can you open a PR for this?
+# WHY: a hyphenated PR number names one that exists.
+allow	open PR-17 in the browser
+# WHY: only a line break ends these clauses, so a newline that stopped ending one would leave them unarmed.
+ctx	looks good\nopen PRs for both branches
+ctx	don't close 19\nmerge 17
+
+# --- fifth review: `did` only as a question, and a named step before a colon ---
+# WHY: `did` is a question only when a subject follows it.
+ctx	I did the rebase, now open a PR
+ctx	the build did pass, so open a PR
+# WHY: a `create PR` that a later colon labels is a report line, not a request.
+allow	Report:\n- create PR: failed\n- ok
+
+# WHY: the verb reaches only the next four words, so a PR mentioned later in the clause is not the thing opened.
+allow	open the dashboard and check whether the PR builds
+
+# --- menu answers: PostToolUse on AskUserQuestion, the question and the label picked ---
+#!event PostToolUse
+#!tool AskUserQuestion
+# WHY: a label is a pick, not a heading, so a terse one arms pr on its own.
+ctx	How should I proceed?	Create PR (Recommended)
+ctx	How should I proceed?	Open PR
+ctx	How should I proceed?	Open PRs
+ctx	Open PR?	Yes
+ctx	Open the PR as drafted?	Yes (Recommended)
+# WHY: a menu answer never arms merge, and a qualified answer is not consent.
+allow	Merge #17 now?	Yes
+allow	Open the PR now?	Yes, but only after CI
+allow	Which shape?	One PR per change
+# WHY: a question is the agent's own text, so a heading in it is still a heading.
+allow	Open PRs: 3 need review. Merge them?	Yes
+allow	Open PRs (2): should I rebase them?	Yes
+# WHY: a pick among PRs the question names is a filter, not an action.
+allow	Which PRs should I summarize?	Open PRs
+# WHY: a menu question proposing a PR is not a question about the past.
+ctx	Did you want me to open a PR?	Yes
+# WHY: a picked label is never a heading, so a colon in it does not cancel the pick.
+ctx	How should I proceed?	Open PRs for both: services and infra

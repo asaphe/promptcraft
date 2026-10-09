@@ -111,10 +111,30 @@ def _grant_dir(tmp):
 
 def destructive_guard(tmp):
     feature = _init(os.path.join(tmp, "push-feature"), branch="feature")
-    return {"cwd": feature, "env": _grant_dir(tmp), "tokens": {
+    # A linked worktree on main of the session's own repo, so a branch move there is not a cross-repo switch.
+    _base_commit(feature)
+    same_repo_main = os.path.join(tmp, "push-feature-main")
+    _git(feature, "worktree", "add", "-q", "-b", "main", same_repo_main)
+    # Directories named like the placeholders, so a guard that reads one as a path finds a checkout instead of nothing.
+    for placeholder in ("SUBSTITUTION", "QUOTED_ARG"):
+        os.makedirs(os.path.join(feature, placeholder))
+    spaced = _init(os.path.join(tmp, "push main wt"))
+    # A word split at its escaped space, taken literally, names a feature checkout, so misreading the escape is observable.
+    _init(os.path.join(tmp, "push\\"), branch="feature")
+    # HOME is a checkout off the default branch, so `cd -P && git push` reads a branch no other repo here holds.
+    env = dict(_grant_dir(tmp), HOME=_init(os.path.join(tmp, "home"), branch="home"))
+    # A linked worktree's `.git` is a file, not a directory, so GIT_DIR naming it needs its own case.
+    wt_base = _init(os.path.join(tmp, "push-wt-base"), branch="feature")
+    _base_commit(wt_base)
+    main_wt = os.path.join(tmp, "push-main-wt")
+    _git(wt_base, "worktree", "add", "-q", "-b", "main", main_wt)
+    return {"cwd": feature, "env": env, "tokens": {
+        "push_main_wt": main_wt,
         "push_feature": feature,
+        "same_repo_main": same_repo_main,
         "push_main": _init(os.path.join(tmp, "push-main")),
         "push_master": _init(os.path.join(tmp, "push-master"), branch="master"),
+        "push_main_esc": spaced.replace(" ", "\\ "),
     }}
 
 

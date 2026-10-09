@@ -36,6 +36,157 @@ allow	cd {push_feature} && git push
 hard	cd {push_main} && git push
 hard	cd {push_master} && git push
 
+# --- hard: a redirect, a second refspec, an option's value or an all-branches flag hides main from a first-refspec read ---
+hard	git push>/dev/null origin main
+hard	git push 2>&1 origin main
+hard	git push &>/dev/null origin main
+hard	git push origin feature/my-branch main
+hard	git push origin feature/my-branch +main
+hard	git push origin 'refs/heads/*:refs/heads/*'
+hard	git push -o ci.skip origin main
+hard	git push --push-option ci.skip origin main
+hard	git push --all origin
+hard	git push --mirror origin
+hard	git push origin --delete main
+allow	git push origin feature/my-branch 2>&1 | tail -3
+allow	git push -o ci.skip origin feature/my-branch
+
+# --- the directory a bare push runs in: its own -C over a cd, a subshell's cd stays inside it ---
+allow	cd {push_main} && git -C {push_feature} push
+hard	cd {push_feature} && git -C {push_main} push
+hard	cd {push_main} && git -C . push
+hard	(cd {push_main} && git push)
+allow	(cd {push_main}) && git push
+allow	echo $(cd {push_main}) && git push
+hard	cd {push_main} && git push && cd {push_feature}
+hard	cd "$WORKTREE" && git push
+allow	cd "$WORKTREE" && git push origin feature/my-branch
+hard	(cd {push_main} && git checkout -b topic)
+hard	git -C {push_main} --work-tree={push_main} checkout -b topic
+hard	git -C {push_main} --git-dir={push_main}/.git checkout -b topic
+hard	git --git-dir={push_main}/.git checkout -b topic
+allow	git --git-dir={push_feature}/.git checkout -b topic
+
+# --- a substitution in the -C, the remote or the refspec does not cut the push out of its own segment ---
+allow	git -C "$(git rev-parse --show-toplevel)" push
+allow	cd "$(git rev-parse --show-toplevel)" && git push -u origin HEAD
+allow	cd $(git rev-parse --show-toplevel) && git push
+hard	cd {push_main} && cd "$(git rev-parse --show-toplevel)" && git push
+hard	git -C "$(git -C {push_main} rev-parse --show-toplevel)" push
+hard	git -C "$(git -C {push_main} rev-parse --show-toplevel)" push origin main
+hard	git -C $(echo {push_main}) push origin main
+hard	git -C `echo {push_main}` push origin main
+hard	git push $(git remote) main
+hard	git push origin feature/my-branch $(echo x) main
+hard	git push -o "$(echo ci.skip)" origin main
+hard	git push --push-option="$(echo a)" origin main
+hard	cd {push_main} && git push --push-option=$(echo x) origin
+hard	cd {push_main} && git push --receive-pack=$(echo git-receive-pack) origin
+hard	cd {push_main} && git push --force-with-lease=main:$(git rev-parse origin/main) origin
+hard	cd {push_main} && git push $(echo) origin
+allow	git push --push-option=$(echo x) origin
+hard	git push origin "$(git rev-parse HEAD)":refs/heads/main
+hard	git push origin `git rev-parse HEAD`:main
+hard	cd "$(dirname {push_main}/x)" && git push
+hard	cd {push_main} && git push origin $(git branch --show-current)
+hard	cd {push_main} && git push -u origin "$(git rev-parse --abbrev-ref HEAD)"
+hard	cd {push_main} && git push origin "$B"
+allow	git push -u origin $(git branch --show-current)
+allow	git -C "$(git rev-parse --show-toplevel)" push origin feature/my-branch
+hard	diff <(git push origin main) empty.txt
+hard	cat >(git push origin main) </dev/null
+
+# --- a cd behind a reserved word or a builtin prefix, pushd and popd, and a repository moved by --git-dir ---
+hard	if cd {push_main}; then git push origin HEAD; fi
+hard	if cd {push_main}; then git push; fi
+hard	if true; then cd {push_main} && git push; fi
+hard	for i in 1; do cd {push_main}; git push; done
+hard	builtin cd {push_main} && git push
+hard	command cd {push_main} && git push
+hard	time cd {push_main}; git push
+hard	pushd {push_main} && git push
+hard	pushd {push_main} >/dev/null && git push
+hard	pushd {push_feature} && popd && git push
+hard	git --git-dir={push_main}/.git push
+hard	GIT_DIR={push_main}/.git git push
+hard	git --git-dir {push_main}/.git --work-tree {push_main} push
+allow	if cd {push_feature}; then git push; fi
+allow	builtin cd {push_feature} && git push
+allow	pushd {push_feature} && git push
+allow	git --git-dir={push_main}/.git push origin feature/my-branch
+allow	git --git-dir={push_feature}/.git push
+allow	git -C {push_main} --work-tree={push_main} --git-dir={push_feature}/.git push
+hard	export GIT_DIR={push_main}/.git && git push
+hard	GIT_DIR={push_main}/.git; git push
+allow	export GIT_DIR={push_main}/.git && git push origin feature/my-branch
+allow	export FOO=1 && git push
+# WHY: an exported GIT_DIR resolves where each later git runs, as a GIT_DIR= prefix would; unset restores the directory's repository.
+allow	export GIT_DIR={push_feature}/.git && cd {push_main} && git push
+allow	cd {push_main} && export GIT_DIR=.git && cd {push_feature} && git push
+hard	cd {push_feature} && export GIT_DIR=.git && cd {push_main} && git push
+hard	export GIT_DIR=$REPO/.git && git push
+hard	export GIT_DIR && git push
+allow	export GIT_DIR={push_main}/.git; unset GIT_DIR; git push
+allow	export GIT_WORK_TREE={push_main} && git push
+hard	export GIT_DIR={push_main}/.git && git checkout -b topic
+hard	declare -x GIT_DIR={push_main}/.git; git switch -c topic
+allow	export GIT_DIR={push_feature}/.git && git checkout -b topic
+hard	cd -P -- {push_main} && git push
+allow	cd {push_main} && cd -P && git push
+allow	cd {push_main} && cd -- && git push
+
+# --- a push inside a shell string runs where this guard cannot follow, so a bare one must name its branch ---
+hard	cd {push_main} && bash -c "git push"
+hard	bash -c 'git push'
+hard	eval "git push"
+hard	sh -c "cd {push_main} && git push"
+allow	bash -c "git push origin feature/my-branch"
+allow	GIT_SSH_COMMAND="ssh -o BatchMode=yes" git push
+
+# --- an escaped space, an option that takes its value as the next word, and a tags-only push ---
+hard	cd {push_main_esc} && git push
+hard	git -C {push_main_esc} push
+allow	git -C {push_main_esc} push origin feature/my-branch
+hard	cd {push_main} && git push --recurse-submodules check origin
+allow	git push --recurse-submodules check origin
+allow	cd {push_main} && git push origin --tags
+hard	cd {push_main} && git push origin --tags main
+
+# --- git accepts any unique prefix of a long option and bundled short flags ---
+hard	cd {push_main} && git push --recu check origin
+hard	cd {push_main} && git push --push ci.skip origin
+hard	cd {push_main} && git push -uo ci.skip origin
+hard	git push --mirr
+hard	git push --al origin
+hard	git push --bran origin
+allow	git push --recu check origin
+allow	git push -uo ci.skip origin feature/my-branch
+
+# --- an arithmetic expansion or a case pattern inside a subshell does not close the subshell ---
+hard	(cd {push_main}; x=$((1+1)); git push)
+hard	(cd {push_main}; echo $((1)); git push)
+hard	(cd {push_main} && echo $((1)) && git push)
+hard	(cd {push_main}; case x in x) true;; esac; git push)
+allow	(cd {push_main}; echo $((1))); git push
+hard	(git push origin main) 2>&1
+hard	(cd {push_main} && git push) 2>&1
+allow	(cd {push_main}) 2>&1; git push
+hard	case x in x) cd {push_main}; git push;; esac
+allow	case x in x) cd {push_feature}; git push;; esac
+hard	if true; then (cd {push_main} && git push); fi
+hard	cd {push_main} && case x in x) (cd {push_feature}; true); git push;; esac
+hard	cd {push_main} && case x in x) (cd {push_feature} && pwd); git push;; esac
+hard	cd {push_main} && (cd {push_feature}; case x in y) true;; esac); git push
+hard	cd {push_main} && (case x in x) cd {push_feature};; esac); git push
+allow	(cd {push_main}; case x in y) true;; esac); git push
+hard	case a in a|b) cd {push_main}; git push;; esac
+hard	case x in (x) cd {push_main};; esac; git push
+
+# --- an escaped parenthesis neither opens nor closes a subshell ---
+hard	(cd {push_main}; echo a\)b; git push)
+allow	(cd {push_main}; echo \(); git push
+hard	cd {push_main} && (cd {push_feature}; echo \(); git push
+
 # --- hard: merges. No merge grant is armed here (the setup points the grant store at an empty
 # directory), so there is no approval path. test-merge-grant.py covers the armed turn. ---
 hard	gh pr merge 42 --squash
@@ -56,6 +207,131 @@ ask	terraform destroy
 ask	git reset --hard HEAD~1
 ask	kubectl delete pod web-0
 ask	git push --force origin feature/my-branch
+ask	git push 2>&1 -f origin feature/my-branch
+ask	git push>/dev/null --delete origin feature/my-branch
+ask	git push origin feature/my-branch -f;echo ok
+ask	git push origin feature/my-branch --force&&echo ok
+ask	git push origin +feature/my-branch;echo ok
+ask	git push origin feature/my-branch -f|cat
+ask	git push origin feature/my-branch :other
+ask	git push origin feature/my-branch --delete;
+ask	git push $(echo origin) :feature/my-branch
+ask	git push origin +HEAD~1:feature/my-branch
+ask	git push origin +HEAD^:feature/my-branch
+ask	git push origin +@:feature/my-branch
+ask	git push origin +feature/my-branch@{1}:feature/my-branch
+ask	git push -qd origin feature/my-branch
+ask	git push --del origin feature/my-branch
+ask	git push --force-w origin feature/my-branch
+allow	git push origin HEAD:feature/my-branch
+allow	git push origin feature/my-branch:other
+
+# --- third review: push and branch-switch parsing ---
+# WHY: a word that only starts with the toplevel substitution is that checkout's top plus the rest of the word.
+hard	cd $(git rev-parse --show-toplevel)/../push-main && git push
+hard	git -C $(git rev-parse --show-toplevel)/../push-main push
+hard	git --git-dir=$(git rev-parse --show-toplevel)/../push-main/.git push
+allow	cd {push_main} && cd $(git rev-parse --show-toplevel)/../push-feature && git push
+hard	cd {push_main} && git -C {push_feature} -C "$(git rev-parse --show-toplevel)" push
+allow	cd $(git rev-parse --show-toplevel) && git push
+# WHY: a redirect inside the toplevel substitution, or a suffix after it, still names a path in the checkout.
+allow	cd "$(git rev-parse --show-toplevel 2>/dev/null)" && git push
+allow	cd "$(git rev-parse --show-toplevel)/." && git push
+hard	cd {push_main} && cd "$(git rev-parse --show-toplevel 2>/dev/null)" && git push
+# WHY: an export inside a subshell or a substitution ends with it, as the cd beside it does.
+hard	cd {push_main} && (export GIT_DIR={push_feature}/.git); git push
+hard	cd {push_main} && x=$(export GIT_DIR={push_feature}/.git); git push
+hard	export GIT_DIR={push_main}/.git; (unset GIT_DIR); git push
+allow	cd {push_main} && (export GIT_DIR={push_feature}/.git; git push)
+# WHY: GIT_DIR naming a linked worktree's .git file reads that worktree's branch.
+hard	GIT_DIR={push_main_wt}/.git git push
+hard	git --git-dir={push_main_wt}/.git push
+hard	export GIT_DIR={push_main_wt}/.git && git push
+hard	git --git-dir={push_main_wt}/.git checkout -b topic
+hard	git -C {push_main_wt} push
+# WHY: in a short-flag bundle the first o takes the rest of the word, and the next word only when it comes last.
+hard	git push -oo origin main
+hard	git push -ofoo origin main
+allow	git push -oci.skip origin feature/my-branch
+# WHY: a push that closes its shell string has no arguments; the words after the string are the shell's own.
+hard	cd {push_main} && bash -c "git push" origin feature/my-branch
+hard	cd {push_main} && sh -c 'git push' sh feature/my-branch
+hard	bash -c "cd {push_main} && git push" git push
+# WHY: a checkout, switch or rename earlier in the command decides the branch a bare push sends.
+hard	git checkout main && git push
+hard	git switch main && git merge feature && git push origin HEAD
+hard	git checkout - && git push
+hard	git checkout -B main && git push
+hard	git branch -m main && git push
+hard	git checkout master && git push -u origin HEAD
+# WHY: the branch the command creates is the one its bare push sends, and a path checkout moves nothing.
+allow	git checkout main && git checkout -b topic-x && git push -u origin HEAD
+allow	git switch main && git switch -c topic-x && git push
+hard	git checkout -b topic-x && git checkout main && git push
+allow	git checkout main && git checkout README.txt && git checkout -b topic-x && git push -u origin HEAD
+hard	git checkout main && git checkout feature README.txt && git push
+ask	git push -4f origin feature/my-branch
+allow	cd {push_main} && git push "$(git remote)" feature/my-branch
+hard	declare -gx GIT_DIR={push_main}/.git; git push
+hard	cd {push_main} && export GIT_DIR=$(git rev-parse --show-toplevel)/.git && cd {push_feature} && git push
+# WHY: a worktree the command creates carries the branch it was created on.
+hard	git worktree add {push_feature}/../new-wt main && cd {push_feature}/../new-wt && git push
+allow	cd {push_main} && git worktree add ../new-wt -b topic-y && cd ../new-wt && git push -u origin HEAD
+# WHY: every push in a shell string is checked, not only the first.
+hard	bash -c "git push origin feature/my-branch && git push origin main"
+hard	eval "git push origin feature/my-branch; git push"
+allow	bash -c "git push origin feature/my-branch && git push origin feature/other"
+# WHY: the matching refspec pushes every branch on both sides, main included.
+hard	git push origin :
+hard	git push origin +:
+# WHY: an escaped quote inside a shell string is a plain quote to the shell that runs it.
+hard	bash -c "git push origin \"main\""
+hard	eval "git push origin \"main\""
+# WHY: push, checkout and switch count only as git's subcommand, never as a later word.
+allow	cd {push_main} && git stash push -m wip
+allow	git -C {push_main} stash push
+allow	cd {push_main} && git log --grep push
+allow	cd {push_main} && git help push
+allow	bash -c "git log --grep push"
+hard	git -C {push_main} -c core.x=y push
+hard	git --no-pager -C {push_main} push
+allow	git -C {push_main} grep -n checkout
+allow	git -C {push_main} log --oneline -S switch
+hard	git -C {push_main} checkout -b topic
+# WHY: a case pattern written with a space before its parenthesis is still a pattern.
+hard	(cd {push_main}; case x in x ) true;; esac; git push)
+hard	case x in x ) cd {push_main};; esac; git push
+# WHY: a substitution glued into an option value keeps the rest of its word.
+hard	cd {push_main} && git push --push-option=$(echo ci).skip origin
+hard	cd {push_main} && git push -o$(echo x)y origin
+# WHY: these wrappers exec their operands, so the shell string after them runs.
+hard	gtimeout 30 bash -c 'git push origin main'
+hard	caffeinate -i bash -c 'git push origin main'
+hard	su --command='git push origin main'
+# WHY: a refspec read from stdin is not in the text, so a bare push through xargs must name its branch.
+hard	echo main | xargs git push origin
+allow	echo x | xargs git push origin feature/my-branch
+# WHY: a parenthesis inside a kept shell string is not syntax of this shell.
+hard	(cd {push_main}; bash -c 'case 1 in 1) echo;; esac'; git push)
+hard	(cd {push_main}; bash -c "echo )"; git push)
+# WHY: eval runs its string in this shell, so a cd in it moves the later push.
+hard	eval "cd {push_main}" && git push
+# WHY: a bar inside a [[ ]] test is a regex alternation, not a pipe.
+hard	(cd {push_main}; [[ x =~ ^(a|b)$ ]]; git push)
+# WHY: a push refspec or mode set with -c decides what a bare push sends.
+hard	git -c remote.origin.push=HEAD:refs/heads/main push origin
+hard	git -c push.default=matching push origin
+allow	git -c push.default=simple push origin feature/my-branch
+
+# WHY: pushd -n adds to the stack without moving, so the push runs where the cd left it.
+hard	cd {push_main} && pushd -n {push_feature} && git push
+allow	pushd -n {push_main} && git push
+# WHY: a checkout of a ref with paths after it restores files and leaves HEAD where it was.
+allow	git checkout main README.txt && git push
+# WHY: a directory the command makes cannot be read before it runs, so a bare push there must name its branch.
+hard	mkdir {push_feature}/../made && cd {push_feature}/../made && git push
+# WHY: a word that is literally TOPLEVEL is a directory name, not the toplevel substitution.
+hard	cd TOPLEVEL && git push
 
 # --- allow: their read-only or non-destructive siblings ---
 allow	terraform plan
@@ -129,6 +405,24 @@ hard	exec bash -c 'git push origin main'
 hard	bash -ec 'git push origin main'
 # WHY: login-shell startup can change PATH, so this fixture is intentionally not an oracle probe.
 hard	bash -lc 'git push origin main'
+# WHY: a wrapper runs its operands as a command, so the shell after it still receives the -c string.
+hard	printf a | xargs -I{} sh -c 'git push origin main'
+hard	xargs -0 -n1 bash -c 'git push'
+hard	timeout 30 bash -c 'git push origin main'
+hard	nice -n 5 sh -c 'git push origin main'
+hard	nohup bash -c 'git push origin main'
+hard	find . -name '*.sh' -exec sh -c 'git push origin main' \;
+hard	sudo -u builder bash -c 'git push origin main'
+hard	timeout 30 ssh build-host 'git push origin main'
+# WHY: these commands hand their own string operand to a shell.
+hard	su -c 'git push origin main'
+hard	flock repo.lock -c 'git push origin main'
+hard	watch -n 60 'git push origin main'
+allow	printf a | xargs -I{} sh -c 'git push origin feature/x'
+allow	echo bash -c 'git push origin main'
+allow	xargs grep -c 'git push origin main'
+allow	find . -name 'git push origin main'
+allow	timeout 30 git commit -m 'git push origin main'
 allow	printf x; git commit -m 'bash -c git push origin main'
 hard	git commit -m "$(git push origin main)"
 hard	git commit -m "prefix $(git push origin main) suffix"
@@ -232,6 +526,163 @@ hard	printf x # $(git push origin main)
 
 # --- A substitution-local cd cannot change the outer checkout directory.
 allow	printf "$(cd /)" && git checkout main
+
+# --- Value-taking global options, separators, and the branch a bare push sends.
+# WHY: --attr-source and --shallow-file take their value as the next word, which is not git's subcommand.
+hard	git --attr-source HEAD push origin main
+hard	git --shallow-file x push origin main
+hard	cd {push_main} && git --attr-source HEAD push
+hard	git -C {push_main} --attr-source HEAD checkout -b topic
+# WHY: a branch create joined by `;` or `||` may have failed, so the push may still send the branch the command started on.
+hard	cd {same_repo_main} && git checkout -b feature; git push -u origin HEAD
+hard	cd {same_repo_main} && git switch -c feature || true; git push
+hard	cd {same_repo_main} && git checkout -b feature || true; git push -u origin HEAD
+hard	cd {same_repo_main} && git worktree add ../wt-y -b feature; cd ../wt-y; git push -u origin HEAD
+hard	cd {same_repo_main} && if ! git checkout -b feature; then git push -u origin HEAD; fi
+hard	cd {same_repo_main} && until git checkout -b feature; do git push -u origin HEAD; done
+hard	cd {same_repo_main} && git checkout -b feature || echo no; git push -u origin HEAD
+allow	cd {same_repo_main} && git checkout -b topic-9 && git push -u origin HEAD
+allow	cd {same_repo_main} && git checkout main && git checkout -b topic-9 && git push -u origin HEAD
+allow	cd {same_repo_main} && if git checkout -b topic-9; then git push -u origin HEAD; fi
+allow	cd {same_repo_main} && git checkout -b topic-9 || exit 1; git push -u origin HEAD
+allow	cd {same_repo_main} && git checkout feature; git checkout -b topic-9 && git push -u origin HEAD
+# WHY: from a feature branch, a move that may fail leaves two branches the push may send, and neither is main.
+allow	git checkout -b topic-9; git push -u origin HEAD
+# WHY: a checkout with paths after `--`, or from a pathspec file, restores files and moves nothing.
+allow	git checkout main -- README.txt && git push
+allow	git checkout main -- . && git commit -qm x && git push
+allow	git checkout master -- README.txt && git push
+allow	git checkout main --pathspec-from-file=list.txt && git push
+hard	git checkout main -- && git push
+# WHY: a target the text cannot read (a variable, a substitution, @{-N}) may be main.
+hard	B=main; git checkout $B && git push
+hard	git checkout "$B" && git push
+hard	git switch "$DEFAULT" && git merge feature && git push
+hard	git checkout "$(git rev-parse --abbrev-ref origin/HEAD | cut -d/ -f2)" && git push
+hard	git checkout @{-1} && git push
+hard	git switch @{-1} && git push
+hard	for b in main; do git checkout "$b"; done; git push
+# WHY: xargs fills a replace string from stdin, and a wrapper before it does not hide it.
+hard	echo main | xargs -I{} git push origin {}
+hard	echo main | xargs -I % git push origin %
+hard	git branch --format='%(refname:short)' | xargs -I{} git push origin {}
+hard	echo main | sudo xargs git push origin
+allow	echo x | xargs -I{} git push origin feature/my-branch
+# WHY: a move in a directory the text cannot name, or a push through the git dir, still reaches the same checkout.
+hard	git -C "$PWD" checkout main && git push
+hard	(cd "$REPO" && git checkout main) && git push
+hard	git --git-dir="$GD" checkout main && git push
+hard	git checkout main && git --git-dir={push_feature}/.git push
+hard	git checkout main && git --git-dir=.git push
+hard	git -C {push_feature} checkout main && git --git-dir={push_feature}/.git push
+allow	git -C . checkout -b topic-9 && git -C . push -u origin HEAD
+# WHY: a shell string spelled with the '\'' or "\"" idiom is one string to the shell that runs it.
+hard	bash -c 'git commit -m '\''x'\'' && git push origin main'
+hard	sh -c 'echo '\''hi'\''; git push origin main'
+hard	bash -c "git commit -m "\""x"\"" && git push origin main"
+allow	git commit -m 'it'\''s done' && git push origin feature/my-branch
+# WHY: glued values, --track and a `--` before the name are the same moves.
+hard	git checkout -Bmain && git push
+hard	git switch --force-create=main && git push
+hard	git switch -Cmain && git push
+hard	git checkout -t origin/main && git push
+hard	git checkout --track origin/main && git push
+hard	git switch --track origin/main && git push
+hard	git switch -- main && git push
+hard	git branch -M -- main && git push -u origin HEAD
+hard	git worktree add ../wt-q -Bmain && cd ../wt-q && git push
+allow	cd {same_repo_main} && git checkout -btopic-9 && git push -u origin HEAD
+allow	cd {same_repo_main} && git switch -ctopic-9 && git push -u origin HEAD
+allow	cd {same_repo_main} && git switch --create=topic-9 && git push -u origin HEAD
+allow	git worktree add ../wt-z -btopic-9 && cd ../wt-z && git push -u origin HEAD
+allow	git checkout --track origin/feature && git push
+# WHY: the toplevel substitution runs in the shell's directory, whether quoted, exported or after a -C.
+hard	cd {push_main} && export GIT_DIR="$(git rev-parse --show-toplevel)/.git" && cd {push_feature} && git push
+hard	cd {push_main} && git -C {push_feature} --git-dir=$(git rev-parse --show-toplevel)/.git push
+hard	cd {push_main} && GIT_DIR=$(git rev-parse --show-toplevel)/.git git -C {push_feature} push
+allow	git -C {push_main} --git-dir=$(git rev-parse --show-toplevel)/.git push
+# WHY: config keys are case-insensitive, and mirror, upstream and the env config spellings pick what a bare push sends.
+hard	git -c remote.origin.mirror=true push origin
+hard	git -c push.default=upstream push
+hard	git -c push.default=tracking push
+hard	git -c Push.Default=matching push origin
+hard	git -c REMOTE.origin.PUSH=HEAD:refs/heads/main push origin
+hard	GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=push.default GIT_CONFIG_VALUE_0=matching git push
+allow	git -c push.default=simple push
+allow	git -c push.default=current push
+# WHY: a directory missing at hook time may be made by the command, as a clone is, so even a `;`-chained cd into one is unresolvable.
+hard	cd {push_feature}/nope; git push
+hard	git clone {push_main} {push_feature}/../cl; cd {push_feature}/../cl; git push
+# WHY: the toplevel substitution is read with its quote closed before the rest of the word, and with a space after `2>`.
+allow	cd "$(git rev-parse --show-toplevel)"/. && git push
+allow	cd "$(git rev-parse --show-toplevel 2> /dev/null)" && git push
+allow	cd {same_repo_main} && cd "$(git rev-parse --show-toplevel)"/. && git checkout -b topic-9 && git push -u origin HEAD
+# WHY: an unmatched `[[` is a word, so it cannot merge the segments after it.
+hard	echo [[ ; cd {push_main} && git push
+hard	echo [[ ; gh api -X GET repos/o/r/pulls/1/merge && gh api repos/o/r/pulls/2/merge -X PUT
+allow	[[ -n x ]] && git push origin feature/x
+hard	[[ -n x ]] && git push origin main
+# WHY: the soft delete and force tiers count push only as git's subcommand, inside a shell string too.
+allow	git stash push -- ':!README.txt'
+allow	cd {push_main} && git stash push -- ':!README.txt'
+ask	bash -c "git -C \"my dir\" push -f origin feature/x"
+ask	bash -c "git -C \"my dir\" push origin :feature/x"
+# WHY: symbolic-ref, a two-argument rebase and a later move in the same loop body change the branch a bare push sends.
+hard	git symbolic-ref HEAD refs/heads/main && git push
+hard	git rebase main main && git push
+hard	for i in 1 2; do git push; git checkout main; done
+allow	git rebase main feature && git push
+allow	git symbolic-ref HEAD && git push
+# WHY: `-c --` before the string, fish and busybox still run it.
+hard	bash -c -- 'git push origin main'
+hard	fish -c 'git push origin main'
+hard	busybox sh -c 'git push origin main'
+# WHY: only a bare `--` after checkout discards changes, not a long option.
+allow	git checkout --quiet feature/my-branch
+allow	git checkout --detach HEAD~1
+# WHY: an escaped quote around a multi-word option value inside a shell string still leaves its push checked.
+hard	bash -c "git -C \"my dir\" push origin main"
+hard	bash -c "git -c \"user.name=A B\" push origin main"
+hard	eval "git -C \"my dir\" push origin main"
+hard	ssh host "git -C \"srv/my app\" push origin main"
+allow	bash -c "git -C \"my dir\" push origin feature/my-branch"
+# WHY: a cd in a pipeline component or a background job runs in a subshell.
+hard	cd {push_main} && cd {push_feature} | true; git push
+allow	cd {push_main} | true; git push
+hard	cd {push_main} & git push origin main
+# WHY: a glued closing brace is data, so a brace group still closes on its own word.
+allow	{ git push origin feature/x; }
+hard	{ git push origin main; }
+# WHY: a line continuation inside a shell string joins git to its push.
+hard	bash -c 'git \\\n push origin main'
+hard	bash -c "git \\\n push origin main"
+hard	bash -c 'git push origin feature/my-branch && git \\\n push origin main'
+allow	bash -c 'git push origin feature/my-branch && git \\\n push origin feature/other'
+hard	cd {same_repo_main} && git checkout -b feature\ngit push -u origin HEAD
+
+# --- fifth review: a substitution keeps its chain, negations end one, and the fallback idioms ---
+# WHY: a substitution runs as part of the command around it, so it does not split that command's `&&` chain.
+allow	cd {same_repo_main} && git checkout -b topic-1 && git add -A && git commit -m "$(cat <<'EOF'\nfix: a thing\n\nbody\nEOF\n)" && git push -u origin HEAD
+allow	cd {same_repo_main} && git checkout -b topic-1 && git commit -qm "$(date)" && git push -u origin HEAD
+allow	git worktree add {push_feature}/../wt-new -b topic-1 && cd {push_feature}/../wt-new && git commit -qm "$(date)" && git push -u origin HEAD
+hard	cd {same_repo_main} && git checkout -b topic-1 && git commit -qm "$(git checkout main; date)" && git push -u origin HEAD
+hard	cd {same_repo_main} && git checkout -b feature; git commit -qm "$(date)" && git push -u origin HEAD
+# WHY: `|| return` at top level, `|| exit` in a subshell and a negated move all let the push run after a failed move.
+hard	cd {same_repo_main} && git checkout -b feature || return; git push -u origin HEAD
+hard	cd {same_repo_main} && (git checkout -b feature || exit ); git push -u origin HEAD
+hard	cd {same_repo_main} && if  ! git checkout -b feature; then git push -u origin HEAD; fi
+hard	cd {same_repo_main} && ! git checkout -b feature && git push -u origin HEAD
+allow	cd {same_repo_main} && { git checkout -b topic-1 || exit; } && git push -u origin HEAD
+# WHY: create-or-switch and create-or-exit leave every path that reaches the push on the new branch.
+allow	cd {same_repo_main} && git checkout -b topic-1 || git checkout topic-1 && git push -u origin HEAD
+allow	cd {same_repo_main} && git checkout -b topic-1 || { echo exists; exit 1; }; git push -u origin HEAD
+allow	cd {same_repo_main} && git checkout -qb topic-1 && git push -u origin HEAD
+hard	cd {same_repo_main} && git checkout -b topic-1 || git checkout main && git push -u origin HEAD
+hard	cd {same_repo_main} && git checkout -b topic-1 || { echo exists; }; git push -u origin HEAD
+# WHY: an unquoted substitution with a space is one option value, so the soft force and delete tiers still see the push.
+ask	git -C $(git rev-parse --show-toplevel) push -f origin topic-1
+ask	git -C $(dirname $PWD/x) push origin :topic-1
+allow	git -C $(git rev-parse --show-toplevel) stash push -- ':!README.txt'
 
 # --- input unavailable: the extraction returns nothing, which is indistinguishable from
 # "no command to guard". Pinned so a later edit cannot flip it silently.

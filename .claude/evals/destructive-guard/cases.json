@@ -194,10 +194,10 @@
     "expected_output": "git push on main"
   },
   {
-    "label": "git push origin +main → hard block (leading + is the force marker, not the ref)",
+    "label": "git push origin +main → hard block as a force-push (leading + is the force marker, not the ref)",
     "command": "git push origin +main",
     "expected_exit": 2,
-    "expected_output": "git push on main"
+    "expected_output": "git push --force to main"
   },
   {
     "label": "cd ~/repo-on-main && git push → hard block (tilde is expanded before the branch lookup)",

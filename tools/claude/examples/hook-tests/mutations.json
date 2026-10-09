@@ -15,22 +15,886 @@
     {
       "why": "notification text counts as the user's words, so an agent's own \"ready to merge\" arms the grant",
       "replace": {
-        "from": "<\\/task-notification>//gs'",
-        "to": "<\\/task-notification>/$&/gs'"
+        "from": "<\\/task-notification>//gs;",
+        "to": "<\\/task-notification>/$&/gs;"
       }
     },
     {
-      "why": "a typographic apostrophe stops normalising, so a typed “don’t merge” arms the grant",
+      "why": "a subagent's hand-back counts as the user's words, so its \"open the PR\" arms the pr grant",
       "replace": {
-        "from": "sed -e \"s/’/'/g\"",
-        "to": "sed -e \"s/x/x/g\""
+        "from": "s/<agent-message\\b[^>]*>.*?<\\/agent-message>//gs;",
+        "to": ""
+      }
+    },
+    {
+      "why": "a typographic apostrophe stops normalising, so a typed \u201cdon\u2019t merge\u201d arms the grant",
+      "replace": {
+        "from": "LC_ALL=C sed -e \"s/\u2019/'/g\"",
+        "to": "LC_ALL=C sed -e \"s/x/x/g\""
+      }
+    },
+    {
+      "why": "a negated PR request arms the pr grant, so \"don't open a PR yet\" drops the PR prompt",
+      "replace": {
+        "from": "act == \"pr\" && ($0 == \"open\" || $0 == \"create\" || $0 == \"raise\") && !negated && !asked && prev != \"no\" && !(",
+        "to": "act == \"pr\" && ($0 == \"open\" || $0 == \"create\" || $0 == \"raise\") && !asked && !("
+      }
+    },
+    {
+      "why": "open after keep or leave reads as the verb, so \"keep open the PRs from dependabot\" arms the pr grant",
+      "replace": {
+        "from": " && !($0 == \"open\" && (prev in hold))",
+        "to": ""
+      }
+    },
+    {
+      "why": "an interjection stops leading a clause, so \"ok, open PRs for both branches\" no longer arms the pr grant",
+      "replace": {
+        "from": " && !lead_intj && !(prev == \",\" && lead_ok)",
+        "to": ""
+      }
+    },
+    {
+      "why": "a number or `new` counts as a determiner again, so \"list the open two PRs that touch auth\" arms the pr grant",
+      "replace": {
+        "from": "their both another separate",
+        "to": "their one two new both another separate"
+      }
+    },
+    {
+      "why": "the verb window never closes, so a PR mentioned anywhere after \"open\" arms the pr grant",
+      "delete_matching": "pr_verb-- }"
+    },
+    {
+      "why": "a comma ends the negation again, so \"Don't, please, merge this\" arms the grant",
+      "replace": {
+        "from": "$0 == \",\" || $0 == \":\" { if (label",
+        "to": "$0 == \",\" || $0 == \":\" { negated = 0; if (label"
+      }
+    },
+    {
+      "why": "only a fixed list negates, so \"we shouldn't open a PR yet\" arms the pr grant",
+      "replace": {
+        "from": "$0 in neg || $0 ~ (\"n\" q \"t$\") { negated = 1 }",
+        "to": "$0 in neg { negated = 1 }"
+      }
+    },
+    {
+      "why": "open mid-clause reads as the verb again, so \"list the open draft PRs\" arms the pr grant",
+      "replace": {
+        "from": "if (!($0 in det)) pr_verb = 0; ",
+        "to": ""
+      }
+    },
+    {
+      "why": "pull request stops reading as a PR, so \"open a pull request against main\" arms nothing",
+      "replace": {
+        "from": " -e \"s/pull[^a-z]*requests*/ pr /g\"",
+        "to": ""
+      }
+    },
+    {
+      "why": "a block the strip leaves unbalanced counts as the user's words, so a hand-back quoting its own closing tag arms a grant",
+      "replace": {
+        "from": "   || printf '%s' \"$OWN\" | grep -qE '</?(task-notification|agent-message)'; then",
+        "to": "   ; then"
+      }
+    },
+    {
+      "why": "a verb directly before PRs arms at once again, so `open PRs?` arms the pr grant",
+      "replace": {
+        "from": "{ if (held_open) pending = 1; else tent = 1; pr_verb = 0 }",
+        "to": "{ found = 1 }"
+      }
+    },
+    {
+      "why": "a comma stops ending the verb's reach, so \"Leave it open, the PR needs another review\" arms the pr grant",
+      "replace": {
+        "from": "$0 == \",\" || $0 == \":\" { if (label == \"answer\" && pending) found = 1; if ($0 == \":\" && label != \"answer\") tent = 0; pr_verb = 0; opening = 0; fresh = 0; pending = 0;",
+        "to": "$0 == \",\" || $0 == \":\" {"
+      }
+    },
+    {
+      "why": "a preposition stops ending the verb's reach, so \"create a list of PRs older than a week\" arms the pr grant",
+      "replace": {
+        "from": "act == \"pr\" && pr_verb > 0 && ($0 in stop) { pr_verb = 0; opening = 0 }\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a PR number stops naming an existing PR, so \"open PR 17 in the browser\" arms the pr grant",
+      "replace": {
+        "from": "-e \"s/^prs* *[#-]* *[0-9][0-9]*/ prref /\" -e \"s/\\([^a-z]\\)prs* *[#-]* *[0-9][0-9]*/\\1 prref /g\" ",
+        "to": ""
+      }
+    },
+    {
+      "why": "a clause of interjections stops leading the verb, so \"please open PRs for both branches\" no longer arms",
+      "replace": {
+        "from": "!lead_intj && ",
+        "to": ""
+      }
+    },
+    {
+      "why": "a comma after an interjection stops leading the verb, so \"the build is red, ok, open PRs for both\" no longer arms",
+      "replace": {
+        "from": " && !(prev == \",\" && lead_ok)",
+        "to": ""
+      }
+    },
+    {
+      "why": "no stops being an interjection, so \"no, open PRs for both\" no longer arms",
+      "replace": {
+        "from": "yep no sure",
+        "to": "yep sure"
+      }
+    },
+    {
+      "why": "every verb holds before PR again, so a terse `create PR` arms nothing",
+      "replace": {
+        "from": "held_open = ($0 == \"open\")",
+        "to": "held_open = 1"
+      }
+    },
+    {
+      "why": "a held label stops arming at its end, so the menu pick `Open PR` arms nothing",
+      "replace": {
+        "from": "END { if (tent || (label != \"\" && pending)) found = 1;",
+        "to": "END { if (tent) found = 1;"
+      }
+    },
+    {
+      "why": "a menu label is read as a heading, so the pick `Open PRs` arms nothing",
+      "replace": {
+        "from": "asks_for pr \"$answer\" \"$alabel\"",
+        "to": "asks_for pr \"$answer\""
+      }
+    },
+    {
+      "why": "a copula after a held `open PRs` resolves it, so `Yes, open PRs need review` arms the pr grant",
+      "replace": {
+        "from": " || ($0 in cop)",
+        "to": ""
+      }
+    },
+    {
+      "why": "a question about the past asks, so `Did you open a PR for this?` arms the pr grant",
+      "replace": {
+        "from": "&& !asked && prev",
+        "to": "&& prev"
+      }
+    },
+    {
+      "why": "a line break stops ending a clause, so `looks good` then `open PRs for both branches` on the next line arms nothing",
+      "replace": {
+        "from": "LC_ALL=C tr '\\t\\n' ' .'",
+        "to": "LC_ALL=C tr '\\t\\n' '  '"
+      }
+    },
+    {
+      "why": "for and when stop ending the verb's reach, so `create a report for PRs merged this week` arms the pr grant",
+      "replace": {
+        "from": "per in into for to at when after before across over under",
+        "to": "per in into"
+      }
+    },
+    {
+      "why": "a later colon stops cancelling a held `open PRs`, so `Open PRs for review: 3` arms the pr grant",
+      "replace": {
+        "from": "if ($0 == \":\" && label != \"answer\") tent = 0; ",
+        "to": ""
+      }
+    },
+    {
+      "why": "a hyphen stops joining PR to its number, so `open PR-17 in the browser` arms the pr grant",
+      "replace": {
+        "from": "s/\\([^a-z]\\)prs* *[#-]* *",
+        "to": "s/\\([^a-z]\\)prs* *#* *"
+      }
+    },
+    {
+      "why": "a question's colon commits a held `open PRs`, so `Open PRs: 3 need review. Merge them?` answered Yes arms the pr grant",
+      "replace": {
+        "from": "if (label == \"answer\" && pending) found = 1;",
+        "to": "if (label != \"\" && pending) found = 1;"
+      }
+    },
+    {
+      "why": "a pick among PRs the question names arms, so `Which PRs should I summarize?` answered `Open PRs` arms the pr grant",
+      "replace": {
+        "from": " && alabel=\"\"",
+        "to": ""
+      }
+    },
+    {
+      "why": "any `did` makes a question, so `I did the rebase, now open a PR` arms nothing",
+      "replace": {
+        "from": " && ($0 in subj)",
+        "to": ""
+      }
+    },
+    {
+      "why": "a colon after `create PR` stops cancelling it, so a pasted `create PR: failed` report line arms the pr grant",
+      "replace": {
+        "from": "else tent = 1;",
+        "to": "else found = 1;"
+      }
+    },
+    {
+      "why": "a colon in a picked label cancels it, so the pick `Open PRs for both: services and infra` arms nothing",
+      "replace": {
+        "from": " && label != \"answer\") tent = 0",
+        "to": ") tent = 0"
+      }
+    }
+  ],
+  "destructive-guard": [
+    {
+      "why": "a substitution in a cd stops making the directory unresolvable, so `cd \"$(dirname <main>/x)\" && git push` reads the session's branch",
+      "replace": {
+        "from": "    -|*QUOTED_ARG*|*SUBSTITUTION*|",
+        "to": "    -|*QUOTED_ARG*|"
+      }
+    },
+    {
+      "why": "an escaped space resolves to a missing directory again, so `cd main\\ wt && git push` reads the session's branch",
+      "replace": {
+        "from": "*'`'*|*'\\'*) printf '?' ;;",
+        "to": "*'`'*) printf '?' ;;"
+      }
+    },
+    {
+      "why": "a cd behind if/then/do/builtin/command/time stops moving the directory",
+      "delete_matching": "^        'if '\\*\\|'then '\\*"
+    },
+    {
+      "why": "a case pattern's `)` closes a subshell again, so a later bare push reads the parent directory",
+      "replace": {
+        "from": "if [ \"${#case_depth[@]}\" -gt 0 ] && [ -z \"$arm\" ]",
+        "to": "if false && [ -z \"$arm\" ]"
+      }
+    },
+    {
+      "why": "every `)` closes a subshell again, so `$((1+1))` pops the directory a cd set",
+      "replace": {
+        "from": "pops=$((${#closes} - ${#opens}))",
+        "to": "pops=${#closes}"
+      }
+    },
+    {
+      "why": "pushd stops moving the directory, so `pushd <main> && git push` reads the session's branch",
+      "replace": {
+        "from": "cd\\ *|pushd\\ *)",
+        "to": "cd\\ *)"
+      }
+    },
+    {
+      "why": "--git-dir and GIT_DIR= stop naming the repository, so `git --git-dir=<main>/.git push` reads the session's branch",
+      "replace": {
+        "from": "*) dir=$(join_dir \"$dir\" \"$c\") ;; esac",
+        "to": "*) ;; esac"
+      }
+    },
+    {
+      "why": "--recurse-submodules stops consuming its value, so `git push --recurse-submodules check origin` reads `check` as the remote",
+      "replace": {
+        "from": "|--exec|--recurse-submodules) skip=1",
+        "to": "|--exec) skip=1"
+      }
+    },
+    {
+      "why": "a tags-only push defaults to HEAD again, so `git push origin --tags` from main hard-blocks",
+      "replace": {
+        "from": " || [ -n \"$tags\" ] ||",
+        "to": " ||"
+      }
+    },
+    {
+      "why": "an unreadable destination stops standing for the checked-out branch, so `git push origin $(git branch --show-current)` from main passes",
+      "delete_matching": "case \"\\$dst\" in \\*SUBSTITUTION\\*"
+    },
+    {
+      "why": "a separator glued to a force or delete flag hides it again, so `git push origin x -f;echo` skips the prompt",
+      "replace": {
+        "from": "PUSH_VIEW=$(strip_redirs \"$CMD_MATCH\" | sed 's/[;&|]/ & /g')",
+        "to": "PUSH_VIEW=$(strip_redirs \"$CMD_MATCH\")"
+      }
+    },
+    {
+      "why": "a colon refspec after the first counts as no delete, so `git push origin x :other` skips the prompt",
+      "replace": {
+        "from": "grep -qE \"${PUSH_SEG}\\\\+?:\"",
+        "to": "grep -qE 'git[[:space:]]([^|;&]* )?push +[^ |;&]+ +:'"
+      }
+    },
+    {
+      "why": "a subshell's last word inside a case arm reads as a pattern again, so `case x in x) (cd <feature>; true); git push;; esac` keeps the subshell's directory",
+      "replace": {
+        "from": "[ \"${#stack[@]}\" -eq \"${case_depth[${#case_depth[@]}-1]}\" ]",
+        "to": "true"
+      }
+    },
+    {
+      "why": "`esac)` reads as a case pattern again, so a subshell wrapped around a case never closes",
+      "replace": {
+        "from": " && [[ $seg != 'esac)'* ]]",
+        "to": ""
+      }
+    },
+    {
+      "why": "an escaped parenthesis counts as a subshell boundary again, so `(cd <main>; echo a\\)b; git push)` pops early",
+      "replace": {
+        "from": "bare=${seg//\\\\?/}",
+        "to": "bare=$seg"
+      }
+    },
+    {
+      "why": "the toplevel idiom becomes unresolvable again, so `cd \"$(git rev-parse --show-toplevel)\" && git push -u origin HEAD` blocks from a feature checkout",
+      "replace": {
+        "from": "top=$(git -C \"${1:-.}\" rev-parse --show-toplevel 2>/dev/null) && [ -n \"$top\" ] || { printf '?'; return; }",
+        "to": "printf '?'; return"
+      }
+    },
+    {
+      "why": "an exported GIT_DIR stops moving the repository, so `export GIT_DIR=<main>/.git && git push` reads the session's branch",
+      "replace": {
+        "from": "if [[ $seg =~ $GITDIR_EXPORT_RE ]]; then",
+        "to": "if false; then"
+      }
+    },
+    {
+      "why": "a bare GIT_DIR= assignment stops making the repository unknown, so `GIT_DIR=<main>/.git; git push` reads the session's branch",
+      "replace": {
+        "from": "elif [[ $seg =~ $GITDIR_ASSIGN_RE ]]; then gitenv='?'",
+        "to": "elif false; then :"
+      }
+    },
+    {
+      "why": "unset GIT_DIR stops restoring the directory's repository, so `export GIT_DIR=<main>/.git; unset GIT_DIR; git push` blocks from a feature checkout",
+      "replace": {
+        "from": "elif [[ $seg =~ $GITDIR_UNSET_RE ]]; then gitenv=\"\"",
+        "to": "elif false; then :"
+      }
+    },
+    {
+      "why": "an export with no value stops making the repository unknown, so `export GIT_DIR && git push` reads the session's branch",
+      "replace": {
+        "from": "=*) gitenv=${gitenv#=}; gitenv=${gitenv%% *} ;; *) gitenv='?' ;; esac",
+        "to": "=*) gitenv=${gitenv#=}; gitenv=${gitenv%% *} ;; *) gitenv='' ;; esac"
+      }
+    },
+    {
+      "why": "an abbreviated long option stops naming its option, so `git push --recu check origin` from main reads `check` as the remote",
+      "replace": {
+        "from": "case \"$tok\" in --?*) tok=$(expand_push_option \"$tok\") ;; esac",
+        "to": ""
+      }
+    },
+    {
+      "why": "a bundled -o stops taking its value, so `git push -uo ci.skip origin` from main reads `ci.skip` as the remote",
+      "replace": {
+        "from": "case \"${tok#*o}\" in '') skip=1 ;; esac; ",
+        "to": ""
+      }
+    },
+    {
+      "why": "a force refspec with `~`, `^` or `@` stops asking, so `git push origin +HEAD~1:feature` rewinds the remote unprompted",
+      "replace": {
+        "from": "|\\+[^[:space:]]+)",
+        "to": "|\\+[A-Za-z0-9._/:*-]+)"
+      }
+    },
+    {
+      "why": "pushd -n reads `-n` as a directory again, so `pushd -n <main> && git push` from a feature checkout hard-blocks",
+      "replace": {
+        "from": "      pushd\\ -n|pushd\\ -n\\ *) ;;\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a push that closes its shell string stops counting, so `cd {push_main} && bash -c \"git push\"` reads no push",
+      "replace": {
+        "from": "PUSH_GATE_RE=\"${GIT_SUB_RE}push([\\\"'[:space:]]|\\$)\"",
+        "to": "PUSH_GATE_RE=\"${GIT_SUB_RE}push([[:space:]]|\\$)\""
+      }
+    },
+    {
+      "why": "an unquoted substitution as the remote stops defaulting to HEAD, so `cd {push_main} && git push $(echo) origin` passes",
+      "replace": {
+        "from": "[ \"$raw\" != SUBSTITUTION ] || refs[${#refs[@]}]=HEAD",
+        "to": ":"
+      }
+    },
+    {
+      "why": "an abbreviated or bundled delete stops asking, so `git push -qd origin x` and `--del` pass silently",
+      "replace": {
+        "from": "(--de(l(e(te?)?)?)?|-[a-zA-Z46]*d[a-zA-Z46]*)",
+        "to": "(--delete|-d)"
+      }
+    },
+    {
+      "why": "an abbreviated --force-with-lease stops asking, so `git push --force-w origin x` passes silently",
+      "replace": {
+        "from": "--force(-w[a-z-]*)?",
+        "to": "--force(-with-lease)?"
+      }
+    },
+    {
+      "why": "cd stops skipping `--`, so `cd <main> && cd -- && git push` reads `--` as a directory and hard-blocks instead of going home",
+      "replace": {
+        "from": "while (i <= NF && $i ~ /^-[LPe@]+$/) i++; if ($i == \"--\") i++;",
+        "to": "if ($i == \"-P\" || $i == \"-L\") i++;"
+      }
+    },
+    {
+      "why": "cd with options and no operand stops going home, so `cd -P && git push` reads the session's branch",
+      "replace": {
+        "from": "elif [ \"${seg%% *}\" = cd ]; then cwd=\"$HOME\"",
+        "to": "elif false; then cwd=\"$HOME\""
+      }
+    },
+    {
+      "why": "a push anywhere after git counts again, so `git stash push -m wip` on a main checkout hard-blocks",
+      "replace": {
+        "from": "PUSH_GATE_RE=\"${GIT_SUB_RE}push",
+        "to": "PUSH_GATE_RE=\"git[[:space:]]([^|;&]* )?push"
+      }
+    },
+    {
+      "why": "checkout or switch anywhere after git counts again, so `git -C <main> grep -n checkout` blocks as a branch switch",
+      "replace": {
+        "from": "grep -qE \"${GIT_SUB_RE}(checkout|switch)([[:space:]]|\\$)\" || continue",
+        "to": "grep -qE 'git[[:space:]]([^|;&]* )?(checkout|switch)([[:space:]]|$)' || continue"
+      }
+    },
+    {
+      "why": "branch moves stop being recorded, so `git checkout main && git push` from a feature checkout passes",
+      "replace": {
+        "from": "if [[ $seg =~ $BRANCH_MOVE_RE ]]; then record_branch",
+        "to": "if false; then record_branch"
+      }
+    },
+    {
+      "why": "a checkout of a ref with paths counts as a branch move, so `git checkout main README.txt && git push` blocks",
+      "replace": {
+        "from": "    [ \"${#pos[@]}\" -eq 1 ] || return 0\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a worktree the command adds stops carrying its branch, so a push from a new -b worktree hard-blocks",
+      "replace": {
+        "from": "rec=$(worktree_after \"$dir\" \"${w[@]:2}\")",
+        "to": "rec=\"\""
+      }
+    },
+    {
+      "why": "a directory the command makes falls back to the session branch, so a bare push there reads the session's",
+      "replace": {
+        "from": "elif [ ! -e \"$2\" ]; then",
+        "to": "elif false; then"
+      }
+    },
+    {
+      "why": "a subshell's export leaks again, so `cd <main> && (export GIT_DIR=<feature>/.git); git push` passes",
+      "replace": {
+        "from": "      gitenv=\"${envstack[${#envstack[@]}-1]}\"\n      unset 'envstack[${#envstack[@]}-1]'\n      pops",
+        "to": "      pops"
+      }
+    },
+    {
+      "why": "a substitution's export leaks again, so `x=$(export GIT_DIR=<feature>/.git); git push` passes",
+      "replace": {
+        "from": "         gitenv=\"${envstack[${#envstack[@]}-1]}\"; unset 'envstack[${#envstack[@]}-1]'\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "the toplevel loses the rest of its word, so `cd $(git rev-parse --show-toplevel)/../push-main && git push` passes",
+      "replace": {
+        "from": "printf '%s' \"$top$p\"",
+        "to": "printf '%s' \"$top\""
+      }
+    },
+    {
+      "why": "the matching refspec stops counting, so `git push origin :` only asks as a delete",
+      "replace": {
+        "from": "case \"$ref\" in :|+:) printf",
+        "to": "case \"$ref\" in :NONE) printf"
+      }
+    },
+    {
+      "why": "only the first push in a shell string is read again, so `bash -c \"git push origin x && git push origin main\"` passes",
+      "replace": {
+        "from": "done < <(shell_string_cmds \"$PUSH_SEGMENT\")",
+        "to": "done < <(:)"
+      }
+    },
+    {
+      "why": "escaped quotes in a shell string stay escaped, so `bash -c \"git push origin \\\"main\\\"\"` passes",
+      "replace": {
+        "from": "$s = $d =~ s/\\\\([\"\\\\\\$`])/$1/gr if defined $d;",
+        "to": "$s = $d if defined $d;"
+      }
+    },
+    {
+      "why": "a glued -o value takes the next word again, so `git push -oo origin main` reads `main` as the remote",
+      "replace": {
+        "from": "case \"${tok#*o}\" in '') skip=1 ;; esac;",
+        "to": "skip=1;"
+      }
+    },
+    {
+      "why": "GIT_DIR naming a worktree's .git file stops resolving, so `git --git-dir=<main wt>/.git checkout -b x` passes",
+      "replace": {
+        "from": "if [ -f \"$dir\" ]; then dir=$(dirname \"$dir\"); elif",
+        "to": "if false; then :; elif"
+      }
+    },
+    {
+      "why": "a cd inside eval stops moving later segments, so `eval \"cd <main>\" && git push` passes",
+      "replace": {
+        "from": "*cd*|*pushd*|*popd*) cwd='?'",
+        "to": "*NONE*) cwd='?'"
+      }
+    },
+    {
+      "why": "xargs stops making a bare push name its branch, so `echo main | xargs git push origin` passes",
+      "replace": {
+        "from": "*xargs\\ *git*|",
+        "to": ""
+      }
+    },
+    {
+      "why": "a push refspec set with -c stops counting, so `git -c remote.origin.push=HEAD:refs/heads/main push origin` passes",
+      "replace": {
+        "from": "*' -c 'remote.*.push=*|",
+        "to": ""
+      }
+    },
+    {
+      "why": "a parenthesis in a kept shell string pops a subshell again, so `(cd <main>; bash -c 'echo )'; git push)` passes",
+      "replace": {
+        "from": "    case \"$bare\" in *[\\\"\\']*) bare=$(printf '%s' \"$bare\" | perl -pe 's/\"[^\"]*\"|\\x27[^\\x27]*\\x27//g') ;; esac\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a case pattern with a space before its parenthesis stops counting, so its arm's cd is lost",
+      "replace": {
+        "from": "CASE_ARM_RE='^[(]?[^[:space:]()]+[[:space:]]*[)]'",
+        "to": "CASE_ARM_RE='^[(]?[^[:space:]()]+[)]'"
+      }
+    },
+    {
+      "why": "a force bundled with -4 stops asking, so `git push -4f origin x` passes silently",
+      "replace": {
+        "from": "-[a-zA-Z46]*f[a-zA-Z46]*|",
+        "to": "-[a-zA-Z]*f[a-zA-Z]*|"
+      }
+    },
+    {
+      "why": "a quoted substitution as the remote defaults to HEAD again, so `git push \"$(git remote)\" x` from main blocks",
+      "replace": {
+        "from": "[ \"$raw\" != SUBSTITUTION ]",
+        "to": "[ \"$tok\" != SUBSTITUTION ]"
+      }
+    },
+    {
+      "why": "a word that is literally TOPLEVEL reads as the checkout again, so `cd TOPLEVEL && git push` reads the session's branch",
+      "replace": {
+        "from": "  case \"$p\" in \"$TOPLEVEL_MARK\"|\"$TOPLEVEL_MARK\"/*)",
+        "to": "  [ \"$p\" = TOPLEVEL ] && { printf '%s' \"$1\"; return; }\n  case \"$p\" in \"$TOPLEVEL_MARK\"|\"$TOPLEVEL_MARK\"/*)"
+      }
+    },
+    {
+      "why": "one list stops covering the token walk, so `git --attr-source HEAD push origin main` passes",
+      "replace": {
+        "from": "|--super-prefix|--attr-source|--shallow-file'",
+        "to": "|--super-prefix'"
+      }
+    },
+    {
+      "why": "a negated condition counts as its then, so `if ! git checkout -b feature; then git push` from main passes",
+      "replace": {
+        "from": "'&&:'*|*:1:'then '*|*:1:then|",
+        "to": "'&&:'*|*:'then '*|*:then|"
+      }
+    },
+    {
+      "why": "a `;` stops ending a chain, so `git checkout -b feature; git push -u origin HEAD` from main passes",
+      "replace": {
+        "from": "';:'*|$'\\n:'*) [ -n \"$held\" ] || chain=$((chain + 1)); held=\"\" ;;",
+        "to": "';:'*|$'\\n:'*) held=\"\" ;;"
+      }
+    },
+    {
+      "why": "`|| exit` stops holding the chain, so `git checkout -b topic-9 || exit 1; git push -u origin HEAD` from main hard-blocks",
+      "replace": {
+        "from": "'||:exit'|'||:exit '*) [ \"${#stack[@]}\" -gt 0 ] || held=1 ;; ",
+        "to": "'||:exit'|'||:exit '*) ;; "
+      }
+    },
+    {
+      "why": "a piped cd moves later segments again, so `cd <main> && cd <feature> | true; git push` passes",
+      "replace": {
+        "from": "    [ -z \"$piped\" ] || seg=\"\"\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a `|` before a case arm reads as a pipe, so `case a in a|b) cd <main>; git push;; esac` passes",
+      "replace": {
+        "from": "case \"$op_before\" in '|'|'|&') [ -n \"$arm\" ] || piped=1 ;; esac",
+        "to": "case \"$op_before\" in '|'|'|&') piped=1 ;; esac"
+      }
+    },
+    {
+      "why": "a move later in the loop body stops counting, so `for i in 1 2; do git push; git checkout main; done` passes",
+      "replace": {
+        "from": "case \"${_SEG_LOOP[${_BR_AT[k]}]}\" in *\":$id:\"*) printf '%s' \"$UNRESOLVED_PUSH\"; return 0 ;; esac",
+        "to": ":"
+      }
+    },
+    {
+      "why": "a move in an unreadable directory stops counting, so `git -C \"$PWD\" checkout main && git push` passes",
+      "replace": {
+        "from": "case \"${_BR_KEY[k]}\" in '?') printf '%s' \"$UNRESOLVED_PUSH\"; return 0 ;; \"$key\") ;; *) continue ;; esac",
+        "to": "[ \"${_BR_KEY[k]}\" = \"$key\" ] || continue"
+      }
+    },
+    {
+      "why": "an untrusted move stops leaving the earlier branch possible, so `git checkout -b feature; git push -u origin HEAD` from main passes",
+      "replace": {
+        "from": "        [ -n \"$branch\" ] || branch=$(git branch --show-current 2>/dev/null)\n        cands[${#cands[@]}]=$branch\n      fi",
+        "to": "        [ -n \"$branch\" ] || branch=$(git branch --show-current 2>/dev/null)\n        [ \"${#cands[@]}\" -gt 0 ] || cands[${#cands[@]}]=$branch\n      fi"
+      }
+    },
+    {
+      "why": "paths after `--` read as a switch again, so `git checkout main -- README.txt && git push` hard-blocks",
+      "replace": {
+        "from": "checkout:--) [ $# -eq 0 ] || return 0; break ;;",
+        "to": "checkout:--) break ;;"
+      }
+    },
+    {
+      "why": "a pathspec file reads as a switch, so `git checkout main --pathspec-from-file=list.txt && git push` hard-blocks",
+      "replace": {
+        "from": "      checkout:--pathspec-from-file*|checkout:-p|checkout:--patch) return 0 ;;\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a target the text cannot read records nothing, so `B=main; git checkout $B && git push` passes",
+      "replace": {
+        "from": "          *SUBSTITUTION*|*TOPLEVEL*|*QUOTED_ARG*|*'$'*|*'`'*|'@{'*) printf '?'; return ;;\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a glued -B value is missed, so `git checkout -Bmain && git push` passes",
+      "replace": {
+        "from": "      checkout:-[bB]?*|switch:-[cC]?*) set -- \"${w#-?}\" \"$@\"; w=${w%\"${w#-?}\"} ;;\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a long option's `=` value is missed, so `git switch --force-create=main && git push` passes",
+      "replace": {
+        "from": "      switch:--create=*|switch:--force-create=*|checkout:--orphan=*|switch:--orphan=*) set -- \"${w#*=}\" \"$@\"; w=${w%%=*} ;;\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "--track stops naming the branch it creates, so `git checkout -t origin/main && git push` passes",
+      "replace": {
+        "from": "          */*) [ -z \"$track\" ] || new=${pos[0]#*/} ;;\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "`--` stops marking the name after it, so `git switch -- main && git push` passes",
+      "replace": {
+        "from": "      *:--) ends=1 ;;",
+        "to": "      *:--) break ;;"
+      }
+    },
+    {
+      "why": "a worktree's glued -B value is missed, so `git worktree add ../wt-q -Bmain && cd ../wt-q && git push` passes",
+      "replace": {
+        "from": "    case \"$w\" in -[bB]?*) set -- \"${w#-?}\" \"$@\"; w=${w%\"${w#-?}\"} ;; esac\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "symbolic-ref and rebase stop moving HEAD, so `git symbolic-ref HEAD refs/heads/main && git push` passes",
+      "replace": {
+        "from": "BRANCH_MOVE_VERBS='checkout|switch|branch|worktree|symbolic-ref|rebase'",
+        "to": "BRANCH_MOVE_VERBS='checkout|switch|branch|worktree'"
+      }
+    },
+    {
+      "why": "moves key on the work tree again, so `git checkout main && git --git-dir=.git push` passes",
+      "replace": {
+        "from": "top=$(git -C \"${1:-.}\" rev-parse --absolute-git-dir 2>/dev/null)",
+        "to": "top=$(git -C \"${1:-.}\" rev-parse --show-toplevel 2>/dev/null)"
+      }
+    },
+    {
+      "why": "an xargs replace string reads as a branch, so `echo main | xargs -I{} git push origin {}` passes",
+      "replace": {
+        "from": "    case \"${4:-}\" in ?*) case \"$dst\" in *\"$4\"*) dst=HEAD ;; esac ;; esac\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a glued brace is trimmed as a group's close, so `echo main | xargs -I{} git push origin {}` passes",
+      "replace": {
+        "from": "*' '|*' }'|'}') seg=\"${seg%?}\" ;;",
+        "to": "*' '|*'}') seg=\"${seg%?}\" ;;"
+      }
+    },
+    {
+      "why": "config keys are read in their own case, so `git -c Push.Default=matching push origin` passes",
+      "replace": {
+        "from": "seg=$(printf '%s' \"$1\" | tr '[:upper:]' '[:lower:]')",
+        "to": "seg=$1"
+      }
+    },
+    {
+      "why": "only matching counts as a push mode, so `git -c push.default=upstream push` passes",
+      "replace": {
+        "from": "case \"$v\" in simple|current|nothing) ;; *) return 0 ;; esac",
+        "to": "case \"$v\" in matching) return 0 ;; esac"
+      }
+    },
+    {
+      "why": "remote mirror stops counting, so `git -c remote.origin.mirror=true push origin` passes",
+      "replace": {
+        "from": "*' -c 'remote.*.mirror=*|",
+        "to": ""
+      }
+    },
+    {
+      "why": "an escaped quote hides the push from the pieces again, so `bash -c \"git -C \\\"my dir\\\" push origin main\"` passes",
+      "replace": {
+        "from": "      if echo \"$PUSH_SEGMENT\" | grep -qE \"$PUSH_GATE_RE\"; then\n",
+        "to": "      echo \"$PUSH_SEGMENT\" | grep -qE \"$PUSH_GATE_RE\" || continue\n      if :; then\n"
+      }
+    },
+    {
+      "why": "a continuation in a shell string stops being joined, so `bash -c 'git \\<newline> push origin main'` passes",
+      "replace": {
+        "from": "$s =~ s/\\\\\\n//g; ",
+        "to": ""
+      }
+    },
+    {
+      "why": "the broad gate stops joining continuations, so `bash -c 'git \\<newline> push origin main'` skips the push check",
+      "replace": {
+        "from": "perl -0777 -pe 's/\\\\\\n//g' | ",
+        "to": ""
+      }
+    },
+    {
+      "why": "the soft force tier stops reading shell-string commands, so `bash -c \"git -C \\\"my dir\\\" push -f origin feature/x\"` runs unprompted",
+      "replace": {
+        "from": "if echo \"$PUSH_SOFT_VIEW\" | grep -qE \"${PUSH_SEG}(--force(-w",
+        "to": "if echo \"$PUSH_VIEW\" | grep -qE \"${PUSH_SEG}(--force(-w"
+      }
+    },
+    {
+      "why": "a later `push` word counts again in the soft tiers, so `git stash push -- ':!README.txt'` asks",
+      "replace": {
+        "from": "PUSH_SEG=\"${GIT_SUB_RE}push[^|;&]*[[:space:]]\"",
+        "to": "PUSH_SEG='git[[:space:]]([^|;&]* )?push[^|;&]*[[:space:]]'"
+      }
+    },
+    {
+      "why": "a long option reads as a bare `--`, so `git checkout --quiet feature/my-branch` asks",
+      "replace": {
+        "from": "checkout +--([[:space:]]|$)'",
+        "to": "checkout +--'"
+      }
+    },
+    {
+      "why": "a quote closed before the rest of the word hides the toplevel, so `cd \"$(git rev-parse --show-toplevel)\"/. && git push` hard-blocks",
+      "replace": {
+        "from": "  case \"$2\" in '\"'\"$TOPLEVEL_MARK\"*) set -- \"$1\" \"${2//\\\"/}\" ;; esac\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a --git-dir toplevel resolves in the -C directory, so `cd <main> && git -C <feature> --git-dir=$(git rev-parse --show-toplevel)/.git push` passes",
+      "replace": {
+        "from": "  case \"$(unquote \"$c\")\" in \"$TOPLEVEL_MARK\"*) dir=$2 ;; esac\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a quoted exported toplevel is resolved at the push, so `cd <main> && export GIT_DIR=\"$(\u2026)/.git\" && cd <feature> && git push` passes",
+      "replace": {
+        "from": "case \"$(unquote \"$gitenv\")\" in \"$TOPLEVEL_MARK\"*)",
+        "to": "case \"$gitenv\" in \"$TOPLEVEL_MARK\"*)"
+      }
+    },
+    {
+      "why": "a substitution splits its command's chain again, so `git checkout -b topic-1 && git commit -qm \"$(date)\" && git push -u origin HEAD` from main hard-blocks",
+      "replace": {
+        "from": "         last_op=${saved%%|*}; saved=${saved#*|}; chain=${saved%%|*}; saved=${saved#*|}; held=${saved%%|*}; cond=${saved#*|}\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "an `|| exit` inside a subshell holds the chain, so `(git checkout -b feature || exit ); git push -u origin HEAD` from main passes",
+      "replace": {
+        "from": "[ \"${#stack[@]}\" -gt 0 ] || held=1",
+        "to": "held=1"
+      }
+    },
+    {
+      "why": "a negated move keeps its chain, so `! git checkout -b feature && git push -u origin HEAD` from main passes",
+      "replace": {
+        "from": "    [ -z \"$neg\" ] || chain=$((chain + 1))\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a create-or-exit group stops returning to the move's chain, so `git checkout -b topic-1 || { echo exists; exit 1; }; git push -u origin HEAD` from main hard-blocks",
+      "replace": {
+        "from": "[ -z \"$grp_exit\" ] || { chain=$grp_chain; held=1; }; ",
+        "to": ""
+      }
+    },
+    {
+      "why": "a branch an earlier move creates is not a branch yet, so `git checkout -b topic-1 || git checkout topic-1 && git push -u origin HEAD` from main hard-blocks",
+      "replace": {
+        "from": "          case \" ${_BR_NAME[*]:-} \" in *\" ${pos[0]} \"*) new=${pos[0]} ;; esac\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "a short-option bundle hides its create letter, so `git checkout -qb topic-1 && git push -u origin HEAD` from main hard-blocks",
+      "replace": {
+        "from": "    case \"$sub:$w\" in checkout:-[!-bB]*[bB]|switch:-[!-cC]*[cC]) w=-${w#\"${w%?}\"} ;; esac\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "an unquoted substitution ends an option value at its space, so `git -C $(git rev-parse --show-toplevel) push -f origin topic-1` runs unprompted",
+      "replace": {
+        "from": "|\\$\\([^()]*\\)|",
+        "to": "|"
       }
     }
   ],
   "pr-create-guard": [
     {
       "why": "the stack form stops being recognised, so a stack submit skips every check",
-      "delete_matching": "stack \\+\\(submit\\|link\\)"
+      "replace": {
+        "from": "stack +(submit|link)([[:space:]]|$)'; then",
+        "to": "stack +(nomatch)([[:space:]]|$)'; then"
+      }
     },
     {
       "why": "the dirty-tree block on a stack submit becomes advisory instead of blocking",
@@ -41,7 +905,10 @@
     },
     {
       "why": "the working directory stops being resolved, so every git check reads the session repo",
-      "delete_matching": "GITC=\\(-C \"\\$WORK_DIR\"\\)"
+      "replace": {
+        "from": "  GITC=(-C \"$WORK_DIR\")\n",
+        "to": "  :\n"
+      }
     },
     {
       "why": "an unresolvable default branch goes back to blocking, asserting a zero diff nobody measured",
@@ -86,14 +953,94 @@
   ],
   "_lib/split-cmd-segments.pl": [
     {
-      "why": "a completed dollar-parenthesis substitution is discarded, hiding a nested destructive command",
+      "why": "a completed substitution is discarded, hiding a nested destructive command",
       "suite": "destructive-guard",
-      "delete_matching": "collect_segments\\(substr\\(\\$text, \\$i \\+ 2"
+      "delete_matching": "collect_segments\\(\\$inner, \\$out"
     },
     {
       "why": "a substitution scope opener is omitted, so checkout directory state cannot be restored safely",
       "suite": "destructive-guard",
       "delete_matching": "emit_scope\\(\\$out, 'E'\\)"
+    },
+    {
+      "why": "a substitution cuts its enclosing segment again, so `git -C \"$(\u2026)\" push` reaches no push check",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "$segment .= substitution(",
+        "to": "emit_segment($out, $segment); $segment = substitution("
+      }
+    },
+    {
+      "why": "process substitution stops being a substitution, so `diff <(git push origin main) x` passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "($char eq '<' || $char eq '>')",
+        "to": "($char eq \"\\0\")"
+      }
+    },
+    {
+      "why": "a substitution after `=` is split off its option again, so `git push --push-option=$(echo x) origin` from main reads it as the remote",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "return ($glued ? '' : ' ') . $word . $tail;",
+        "to": "return ' ' . $word . ' ';"
+      }
+    },
+    {
+      "why": "the toplevel splits from the rest of its word, so `cd $(git rev-parse --show-toplevel)/../push-main && git push` passes",
+      "replace": {
+        "from": "my $tail = ($glued || $word ne 'SUBSTITUTION')",
+        "to": "my $tail = $glued"
+      },
+      "suite": "destructive-guard"
+    },
+    {
+      "why": "a redirect inside the toplevel substitution makes it unreadable, so `cd \"$(git rev-parse --show-toplevel 2>/dev/null)\"` blocks",
+      "replace": {
+        "from": "(?:\\s+2>\\s*(?:\\/dev\\/null|&1))?",
+        "to": ""
+      },
+      "suite": "destructive-guard"
+    },
+    {
+      "why": "a bar inside [[ ]] splits the segment again, so its `)` pops the subshell holding the cd",
+      "replace": {
+        "from": "if (!$quote && !$test && (",
+        "to": "if (!$quote && ("
+      },
+      "suite": "destructive-guard"
+    },
+    {
+      "why": "a substitution glued into an option value splits off the rest, so `-o$(echo x)y origin` reads `y` as the remote",
+      "replace": {
+        "from": "(?:[=:]|(?:\\A|\\s)-[^\\s-]*o)\\z",
+        "to": "[=:]\\z"
+      },
+      "suite": "destructive-guard"
+    },
+    {
+      "why": "no operator records reach the guard, so `git checkout -b topic-9 && git push -u origin HEAD` from main hard-blocks",
+      "replace": {
+        "from": "            push @$out, ['O', $op] if $scoped;\n",
+        "to": ""
+      },
+      "suite": "destructive-guard"
+    },
+    {
+      "why": "an unmatched `[[` merges every later segment, so `echo [[ ; cd <main> && git push` passes",
+      "replace": {
+        "from": "&& substr($text, $i + 2) =~ /\\s\\]\\](?:[\\s;&|)]|\\z)/",
+        "to": "&& 1"
+      },
+      "suite": "destructive-guard"
+    },
+    {
+      "why": "a space after 2> makes the toplevel unreadable, so `cd \"$(git rev-parse --show-toplevel 2> /dev/null)\" && git push` hard-blocks",
+      "replace": {
+        "from": "(?:\\s+2>\\s*(?:\\/dev\\/null|&1))?",
+        "to": "(?:\\s+2>(?:\\/dev\\/null|&1))?"
+      },
+      "suite": "destructive-guard"
     }
   ],
   "_lib/strip-quoted-args.pl": [
@@ -144,6 +1091,70 @@
         "from": "} elsif (!$doc->{quoted}) {",
         "to": "} else {"
       }
+    },
+    {
+      "why": "a wrapper hides the shell after it, so `printf a | xargs -I{} sh -c 'git push origin main'` reads the push as data",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "if ($program =~ m{(?:^|/)(?:xargs|timeout|gtimeout|nice|nohup|sudo|doas|stdbuf|setsid|ionice|find|caffeinate|arch|script|runuser|chroot|unbuffer|chrt|taskset|busybox)$}) {",
+        "to": "if (0) {"
+      }
+    },
+    {
+      "why": "su -c and flock -c strings stop counting as code, so `su -c 'git push origin main'` reads the push as data",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "return 1 if $program =~ m{(?:^|/)(?:su|flock)$}",
+        "to": "return 0 if $program =~ m{(?:^|/)(?:su|flock)$}"
+      }
+    },
+    {
+      "why": "watch's operand stops counting as code, so `watch -n 60 'git push origin main'` reads the push as data",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "(?:eval|ssh|watch|parallel)$}",
+        "to": "(?:eval|ssh|parallel)$}"
+      }
+    },
+    {
+      "why": "a path beside a quoted substitution is masked again, so `cd \"$(git rev-parse --show-toplevel)/.\" && git push` blocks",
+      "replace": {
+        "from": " || $data =~ /\\A[^\\s\"'\\\\`;|&<>()\\$]*\\z/",
+        "to": ""
+      },
+      "suite": "destructive-guard"
+    },
+    {
+      "why": "macOS and Linux exec wrappers stop being looked through, so `caffeinate -i bash -c 'git push origin main'` passes",
+      "replace": {
+        "from": "|caffeinate|arch|script|runuser|chroot|unbuffer|chrt|taskset",
+        "to": ""
+      },
+      "suite": "destructive-guard"
+    },
+    {
+      "why": "a `'\\''` chunk ends the shell string, so `bash -c 'git commit -m '\\''x'\\'' && git push origin main'` passes",
+      "replace": {
+        "from": "my $keep = $word_keep || executable_string($simple);",
+        "to": "my $keep = executable_string($simple);"
+      },
+      "suite": "destructive-guard"
+    },
+    {
+      "why": "`-c --` hides the string, so `bash -c -- 'git push origin main'` passes",
+      "replace": {
+        "from": "    pop @words if @words > 1 && $words[-1] eq '--';\n",
+        "to": ""
+      },
+      "suite": "destructive-guard"
+    },
+    {
+      "why": "fish stops being a shell, so `fish -c 'git push origin main'` passes",
+      "replace": {
+        "from": "dash|ash|fish)$};\n    # `-c -- '<code>'`",
+        "to": "dash|ash)$};\n    # `-c -- '<code>'`"
+      },
+      "suite": "destructive-guard"
     }
   ]
 }

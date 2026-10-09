@@ -12,7 +12,7 @@ for my $record (@records) {
     my ($type, $segment) = @$record;
     if ($scoped) {
         print "$type\0";
-        print "$segment\0" if $type eq 'S';
+        print "$segment\0" if $type eq 'S' || $type eq 'O';
     } elsif ($type eq 'S') {
         print "$segment\0";
     }
@@ -27,9 +27,27 @@ sub emit_segment {
 
 sub emit_scope { push @{$_[0]}, [$_[1]]; }
 
+# see: README.md § split-cmd-segments.pl — the enclosing segment stays open, so `git -C "$(…)" push` reaches the push check whole
+sub substitution {
+    my ($text, $start, $end, $out, $scoped, $quote, $before) = @_;
+    my $inner = substr($text, $start, $end - $start);
+    emit_scope($out, 'E') if $scoped;
+    collect_segments($inner, $out, $scoped);
+    emit_scope($out, 'X') if $scoped;
+    # see: README.md § split-cmd-segments.pl — TOPLEVEL, and why a value after `=` or `:` keeps its word
+    my $after = substr($text, $end + 1, 1);
+    my $starts = $before =~ ($quote eq '"' ? qr/(?:\A|[\s=])"\z/ : qr/(?:\A|[\s=])\z/);
+    my $word = $starts && $inner =~ /\A\s*git\s+rev-parse\s+--show-toplevel(?:\s+2>\s*(?:\/dev\/null|&1))?\s*\z/
+        ? "\x01TOPLEVEL" : 'SUBSTITUTION';
+    return $word if $scoped && $quote eq '"';
+    my $glued = $before =~ /(?:[=:]|(?:\A|\s)-[^\s-]*o)\z/;
+    my $tail = ($glued || $word ne 'SUBSTITUTION') && length($after) && $after !~ /[\s;&|)]/ ? '' : ' ';
+    return ($glued ? '' : ' ') . $word . $tail;
+}
+
 sub collect_segments {
     my ($text, $out, $scoped) = @_;
-    my ($segment, $quote, $i) = ('', '', 0);
+    my ($segment, $quote, $i, $test) = ('', '', 0, 0);
     my $length = length $text;
 
     while ($i < $length) {
@@ -66,14 +84,16 @@ sub collect_segments {
             }
             my $end = command_substitution_end($text, $i + 1);
             if (defined $end) {
-                if ($scoped) {
-                    emit_segment($out, $segment);
-                    $segment = '';
-                    emit_scope($out, 'E');
-                }
-                collect_segments(substr($text, $i + 2, $end - $i - 2), $out, $scoped);
-                emit_scope($out, 'X') if $scoped;
-                $segment .= ' SUBSTITUTION ';
+                $segment .= substitution($text, $i + 2, $end, $out, $scoped, $quote, $segment);
+                $i = $end + 1;
+                next;
+            }
+        }
+        # Process substitution runs its command too; `cat <(…)` was hard only because a trailing `)` was trimmed.
+        if (!$quote && ($char eq '<' || $char eq '>') && $i + 1 < $length && substr($text, $i + 1, 1) eq '(') {
+            my $end = command_substitution_end($text, $i + 1);
+            if (defined $end) {
+                $segment .= substitution($text, $i + 2, $end, $out, $scoped, $quote, $segment);
                 $i = $end + 1;
                 next;
             }
@@ -81,14 +101,7 @@ sub collect_segments {
         if ($char eq '`') {
             my $end = backtick_end($text, $i);
             if (defined $end) {
-                if ($scoped) {
-                    emit_segment($out, $segment);
-                    $segment = '';
-                    emit_scope($out, 'E');
-                }
-                collect_segments(substr($text, $i + 1, $end - $i - 1), $out, $scoped);
-                emit_scope($out, 'X') if $scoped;
-                $segment .= ' SUBSTITUTION ';
+                $segment .= substitution($text, $i + 1, $end, $out, $scoped, $quote, $segment);
                 $i = $end + 1;
                 next;
             }
@@ -102,10 +115,21 @@ sub collect_segments {
                 next;
             }
         }
-        if (!$quote && ($char eq ';' || $char eq '|' || $char eq '&' || $char eq "\n")) {
+        # Only a `[[` closed later is a test: an unmatched one would merge every segment after it.
+        if (!$quote && substr($text, $i, 2) eq '[[' && $segment =~ /(?:\A|[\s;&|(!])\z/
+            && substr($text, $i + 2) =~ /\s\]\](?:[\s;&|)]|\z)/) {
+            $test = 1;
+        } elsif (!$quote && $test && substr($text, $i, 2) eq ']]') {
+            $test = 0;
+        }
+        if (!$quote && !$test && ($char eq ';' || $char eq '|' || $char eq '&' || $char eq "\n")) {
             emit_segment($out, $segment);
             $segment = '';
-            $i++;
+            # see: README.md § split-cmd-segments.pl — the operator after a segment decides whether a later one runs only after it succeeded
+            my $op = substr($text, $i, 2);
+            $op = $char unless $op eq '&&' || $op eq '||' || $op eq ';;' || $op eq '|&';
+            push @$out, ['O', $op] if $scoped;
+            $i += length $op;
             next;
         }
         $segment .= $char;

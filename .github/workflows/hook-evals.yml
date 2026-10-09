@@ -41,12 +41,64 @@ jobs:
           python3 tools/claude/examples/hook-tests/run-fixtures.py destructive-guard --hooks-dir tools/claude/examples/hooks
           python3 tools/claude/examples/hook-tests/test-expansion-semantics.py
 
-      - name: Verify expansion regression mutations are detected
-        run: python3 tools/claude/examples/hook-tests/mutate-fixtures.py --hooks-dir tools/claude/examples/hooks _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl _lib/strip-cmd
-
       # The grant is a contract between two hooks, so neither hook's own suite can see it break.
       - name: Check the merge grant and the guard together
         run: |
           python3 tools/claude/examples/hook-tests/run-fixtures.py merge-grant --hooks-dir tools/claude/examples/hooks
-          python3 tools/claude/examples/hook-tests/mutate-fixtures.py --hooks-dir tools/claude/examples/hooks merge-grant
           python3 tools/claude/examples/hook-tests/test-merge-grant.py
+
+      # The scorer is what keeps a slow runner from reading as a caught mutation.
+      - name: Check the mutation scorer
+        run: python3 tools/claude/examples/hook-tests/test-mutate-fixtures.py
+
+      # The lease exemption reads live git and PR state, so it needs a repository and a gh stub per case.
+      - name: Check the own-PR force-push lease
+        run: python3 tools/claude/examples/hook-tests/test-force-push-lease.py
+
+      # Codex runs the tool on any exit but 2-with-a-reason, so each way the dispatcher can fail must still block.
+      - name: Check the Codex hook dispatcher fails closed
+        run: python3 tools/codex/test-bash-hook-dispatcher.py
+
+  # Every mutation reruns a whole suite, so they get their own sharded job instead of the evals budget.
+  mutations:
+    runs-on: ubuntu-latest
+    # A destructive-guard shard holds at most 12 mutations, each rerunning at most 477 cases at about 0.17 s a case on CI: about 16 minutes.
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: destructive-guard 1/10
+            args: --shard 1/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 2/10
+            args: --shard 2/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 3/10
+            args: --shard 3/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 4/10
+            args: --shard 4/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 5/10
+            args: --shard 5/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 6/10
+            args: --shard 6/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 7/10
+            args: --shard 7/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 8/10
+            args: --shard 8/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 9/10
+            args: --shard 9/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 10/10
+            args: --shard 10/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: merge-grant, pr-create-guard, stateful-op-reminder and strip-cmd
+            args: merge-grant _lib/strip-cmd pr-create-guard stateful-op-reminder
+    name: mutations (${{ matrix.suite }})
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify regression mutations are detected
+        env:
+          MUTATION_ARGS: ${{ matrix.args }}
+        run: |
+          read -r -a args <<<"$MUTATION_ARGS"
+          python3 tools/claude/examples/hook-tests/mutate-fixtures.py --hooks-dir tools/claude/examples/hooks --timeout 60 "${args[@]}"

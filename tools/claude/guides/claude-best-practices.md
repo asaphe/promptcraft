@@ -430,6 +430,23 @@ A real-world consolidation reduced 60 rule files (~35K tokens) to 14 (~18K token
 
 **Audit periodically:** Count your always-on token budget with `wc -c .claude/rules/**/*.md CLAUDE.md` (rough: 4 chars ≈ 1 token). If it exceeds 15-20K tokens, consolidate.
 
+#### Claude Code's own size warning
+
+Claude Code measures the same thing. [Documented](https://code.claude.com/docs/en/memory#my-claude-md-is-too-large): one instruction file over the recommended length raises a warning at startup and in `/status`, and so do files that are each within it but add up past a combined limit. Each `CLAUDE.md`, rules file and `@path` import counts as a separate file, and a file over 4 MiB is skipped. The docs do not give the limits. Read from the v2.1.292 binary — **observed, not documented**, so expect them to move:
+
+| Model's context window | Per file | Combined |
+|---|--:|--:|
+| 200k tokens | 40,000 characters | 120,000 characters |
+| 1M tokens | 150,000 characters (200,000 on Claude 4.6 and earlier) | same as per file |
+
+The per-file limit is 5% of the context window, converted at 3 characters per token (4 for Claude 3.x through 4.6), and never below 40,000; the combined limit is the larger of 120,000 and the per-file limit. The combined figure covers **every** always-loaded layer together — your user `CLAUDE.md`, each `CLAUDE.md` from the launch directory up, every rule file without `paths:` frontmatter, and their imports — so a project's files and yours draw on one budget.
+
+#### Move bodies to docs, keep the rule inline
+
+When a file nears the limit, do not delete rules — split each one. The line that must fire from a cold start stays always-loaded: the imperative, plus the one condition that triggers it. The mechanism, worked cases and rationale move to an on-demand doc behind a pointer (`see: docs/<topic>.md § <heading>`), where they cost nothing until read.
+
+A move can drop the part that was load-bearing, so test it the way [rule-authoring](../examples/docs/rule-authoring.md) tests new wording, as an A/B pair: run the rule's trigger scenario in a fresh session with the full rule inline, then with the one-line rule and its pointer. If the pointer-only run regresses, the moved text was doing work — bring that sentence back inline and move the rest.
+
 ### MCP Tool Definition Budget
 
 Each MCP server's tool definitions consume context tokens in every session — even if you never call the tools. Cloud-synced MCPs from claude.ai connectors are particularly insidious: they're enabled by default and load silently.

@@ -485,6 +485,18 @@ Instead of guessing which hooks to build, mine session data to find the highest-
 
 See the [Session Analytics Guide](session-analytics-guide.md) for queries and methodology.
 
+### Auditing permission prompts: measure, then exempt
+
+A soft block that fires on work the user would have approved anyway costs more than a keystroke: an approver who clicks through ten routine prompts clicks through the eleventh. Prune prompts by measurement, never by feel:
+
+1. **Label every ask with its trigger.** An ask and a plain allow both exit 0, so prompt volume is invisible unless the hook records it. `destructive-guard` sets `HOOK_DIAG_DECISION=ask:<trigger>`, and [`hook-diag.sh`](../examples/hooks/_lib/README.md) appends each one to an ask log: `grep '^decision=ask' ~/.claude/local/hook-ask-decisions.log | sort | uniq -c | sort -rn`.
+2. **Count asks per trigger over a real window**, then read a sample of each high-volume trigger's commands and sort them. Would your rules have the agent run this unasked — its own branch, its own PR, a read the pattern misclassifies — or does it need a human?
+3. **Exempt only the class you measured, with a predicate that proves membership from live state** — who opened the PR, which commits a push overwrites — never from a name, a path or a branch prefix. Every lookup it makes fails closed, back to the prompt.
+4. **Ship each exemption with three controls known in advance:** a case it must exempt, a case that must still ask, and one with its input unavailable, where it must keep the prompt. Disable the predicate and confirm the exempt case goes red.
+5. **Re-measure after shipping**, at every site the exemption touches. A trigger whose volume did not move was exempted for the wrong class.
+
+Two moves stay off the table: turning a prompt into a silent pass for a class nobody measured, and turning a hard block into a standing prompt because blocks are inconvenient — that trades "unapprovable" for "approvable by a stray keystroke". The narrower move is a grant the user's own words arm for one turn. Worked examples: [destructive-guard's own-PR lease](../examples/hooks/destructive-guard/README.md#own-pr-lease) and the [PR grant](../examples/hooks/merge-grant/README.md#the-pr-grant).
+
 ## Common Mistakes
 
 | Mistake | Fix |
@@ -507,7 +519,7 @@ Production-tested hook examples with README documentation:
 | Hook | Type | Purpose | Blocks? |
 |------|------|---------|---------|
 | [Destructive Guard](../examples/hooks/destructive-guard/) | PreToolUse | Two-tier blocking for irreversible operations | Hard (exit 2) + Soft (JSON) |
-| [Merge Grant](../examples/hooks/merge-grant/) | UserPromptSubmit | Arms a one-turn merge grant from the user's own prompt, read by Destructive Guard | No (context) |
+| [Merge Grant](../examples/hooks/merge-grant/) | UserPromptSubmit, PostToolUse | Arms one-turn merge and PR grants from the user's own prompt (PR only from a menu answer), read by Destructive Guard | No (context) |
 | [Review Verification Guard](../examples/hooks/review-verification-guard/) | PreToolUse | Verification checklist before posting PR reviews/comments | Soft |
 | [Memory Guard](../examples/hooks/memory-guard/) | PreToolUse (Write) | Blocks project memory writes for multi-clone repos | Hard (exit 2) |
 | [1Password Read Guard](../examples/hooks/op-read-guard/) | PreToolUse | Blocks raw secret reads, redirects to a masked cache (ships in [claude-secret-guard](https://github.com/asaphe/claude-secret-guard)) | Hard |

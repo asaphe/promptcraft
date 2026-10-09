@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Prove a fixture suite bites, by breaking the hook and requiring the suite to notice.
 
-Usage: mutate-fixtures.py [--hooks-dir DIR] [hook ...]   (no hooks = every hook in mutations.json)
+Usage: mutate-fixtures.py [--hooks-dir DIR] [--timeout S] [--shard K/N] [--manifest F] [hook ...]
+       (no hooks = every hook in mutations.json)
 
 A fixture that has never been observed to fail is indistinguishable from one that
 cannot fail. Guard fixtures are usually written by reading the hook, so the failure
@@ -27,6 +28,13 @@ nothing, the pristine hook passes its own suite, and the run reports the fixture
 vacuous when the truth is that the mutation was. That reads as a real finding and
 sends you off to rewrite a fixture that was fine.
 
+A third outcome is neither: a run whose only failures are TIMEOUTs says the host was slow,
+not that the suite noticed the break. That run is INCONCLUSIVE and fails, because scoring it as
+caught turns a loaded runner into a green step. Each suite runs with --fail-fast, so a caught
+mutation stops at its first real failure instead of running every remaining case.
+
+`--shard K/N` runs every Nth mutation starting at the Kth, so CI can split one long run.
+
 The copy is a whole tree under a temp dir, so the live hooks are never edited.
 """
 
@@ -38,9 +46,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 HERE = pathlib.Path(__file__).resolve().parent
 MANIFEST = HERE / "mutations.json"
+# run-fixtures.py's summary row for one mismatched case.
+FAILURE_LINE = re.compile(r"^  want=[^\t\n]*\tgot=([^\t\n]*)\t", re.M)
 
 
 def apply_mutation(text, mutation):
@@ -71,9 +82,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("hooks", nargs="*")
     ap.add_argument("--hooks-dir", default=str(HERE.parent))
+    # A per-case TIMEOUT fails the suite too, so on a loaded host it would score every mutation as caught.
+    ap.add_argument("--timeout", help="per-case timeout passed to run-fixtures.py")
+    ap.add_argument("--shard", default="1/1", help="K/N: run every Nth mutation, starting at the Kth")
+    ap.add_argument("--manifest", default=str(MANIFEST))
     args = ap.parse_args()
+    shard = re.fullmatch(r"([1-9][0-9]*)/([1-9][0-9]*)", args.shard)
+    if not shard or int(shard.group(1)) > int(shard.group(2)):
+        sys.exit("--shard must be K/N with 1 <= K <= N: %r" % args.shard)
+    shard_k, shard_n = int(shard.group(1)) - 1, int(shard.group(2))
 
-    manifest = {k: v for k, v in json.loads(MANIFEST.read_text()).items()
+    manifest = {k: v for k, v in json.loads(pathlib.Path(args.manifest).read_text()).items()
                 if k != "_README"}
     wanted = args.hooks or sorted(manifest)
     unknown = [h for h in wanted if h not in manifest]
@@ -85,11 +104,14 @@ def main():
     tree = tmp / "hooks"
     shutil.copytree(src, tree)
 
-    failures, total = [], 0
+    failures, total, position = [], 0, -1
     for hook in wanted:
         target = resolve_target(tree, hook)
         pristine = target.read_text()
         for mutation in manifest[hook]:
+            position += 1
+            if position % shard_n != shard_k:
+                continue
             total += 1
             broken = apply_mutation(pristine, mutation)
             if broken == pristine:
@@ -100,17 +122,27 @@ def main():
             target.write_text(broken)
             # A shared library has no suite of its own; run one that consumes it.
             suite = mutation.get("suite", hook)
-            proc = subprocess.run(
-                [sys.executable, str(HERE / "run-fixtures.py"), suite, "--hooks-dir", str(tree)],
-                capture_output=True, text=True,
-            )
+            cmd = [sys.executable, str(HERE / "run-fixtures.py"), suite, "--hooks-dir", str(tree),
+                   "--fail-fast"]
+            if args.timeout:
+                cmd += ["--timeout", args.timeout]
+            started = time.monotonic()
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            took = time.monotonic() - started
             target.write_text(pristine)
-            caught = proc.returncode != 0
+            got = [m.group(1) for m in FAILURE_LINE.finditer(proc.stdout)]
+            caught = proc.returncode != 0 and any(g != "TIMEOUT" for g in got)
             tally = next((ln for ln in proc.stdout.splitlines() if "passed" in ln), "?")
-            print("%s %s: %s  [%s]" % ("ok  " if caught else "FAIL", hook,
-                                       mutation["why"], tally.strip()))
-            if not caught:
+            label = "ok  " if caught else ("FAIL" if proc.returncode == 0 else "INCONCLUSIVE")
+            print("%s %s: %s  [%s, %.0fs]" % (label, hook, mutation["why"], tally.strip(), took),
+                  flush=True)
+            if proc.returncode == 0:
                 failures.append((hook, mutation["why"], "suite still passed with the hook broken"))
+            elif not caught:
+                failures.append((hook, mutation["why"],
+                                 "INCONCLUSIVE: the suite failed only on timeouts or on its own error"
+                                 " (exit %d), so it never showed the break; raise --timeout"
+                                 % proc.returncode))
 
     shutil.rmtree(tmp, ignore_errors=True)
     print("\n%d/%d mutations caught" % (total - len(failures), total))

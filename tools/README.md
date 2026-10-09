@@ -5,6 +5,7 @@ Tool-specific configurations, prompts, rules, and integrations. One subdirectory
 ## What's here
 
 - `claude/` — Claude Code configs (agents, rules, skills, hooks, scaffolding, and production examples).
+- `codex/` — running a Claude Code setup under OpenAI Codex (config map, absolute paths, shared hooks dispatcher).
 - `cursor/` — Cursor IDE configs (user rules, `.mdc` scoped rules, MCP setup, conversation recovery utility).
 - `chatgpt/` — ChatGPT custom instructions (global + per-project).
 
