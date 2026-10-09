@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prove a fixture suite bites, by breaking the hook and requiring the suite to notice.
 
-Usage: mutate-fixtures.py [--hooks-dir DIR] [--timeout S] [--shard K/N] [--manifest F] [hook ...]
+Usage: mutate-fixtures.py [--hooks-dir DIR] [--timeout S] [--shard K/N] [--jobs N] [--manifest F] [hook ...]
        (no hooks = every hook in mutations.json)
 
 A fixture that has never been observed to fail is indistinguishable from one that
@@ -85,6 +85,7 @@ def main():
     # A per-case TIMEOUT fails the suite too, so on a loaded host it would score every mutation as caught.
     ap.add_argument("--timeout", help="per-case timeout passed to run-fixtures.py")
     ap.add_argument("--shard", default="1/1", help="K/N: run every Nth mutation, starting at the Kth")
+    ap.add_argument("--jobs", help="cases each suite runs at once, passed to run-fixtures.py")
     ap.add_argument("--manifest", default=str(MANIFEST))
     args = ap.parse_args()
     shard = re.fullmatch(r"([1-9][0-9]*)/([1-9][0-9]*)", args.shard)
@@ -126,6 +127,8 @@ def main():
                    "--fail-fast"]
             if args.timeout:
                 cmd += ["--timeout", args.timeout]
+            if args.jobs:
+                cmd += ["--jobs", args.jobs]
             started = time.monotonic()
             proc = subprocess.run(cmd, capture_output=True, text=True)
             took = time.monotonic() - started

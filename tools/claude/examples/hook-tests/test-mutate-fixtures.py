@@ -89,6 +89,31 @@ class MutateFixturesTest(unittest.TestCase):
         self.assertIn("stopped at the first failure", proc.stdout)
 
 
+    def test_fail_fast_with_jobs_still_stops_at_the_first_real_failure(self):
+        broken = pathlib.Path(self.tmp) / "hooks"
+        subprocess.run(["cp", "-R", str(HOOKS), str(broken)], check=True)
+        (broken / "merge-grant" / "merge-grant.sh").write_text("#!/usr/bin/env bash\nexit 0\n")
+        proc = subprocess.run(
+            [sys.executable, str(RUNNER), "merge-grant", "--hooks-dir", str(broken), "--fail-fast", "--jobs", "4"],
+            capture_output=True, text=True, timeout=600, env=dict(os.environ))
+        self.assertEqual(proc.returncode, 1, proc.stdout)
+        fails = [ln for ln in proc.stdout.splitlines() if ln.startswith("FAIL")]
+        self.assertEqual(len(fails), 1, proc.stdout)
+        self.assertIn("stopped at the first failure", proc.stdout)
+
+    def test_jobs_print_the_same_cases_in_the_same_order(self):
+        runs = [subprocess.run([sys.executable, str(RUNNER), "merge-grant", "--hooks-dir", str(HOOKS), *extra],
+                               capture_output=True, text=True, timeout=600)
+                for extra in ((), ("--jobs", "4"))]
+        self.assertEqual(runs[0].returncode, 0, runs[0].stdout[-500:])
+        self.assertEqual(runs[0].stdout, runs[1].stdout)
+
+    def test_jobs_below_one_is_refused(self):
+        proc = subprocess.run([sys.executable, str(RUNNER), "merge-grant", "--hooks-dir", str(HOOKS), "--jobs", "0"],
+                              capture_output=True, text=True, timeout=60)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("--jobs must be 1 or more", proc.stderr)
+
     def test_a_run_that_crashes_is_inconclusive(self):
         proc = self.score([dict(NO_OP, suite="no-such-suite")], "--timeout", "60")
         self.assertEqual(proc.returncode, 1, proc.stdout)

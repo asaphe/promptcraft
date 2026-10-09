@@ -23,6 +23,8 @@ A hook test is unusually easy to write so that it cannot fail, and there are thr
 ```bash
 # One hook, from fixtures/<hook>.tsv
 python3 run-fixtures.py destructive-guard --hooks-dir ../hooks
+# The same, eight cases at a time; results still print in file order
+python3 run-fixtures.py destructive-guard --hooks-dir ../hooks --jobs 8
 
 # Delivery contracts across every hook, plus the selftest that proves they fire
 python3 probe-hooks.py --hooks-dir ../hooks
@@ -48,6 +50,8 @@ python3 test-force-push-lease.py
 ```
 
 `--hooks-dir` resolves both layouts: flat `<dir>/<name>.sh`, which is how hooks sit in an installed `~/.claude/hooks/`, and nested `<dir>/<name>/<name>.sh`, which is how they sit in this repo. Installed alongside your own hooks as `~/.claude/hooks/tests/`, the default is already right and the flag can be dropped.
+
+Cases run one at a time unless `--jobs N` is given, to `run-fixtures.py` or to `mutate-fixtures.py`, which passes it on. Each case is its own hook process, so N of them can run at once; results are read back in file order, so the output, the pass count and the `--fail-fast` stop are the same as a serial run. Keep the default for a hook whose verdict reads state an earlier case leaves behind, such as a counter, a throttle or a file it writes and reads back: cases would then race. None of the hooks with a fixture here does: `merge-grant` writes a grant file, but its verdict reads only the prompt.
 
 Each mutation runs its suite with `run-fixtures.py --fail-fast`, which stops at the first mismatch that is not a TIMEOUT, so a caught mutation costs the rows up to its first failure instead of the whole suite. A mutation scores as caught only when at least one failure is a real verdict mismatch; a run whose failures are all timeouts (or that crashed before printing any) is reported INCONCLUSIVE and fails the run, because on a slow runner it would otherwise read as caught whatever the fixture asserts.
 

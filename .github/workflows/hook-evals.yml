@@ -39,16 +39,16 @@ jobs:
       # Every suite a mutation runs must also pass unmutated in this job: the scorer counts a red suite as a catch.
       - name: Check Bash expansion semantics and published guard fixtures
         run: |
-          python3 tools/claude/examples/hook-tests/run-fixtures.py destructive-guard --hooks-dir tools/claude/examples/hooks
-          python3 tools/claude/examples/hook-tests/run-fixtures.py pr-create-guard --hooks-dir tools/claude/examples/hooks
-          python3 tools/claude/examples/hook-tests/run-fixtures.py stateful-op-reminder --hooks-dir tools/claude/examples/hooks
-          python3 tools/claude/examples/hook-tests/run-fixtures.py null-result-probe --hooks-dir tools/claude/examples/hooks
+          python3 tools/claude/examples/hook-tests/run-fixtures.py destructive-guard --hooks-dir tools/claude/examples/hooks --jobs "$(nproc)"
+          python3 tools/claude/examples/hook-tests/run-fixtures.py pr-create-guard --hooks-dir tools/claude/examples/hooks --jobs "$(nproc)"
+          python3 tools/claude/examples/hook-tests/run-fixtures.py stateful-op-reminder --hooks-dir tools/claude/examples/hooks --jobs "$(nproc)"
+          python3 tools/claude/examples/hook-tests/run-fixtures.py null-result-probe --hooks-dir tools/claude/examples/hooks --jobs "$(nproc)"
           python3 tools/claude/examples/hook-tests/test-expansion-semantics.py
 
       # The grant is a contract between two hooks, so neither hook's own suite can see it break.
       - name: Check the merge grant and the guard together
         run: |
-          python3 tools/claude/examples/hook-tests/run-fixtures.py merge-grant --hooks-dir tools/claude/examples/hooks
+          python3 tools/claude/examples/hook-tests/run-fixtures.py merge-grant --hooks-dir tools/claude/examples/hooks --jobs "$(nproc)"
           python3 tools/claude/examples/hook-tests/test-merge-grant.py
 
       # The scorer is what keeps a slow runner from reading as a caught mutation.
@@ -66,7 +66,7 @@ jobs:
   # Every mutation reruns a whole suite, so they get their own sharded job instead of the evals budget.
   mutations:
     runs-on: ubuntu-latest
-    # A destructive-guard shard holds at most 13 mutations, each rerunning at most 491 cases at about 0.17 s a case on CI: about 18 minutes.
+    # A destructive-guard shard holds at most 13 mutations, each rerunning at most 491 cases at about 0.17 s a case on CI: about 18 minutes one case at a time, the bound this timeout covers; --jobs runs one case per core.
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -105,4 +105,4 @@ jobs:
           MUTATION_ARGS: ${{ matrix.args }}
         run: |
           read -r -a args <<<"$MUTATION_ARGS"
-          python3 tools/claude/examples/hook-tests/mutate-fixtures.py --hooks-dir tools/claude/examples/hooks --timeout 60 "${args[@]}"
+          python3 tools/claude/examples/hook-tests/mutate-fixtures.py --hooks-dir tools/claude/examples/hooks --timeout 60 --jobs "$(nproc)" "${args[@]}"
