@@ -119,8 +119,8 @@ def destructive_guard(tmp):
     for placeholder in ("SUBSTITUTION", "QUOTED_ARG"):
         os.makedirs(os.path.join(feature, placeholder))
     spaced = _init(os.path.join(tmp, "push main wt"))
-    # The escaped spelling taken literally names a feature checkout, so misreading the escape is observable.
-    _init(spaced.replace(" ", "\\ "), branch="feature")
+    # A word split at its escaped space, taken literally, names a feature checkout, so misreading the escape is observable.
+    _init(os.path.join(tmp, "push\\"), branch="feature")
     # HOME is a checkout off the default branch, so `cd -P && git push` reads a branch no other repo here holds.
     env = dict(_grant_dir(tmp), HOME=_init(os.path.join(tmp, "home"), branch="home"))
     # A linked worktree's `.git` is a file, not a directory, so GIT_DIR naming it needs its own case.
