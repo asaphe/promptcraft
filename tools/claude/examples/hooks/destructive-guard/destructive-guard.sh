@@ -68,7 +68,7 @@ strip_redirs() {
 }
 
 # git's global options, so `git stash push` and `git -C <dir> grep checkout` are not read as a push or a switch.
-GIT_VAL_RE='("[^"]*"|'\''[^'\'']*'\''|[^[:space:]"'\''\\]|\\.)+'
+GIT_VAL_RE='("[^"]*"|'\''[^'\'']*'\''|\$\([^()]*\)|[^[:space:]"'\''\\]|\\.)+'
 # One list for the regex and the token walk, so the two cannot disagree on which word is the subcommand.
 GIT_VAL_OPTS='-C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix|--attr-source|--shallow-file'
 GIT_SUB_RE='git([[:space:]]+('"$GIT_VAL_OPTS"')[[:space:]]+'"$GIT_VAL_RE"'|[[:space:]]+-[^[:space:]]+)*[[:space:]]+'
@@ -144,7 +144,7 @@ GITDIR_ASSIGN_RE='^([A-Za-z_][A-Za-z0-9_]*=[^ ]* +)*GIT_DIR=[^ ]*( +[A-Za-z_][A-
 GITDIR_UNSET_RE='^unset( +[^ ]+)* +GIT_DIR( |$)'
 resolve_segment_dirs() {
   local i seg bare op cwd="" stack=() envstack=() case_depth=() pops opens closes arm gitenv=""
-  local last_op="" op_before chain=0 loops="" loop_n=0 piped cond="" held=""
+  local last_op="" op_before chain=0 loops="" loop_n=0 piped cond="" held="" opstack=() saved neg grp_chain="" grp_exit=""
   _SEG_DIRS=()
   _SEG_TEXT=()
   _SEG_GITENV=()
@@ -160,19 +160,34 @@ resolve_segment_dirs() {
     case "${_SCOPED_TYPES[$i]}" in
       O) last_op="${_SCOPED_VALUES[$i]}"; continue ;;
       # A subshell gets a copy of the directory and the exported GIT_DIR, and the parent's come back at its end.
-      E) stack[${#stack[@]}]="$cwd"; envstack[${#envstack[@]}]="$gitenv"; continue ;;
+      E) stack[${#stack[@]}]="$cwd"; envstack[${#envstack[@]}]="$gitenv"
+         # A substitution runs inside the command around it, so it must not move that command's chain.
+         opstack[${#opstack[@]}]="$last_op|$chain|$held|$cond"; continue ;;
       X) cwd="${stack[${#stack[@]}-1]}"; unset 'stack[${#stack[@]}-1]'
-         gitenv="${envstack[${#envstack[@]}-1]}"; unset 'envstack[${#envstack[@]}-1]'; continue ;;
+         gitenv="${envstack[${#envstack[@]}-1]}"; unset 'envstack[${#envstack[@]}-1]'
+         saved=${opstack[${#opstack[@]}-1]}; unset 'opstack[${#opstack[@]}-1]'
+         last_op=${saved%%|*}; saved=${saved#*|}; chain=${saved%%|*}; saved=${saved#*|}; held=${saved%%|*}; cond=${saved#*|}
+         continue ;;
     esac
     seg="${_SCOPED_VALUES[$i]}"
-    # `then` and `do` run only after their condition succeeded, like `&&`; `a || exit; b` runs b only after a succeeded.
-    case "$last_op:$seg" in '||:exit'|'||:exit '*|'||:return'|'||:return '*) held=1 ;; esac
+    # `then` and `do` run only after their condition succeeded, like `&&`; a top-level `a || exit; b` runs b only after a succeeded.
+    case "$last_op:$seg" in '||:exit'|'||:exit '*) [ "${#stack[@]}" -gt 0 ] || held=1 ;; '||:{'*) grp_chain=$chain; grp_exit="" ;; esac
     case "$last_op:$cond:$seg" in
-      '&&:'*|*:1:'then '*|*:1:then|*:1:'do '*|*:1:do|'||:'*:exit|'||:'*:'exit '*|'||:'*:return|'||:'*:'return '*) ;;
+      '&&:'*|*:1:'then '*|*:1:then|*:1:'do '*|*:1:do) ;;
+      '||:'*:exit|'||:'*:'exit '*) [ -n "$held" ] || chain=$((chain + 1)) ;;
       ';:'*|$'\n:'*) [ -n "$held" ] || chain=$((chain + 1)); held="" ;;
       *) chain=$((chain + 1)); held="" ;;
     esac
-    case "$seg" in 'if !'*|'elif !'*|'while !'*) cond="" ;; 'if '*|'elif '*|'while '*|'for '*) cond=1 ;; *) cond="" ;; esac
+    # `a || { …; exit 1; }; b` reaches b only after a succeeded, so the group's close returns to a's chain.
+    if [ -n "$grp_chain" ]; then
+      case "$seg" in
+        exit|'exit '*) grp_exit=1 ;;
+        '}'|'} '*) [ -z "$grp_exit" ] || { chain=$grp_chain; held=1; }; grp_chain="" ;;
+        *) grp_exit="" ;;
+      esac
+    fi
+    cond=""
+    case "$seg" in 'if '*|'elif '*|'while '*|'for '*) [[ $seg =~ ^[a-z]+[[:space:]]+! ]] || cond=1 ;; esac
     op_before=$last_op
     last_op=""
     case "$seg" in 'do '*|do) loop_n=$((loop_n + 1)); loops="$loops:$loop_n" ;; esac
@@ -180,6 +195,7 @@ resolve_segment_dirs() {
     _SEG_LOOP[i]="$loops:"
     # A reserved word, a builtin prefix or a case pattern leaves the command after it in charge: `if cd <dir>` still moves.
     arm=""
+    neg=""
     while :; do
       # A pattern starts an arm only at the subshell depth its `case` opened at, so `true)` and `esac)` still close one.
       if [ "${#case_depth[@]}" -gt 0 ] && [ -z "$arm" ] && [ "${#stack[@]}" -eq "${case_depth[${#case_depth[@]}-1]}" ] \
@@ -190,7 +206,8 @@ resolve_segment_dirs() {
         '('*) stack[${#stack[@]}]="$cwd"; envstack[${#envstack[@]}]="$gitenv"; seg="${seg#?}" ;;
         ' '*|'{'*) seg="${seg#?}" ;;
         'case '*' in'|'case '*' in '*) case_depth[${#case_depth[@]}]=${#stack[@]}; arm=""; seg="${seg#* in}" ;;
-        'if '*|'then '*|'else '*|'elif '*|'do '*|'while '*|'until '*|'! '*|'time '*|'builtin '*|'command '*) seg="${seg#* }" ;;
+        '! '*) neg=1; seg="${seg#* }" ;;
+        'if '*|'then '*|'else '*|'elif '*|'do '*|'while '*|'until '*|'time '*|'builtin '*|'command '*) seg="${seg#* }" ;;
         *) break ;;
       esac
     done
@@ -230,6 +247,7 @@ resolve_segment_dirs() {
     # eval runs its string in this shell, so a cd or GIT_DIR in it moves later segments somewhere the text cannot follow.
     case "$seg" in eval\ *) case "$seg" in *cd*|*pushd*|*popd*) cwd='?' ;; esac; case "$seg" in *GIT_DIR*) gitenv='?' ;; esac ;; esac
     if [[ $seg =~ $BRANCH_MOVE_RE ]]; then record_branch "$i" "$seg" "$cwd" "${_SEG_GITENV[i]}"; fi
+    [ -z "$neg" ] || chain=$((chain + 1))
     [ -z "$piped" ] || seg=""
     case "$seg" in
       cd) cwd="$HOME" ;;
@@ -308,6 +326,7 @@ branch_after() { # directory, subcommand, its words...
     w=$(unquote "$1"); shift
     if [ -n "$ends" ]; then pos[${#pos[@]}]=$w; continue; fi
     # parse-options takes a short option's value glued and a long one's after `=`.
+    case "$sub:$w" in checkout:-[!-bB]*[bB]|switch:-[!-cC]*[cC]) w=-${w#"${w%?}"} ;; esac
     case "$sub:$w" in
       checkout:-[bB]?*|switch:-[cC]?*) set -- "${w#-?}" "$@"; w=${w%"${w#-?}"} ;;
       switch:--create=*|switch:--force-create=*|checkout:--orphan=*|switch:--orphan=*) set -- "${w#*=}" "$@"; w=${w%%=*} ;;
@@ -353,6 +372,8 @@ branch_after() { # directory, subcommand, its words...
         if [ -z "$new" ]; then
           [ "$dir" != '?' ] && git -C "${dir:-.}" rev-parse --verify --quiet "refs/heads/${pos[0]}" >/dev/null 2>&1 \
             && new=${pos[0]}
+          # A branch an earlier move in this command creates exists by the time this one runs.
+          case " ${_BR_NAME[*]:-} " in *" ${pos[0]} "*) new=${pos[0]} ;; esac
         fi
       fi ;;
   esac
@@ -468,7 +489,7 @@ push_hits_main() { # segment, directory it acts on, its segment index (none insi
           [ "${_BR_AT[k]}" -lt "$3" ] || continue
           case "${_BR_KEY[k]}" in '?') printf '%s' "$UNRESOLVED_PUSH"; return 0 ;; "$key") ;; *) continue ;; esac
           cands[${#cands[@]}]=${_BR_NAME[k]}
-          [ "${_SEG_CHAIN[${_BR_AT[k]}]}" != "${_SEG_CHAIN[$3]}" ] || { branch=done; break; }
+          [ "${_SEG_CHAIN[${_BR_AT[k]}]}" != "${_SEG_CHAIN[$3]}" ] || { branch=found; break; }
         done
       fi
       if [ -z "$branch" ]; then

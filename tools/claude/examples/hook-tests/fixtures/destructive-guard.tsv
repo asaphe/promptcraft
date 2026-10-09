@@ -660,6 +660,30 @@ hard	bash -c 'git push origin feature/my-branch && git \\\n push origin main'
 allow	bash -c 'git push origin feature/my-branch && git \\\n push origin feature/other'
 hard	cd {same_repo_main} && git checkout -b feature\ngit push -u origin HEAD
 
+# --- fifth review: a substitution keeps its chain, negations end one, and the fallback idioms ---
+# WHY: a substitution runs as part of the command around it, so it does not split that command's `&&` chain.
+allow	cd {same_repo_main} && git checkout -b topic-1 && git add -A && git commit -m "$(cat <<'EOF'\nfix: a thing\n\nbody\nEOF\n)" && git push -u origin HEAD
+allow	cd {same_repo_main} && git checkout -b topic-1 && git commit -qm "$(date)" && git push -u origin HEAD
+allow	git worktree add {push_feature}/../wt-new -b topic-1 && cd {push_feature}/../wt-new && git commit -qm "$(date)" && git push -u origin HEAD
+hard	cd {same_repo_main} && git checkout -b topic-1 && git commit -qm "$(git checkout main; date)" && git push -u origin HEAD
+hard	cd {same_repo_main} && git checkout -b feature; git commit -qm "$(date)" && git push -u origin HEAD
+# WHY: `|| return` at top level, `|| exit` in a subshell and a negated move all let the push run after a failed move.
+hard	cd {same_repo_main} && git checkout -b feature || return; git push -u origin HEAD
+hard	cd {same_repo_main} && (git checkout -b feature || exit ); git push -u origin HEAD
+hard	cd {same_repo_main} && if  ! git checkout -b feature; then git push -u origin HEAD; fi
+hard	cd {same_repo_main} && ! git checkout -b feature && git push -u origin HEAD
+allow	cd {same_repo_main} && { git checkout -b topic-1 || exit; } && git push -u origin HEAD
+# WHY: create-or-switch and create-or-exit leave every path that reaches the push on the new branch.
+allow	cd {same_repo_main} && git checkout -b topic-1 || git checkout topic-1 && git push -u origin HEAD
+allow	cd {same_repo_main} && git checkout -b topic-1 || { echo exists; exit 1; }; git push -u origin HEAD
+allow	cd {same_repo_main} && git checkout -qb topic-1 && git push -u origin HEAD
+hard	cd {same_repo_main} && git checkout -b topic-1 || git checkout main && git push -u origin HEAD
+hard	cd {same_repo_main} && git checkout -b topic-1 || { echo exists; }; git push -u origin HEAD
+# WHY: an unquoted substitution with a space is one option value, so the soft force and delete tiers still see the push.
+ask	git -C $(git rev-parse --show-toplevel) push -f origin topic-1
+ask	git -C $(dirname $PWD/x) push origin :topic-1
+allow	git -C $(git rev-parse --show-toplevel) stash push -- ':!README.txt'
+
 # --- input unavailable: the extraction returns nothing, which is indistinguishable from
 # "no command to guard". Pinned so a later edit cannot flip it silently.
 allow	<absent>
