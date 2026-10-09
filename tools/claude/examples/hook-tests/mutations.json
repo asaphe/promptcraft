@@ -989,11 +989,11 @@
   ],
   "_lib/strip-cmd": [
     {
-      "why": "an executed heredoc is blanked again, hiding a real invocation behind three lines of shell",
+      "why": "strip_cmd stops asking the helper which bodies are code, so a `sudo bash <<EOF` body is blanked and its kubectl apply passes unreminded",
       "suite": "stateful-op-reminder",
       "replace": {
-        "from": "  if ! _heredoc_is_executed \"$cmd\"; then",
-        "to": "  if true; then"
+        "from": "  if [ -r \"$helper\" ] && bodies=",
+        "to": "  if false && bodies="
       }
     },
     {
@@ -1230,8 +1230,8 @@
       "why": "a heredoc is carried through one pipe only, so `cat <<EOF | tee run.log | sh` hides the push to main",
       "suite": "destructive-guard",
       "replace": {
-        "from": "@piped_docs = $pipe ? (@piped_docs, @command_docs) : ();",
-        "to": "@piped_docs = $pipe ? @command_docs : ();"
+        "from": "@piped_docs = $pipe ? (@piped_docs, @command_docs, @arg_docs) : ();",
+        "to": "@piped_docs = $pipe ? (@command_docs, @arg_docs) : ();"
       }
     },
     {
@@ -1286,7 +1286,7 @@
       "why": "a subshell's output stops carrying its heredocs, so `(cat <<'EOF') | sh` hides the push to main",
       "suite": "destructive-guard",
       "replace": {
-        "from": "                    push @command_docs, @{$frame->{out}};",
+        "from": "                    push @arg_docs, @{$frame->{out}};",
         "to": "                    1;"
       }
     },
@@ -1294,7 +1294,7 @@
       "why": "a brace group's output stops carrying its heredocs, so `{ cat <<'EOF'; } | sh` hides the push to main",
       "suite": "destructive-guard",
       "replace": {
-        "from": "push @command_docs, @{(pop @frames)->{out}};",
+        "from": "push @arg_docs, @{(pop @frames)->{out}};",
         "to": "pop @frames;"
       }
     },
@@ -1334,15 +1334,15 @@
       "why": "a substitution at command position stops running its output, so `$(cat <<'EOF' \u2026)` hides the push to main",
       "suite": "destructive-guard",
       "replace": {
-        "from": "return $simple !~ /\\S/ || $simple =~ /\\s\\z/;",
-        "to": "return 0;"
+        "from": "    return 1 unless @words;\n",
+        "to": "    return 0 unless @words;\n"
       }
     },
     {
       "why": "an argument's substitution counts as command position, so `git commit -m \"$(cat <<'EOF' \u2026)\"` blocks on its message",
       "suite": "destructive-guard",
       "replace": {
-        "from": "    return 0 if command_words($simple);\n",
+        "from": "    return 0 unless $simple !~ /\\S/ || $simple =~ /\\s\\z/;\n",
         "to": ""
       }
     },
@@ -1366,7 +1366,7 @@
       "why": "a here-string stays data, so `bash <<< 'git push origin main'` passes",
       "suite": "destructive-guard",
       "replace": {
-        "from": "if ($simple =~ /<<<\\s*\\z/ && !$arithmetic) {",
+        "from": "if (!$arithmetic && $simple =~ /<<<\\s*\\z/ && $char !~ /\\s/) {",
         "to": "if (0) {"
       }
     },
@@ -1374,8 +1374,8 @@
       "why": "every here-string counts as code, so `grep -c push <<< \"git push origin main\"` blocks",
       "suite": "destructive-guard",
       "replace": {
-        "from": "if (my $kind = interpreter($reader)) {",
-        "to": "if (my $kind = 2) {"
+        "from": "my $doc = {id => $id, inline => $value, quoted => 1, executed => $FORCE{$id} || 0};",
+        "to": "my $doc = {id => $id, inline => $value, quoted => 1, executed => 2};"
       }
     },
     {
@@ -1408,6 +1408,118 @@
       "replace": {
         "from": "$out .= \"\\n\\$($inner)\" if defined $inner;",
         "to": "1;"
+      }
+    },
+    {
+      "why": "a non-shell body that does not parse as shell stops failing closed, so a Perl body with a stray apostrophe hides `qx/git push origin main/`",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "        die \"Unreadable non-shell body that can run commands\\n\" if $body =~ $CAPABLE;\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "prose counts as a process call, so a Python body reading `it's the file system at` blocks",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "getstatusoutput)\\s*[(\\[\"']};",
+        "to": "getstatusoutput)\\s*[(\\[\\s\"']};"
+      }
+    },
+    {
+      "why": "a backtick counts as a process call, so a Node template literal with a stray apostrophe blocks",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "my $CAPABLE = qr{\\bqx",
+        "to": "my $CAPABLE = qr{`|\\bqx"
+      }
+    },
+    {
+      "why": "an exec call's keyword argument hides its list, so `subprocess.run(args=[\"git\", \"push\", \"origin\", \"main\"])` passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "\\s*\\(?\\s*(?:\\w+\\s*=\\s*)?\\[?\\s*/g",
+        "to": "\\s*\\(?\\s*\\[?\\s*/g"
+      }
+    },
+    {
+      "why": "qx is read only with a bracket, so `qx/git push origin main/` passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "while ($body =~ /(?:\\bqx|%x)\\s*([^\\w\\s])/g) {",
+        "to": "while ($body =~ /(?:\\bqx|%x)\\s*([({\\[<])/g) {"
+      }
+    },
+    {
+      "why": "an inline-code flag's string stays data, so `python3 -c 'import os; os.system(\"git push origin main\")'` passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "if (!$keep && !$arithmetic && lang_inline($simple)) {",
+        "to": "if (0) {"
+      }
+    },
+    {
+      "why": "a paren group is matched before the brace group inside it closes, so `( { cat <<'EOF'; } ) | sh` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "            $finish->($simple, 0);\n            my $closes = @frames && ($frames[-1]{depth} || 0) == $depth && $depth;\n",
+        "to": "            my $closes = @frames && ($frames[-1]{depth} || 0) == $depth && $depth;\n            $finish->($simple, 0);\n"
+      }
+    },
+    {
+      "why": "a group after a reserved word is not a group, so `! (cat <<'EOF') | sh` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "} elsif (!command_words($simple) && $simple !~ /[<>]\\s*\\z/) {",
+        "to": "} elsif ($simple !~ /\\S/) {"
+      }
+    },
+    {
+      "why": "a here-string keeps only its first quoted piece, so `bash <<< git' push origin main'` passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "        $value .= $char;\n        $i++;\n    }\n    return ($value, $i, \\@docs, $visible);",
+        "to": "        $i++;\n    }\n    return ($value, $i, \\@docs, $visible);"
+      }
+    },
+    {
+      "why": "a here-string hides its own substitutions, so `cat <<< \"$(git push origin main)\"` passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "$out .= ' HERESTRING' . $visible . ' ';",
+        "to": "$out .= ' HERESTRING ';"
+      }
+    },
+    {
+      "why": "a wrapper's substitution stays data, so `nohup $(cat <<'EOF' \u2026)` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "return $words[0] =~ $STDIN_WRAPPER || $words[0] =~ m{(?:^|/)xargs$} ? 1 : 0;",
+        "to": "return 0;"
+      }
+    },
+    {
+      "why": "an output process substitution gets no stdin, so `cat <<'EOF' > >(sh)` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "my @stdin = $before eq '>' ? (@command_docs, @arg_docs, @piped_docs) : ();",
+        "to": "my @stdin = ();"
+      }
+    },
+    {
+      "why": "an argument's substitution feeds the command's stdin, so `bash -s -- \"$(cat <<'EOF' \u2026)\"` parses its note as shell and blocks",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "if ($code) { mark(2, @$docs); } else { push @arg_docs, @$docs; }",
+        "to": "if ($code) { mark(2, @$docs); } else { push @command_docs, @$docs; }"
+      }
+    },
+    {
+      "why": "every heredoc body is blanked in the raw view, so `strip_cmd` hides a `bash <<EOF` body and its kubectl apply passes unreminded",
+      "suite": "stateful-op-reminder",
+      "replace": {
+        "from": "grep { !$_->{executed} && $_->{span} } @TOPDOCS",
+        "to": "grep { $_->{span} } @TOPDOCS"
       }
     }
   ]

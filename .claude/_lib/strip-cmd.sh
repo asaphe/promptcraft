@@ -23,7 +23,12 @@ strip_cmd() {
     printf '%s' "$cmd"
     return
   fi
-  if ! _heredoc_is_executed "$cmd"; then
+  # see: README.md § strip-quoted-args.pl, "--bodies" — the helper decides which bodies are code; the regex is its fallback
+  local helper bodies
+  helper="$(dirname "${BASH_SOURCE[0]}")/strip-quoted-args.pl"
+  if [ -r "$helper" ] && bodies=$(printf '%s' "$cmd" | perl "$helper" --bodies 2>/dev/null) && [ -n "$bodies" ]; then
+    cmd=$bodies
+  elif ! _heredoc_is_executed "$cmd"; then
     cmd=$(printf '%s' "$cmd" | perl -0777 -pe \
       's/<<-?["\x27]?([A-Za-z_][A-Za-z0-9_]*)["\x27]?[^\n;&|(`]*\n.*?\n[ \t]*\1\b/<<STRIPPED_HEREDOC>>/gs')
   fi
