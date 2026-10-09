@@ -138,6 +138,7 @@ allow	cd {push_main} && cd -- && git push
 # --- a push inside a shell string runs where this guard cannot follow, so a bare one must name its branch ---
 hard	cd {push_main} && bash -c "git push"
 hard	bash -c 'git push'
+hard	bash -c 'git push"" origin main'
 hard	eval "git push"
 hard	sh -c "cd {push_main} && git push"
 allow	bash -c "git push origin feature/my-branch"
@@ -539,6 +540,7 @@ hard	cd {same_repo_main} && git switch -c feature || true; git push
 hard	cd {same_repo_main} && git checkout -b feature || true; git push -u origin HEAD
 hard	cd {same_repo_main} && git worktree add ../wt-y -b feature; cd ../wt-y; git push -u origin HEAD
 hard	cd {same_repo_main} && if ! git checkout -b feature; then git push -u origin HEAD; fi
+hard	cd {same_repo_main} && if git pull || git checkout -b feature; then git push -u origin HEAD; fi
 hard	cd {same_repo_main} && until git checkout -b feature; do git push -u origin HEAD; done
 hard	cd {same_repo_main} && git checkout -b feature || echo no; git push -u origin HEAD
 allow	cd {same_repo_main} && git checkout -b topic-9 && git push -u origin HEAD

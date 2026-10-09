@@ -685,7 +685,7 @@ ALSO: $1"
 # message; force-push to other refs falls through to the soft tier below.
 # Pattern allows flags between `git` and `push` (e.g., `git -C dir push`).
 PUSH_VIEW=$(strip_redirs "$CMD_MATCH" | sed 's/[;&|]/ & /g')
-# The quote helper keeps a shell string's code, so `bash -c "git push"` ends its push in a quote.
+# A quote can end the verb and git still reads push: `bash -c 'git push"" origin main'`.
 PUSH_GATE_RE="${GIT_SUB_RE}push([\"'[:space:]]|\$)"
 # True when no push in the segment survives removing its quoted strings: it runs inside bash -c, eval or ssh.
 push_in_shell_string() {
