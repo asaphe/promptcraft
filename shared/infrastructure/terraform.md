@@ -1,6 +1,6 @@
 # Terraform Standards
 
-> **Scope:** Universal — applies to any AI coding assistant on any project. Adapt examples to your environment.
+> **Scope:** Cross-tool infrastructure guidance. The numbered layers, S3 backend and workspace names below are project examples; adapt them to your backend, access boundaries and pinned Terraform version.
 
 ## Structure & Organization
 
@@ -12,9 +12,11 @@
 ## State Management
 
 - Use S3 backend with appropriate bucket naming convention
-- Enable encryption and use DynamoDB for state locking
+- Enable encryption and state locking using a mechanism supported by the backend and pinned Terraform version. For S3, use `use_lockfile = true` where supported; DynamoDB locking is deprecated.
 - Use Terraform workspaces for environment and service separation
-- Follow workspace naming: "{env}-{service}-{region}" or "{env}_{tenant}-{service}"
+- Example workspace naming: "{env}-{service}-{region}" or "{env}_{tenant}-{service}"
+
+See [S3 state locking](https://developer.hashicorp.com/terraform/language/backend/s3#state-locking). S3 lockfiles and DynamoDB locking can coexist during a legacy-client migration. Retain existing tables until all clients have migrated; this is not an instruction to delete them.
 
 ### Prefer Direct State Fixes Over Scaffolding Blocks
 
@@ -83,7 +85,7 @@ See [`../principles/modular-composition.md`](../principles/modular-composition.m
 - Use terraform fmt, tflint, and-or checkov for linting and security
 - Avoid data races: reference outputs or data sources, never implicitly rely on apply order
 - Use terraform plan and version control before apply
-- Manage secrets with remote backends (e.g., AWS S3 + DynamoDB + KMS)
+- Protect sensitive state with restricted backend access and encryption (for example, S3 with KMS); locking coordinates writers and is not secret storage.
 
 ## Variables & Configuration
 

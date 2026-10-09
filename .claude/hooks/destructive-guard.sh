@@ -591,7 +591,7 @@ load_segments() {
   else
     # Degrading to whole-command matching is correct, but silent degradation is not observable.
     _SEGS[0]="$CMD_MATCH"
-    hook_diag_event SPLITTER_MISSING "$SPLIT_SEGMENTS"
+    hook_diag_event splitter_missing
   fi
 }
 
@@ -1091,9 +1091,8 @@ if [ -n "$HARD_REASON" ]; then
 fi
 
 if [ -n "$SOFT_REASON" ]; then
-  # Label with the trigger (the text before the em-dash) so ask volume is tunable per trigger.
   # shellcheck disable=SC2034  # read by the sourced hook-diag.sh
-  HOOK_DIAG_DECISION="ask:$(printf '%s' "${SOFT_REASON%% —*}" | tr -d '\n' | cut -c1-40)"
+  HOOK_DIAG_DECISION="ask"
   jq -n \
     --arg reason "$SOFT_REASON" \
     '{

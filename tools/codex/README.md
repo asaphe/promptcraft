@@ -2,6 +2,8 @@
 
 Running a Claude Code setup under OpenAI Codex as well: where each piece lives, and what changes meaning on the way.
 
+This is a focused translation and Bash-hook dispatcher guide, not a full Codex configuration distribution. Dispatcher tests use stub children; they do not certify every translated example in a live client.
+
 ## What's here
 
 - `claude-code-translation.md` — the map from Claude Code to Codex: instruction files, rules, skills, subagents, settings, permissions, MCP, plugins, the `config.toml` fields that need absolute paths, and delegating a task to `codex exec`.

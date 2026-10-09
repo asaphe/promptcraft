@@ -1,6 +1,6 @@
 {
   "name": "Terraform Structure Standards",
-  "description": "Enforces Terraform module structure and organization. Based on terraform-infrastructure.md and project-specific-standards.md",
+  "description": "Terraform guidance to adapt when converting to MDC. Regex patterns are illustrative, not enforcement or complete detection. Based on terraform-infrastructure.md and project-specific-standards.md.",
   "version": "1.0.0",
   "author": "Promptcraft",
   "filePattern": "*.tf",
@@ -18,7 +18,7 @@
     {
       "pattern": "backend\\s+\"s3\"",
       "filePattern": "backend.tf",
-      "message": "Backend should use S3 with encryption and DynamoDB locking",
+      "message": "Enable encryption and state locking supported by the backend and pinned Terraform version. S3 supports use_lockfile; DynamoDB locking is deprecated and coexistence is only a legacy-client migration option. See https://developer.hashicorp.com/terraform/language/backend/s3#state-locking",
       "severity": "warning"
     },
     {

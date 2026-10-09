@@ -22,6 +22,14 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Test tracked Markdown input selection
+        run: python3 .claude/scripts/test-markdownlint-inputs.py
+
+      - name: Select tracked Markdown literal inputs
+        id: inputs
+        run: python3 .claude/scripts/markdownlint-inputs.py --github-output "$GITHUB_OUTPUT"
+
       - uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff # v24.2.0
         with:
           config: ".markdownlint.yaml"
+          globs: ${{ steps.inputs.outputs.globs }}

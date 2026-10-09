@@ -4,7 +4,7 @@ A practical guide to getting the most out of Claude Code, synthesized from commu
 
 ## Three Core Principles
 
-1. **Context management is the primary success factor.** Most failures trace back to bloated context, stale state, or Claude losing track of what matters. Manage your context window obsessively.
+1. **Keep context relevant and current.** Bloated context and stale state can hinder work. Preserve task decisions and load relevant guidance when needed; this is practical advice, not a measured ranking of failure causes.
 2. **Plan before you code.** Every quality source and our own experience confirms: upfront planning prevents rework. Claude is better at executing a clear plan than improvising from a vague prompt.
 3. **Keep systems simple.** Simple control loops outperform multi-agent orchestration. Debuggability matters more than sophistication.
 
@@ -12,7 +12,7 @@ A practical guide to getting the most out of Claude Code, synthesized from commu
 
 ## Context Management
 
-Context is your most constrained resource. Everything else follows from managing it well.
+Treat context as a limited resource. Keep relevant facts current and make deliberate choices about what to load.
 
 ### CLAUDE.md File Design
 

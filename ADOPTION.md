@@ -6,49 +6,103 @@ Nothing here is installed — you copy, paste, edit, commit. The repo is source 
 
 ## Quickstart by goal
 
-Pick the closest match and start there. Each starter set is a minimal viable adoption — copy these and you have something useful in <15 minutes; expand later.
+Choose the standalone baseline first. Hooks, the operations profile, and the scaffold are separate opt-in routes. Run the commands from the promptcraft repository root using Bash. Existing destinations cause a nonzero exit before copying; compare and merge existing configuration manually instead. The guards reject symlinked configuration parents as well as existing or dangling destination links.
 
-### Just give me safety guardrails (any tool with hooks)
+### Standalone global baseline
 
-You already have a Claude Code setup; you want the destructive-operation guards without changing your CLAUDE.md.
+Copy-ready: [global-CLAUDE.md](tools/claude/examples/config/global-CLAUDE.md) installs only user instructions, with no rules, hooks, helpers, plugins, or TODOs. It needs only Claude Code's instruction-loading mechanism; instructions guide behavior rather than enforcing permissions. See [Claude memory documentation](https://code.claude.com/docs/en/memory).
 
-```bash
-# Copy the three core safety hooks to your global Claude Code config
-cp -r tools/claude/examples/hooks/destructive-guard ~/.claude/hooks/
-cp -r tools/claude/examples/hooks/stateful-op-reminder ~/.claude/hooks/
-cp -r tools/claude/examples/hooks/pr-create-guard ~/.claude/hooks/
-
-# Bring along the shared lib the destructive-guard sources.
-# (Each hook sources `$(dirname "$0")/../_lib/<lib>.sh`, so the layout is
-# ~/.claude/hooks/<name>/<name>.sh with _lib/ as a sibling of the hook subdirs.)
-mkdir -p ~/.claude/hooks/_lib
-# .pl too: strip-cmd.sh calls strip-quoted-args.pl from beside itself.
-cp tools/claude/examples/hooks/_lib/*.sh tools/claude/examples/hooks/_lib/*.pl ~/.claude/hooks/_lib/
-```
-
-Then register each hook in `~/.claude/settings.json` per its README. You're done.
-
-### Bootstrap a full Claude Code setup from scratch
-
-You have no `~/.claude/CLAUDE.md` and want the complete example: global rules, safety hooks, and a per-repo `.claude/`.
+<!-- adoption:basic -->
 
 ```bash
-# 1. Global config
-cp tools/claude/examples/config/global-CLAUDE.md ~/.claude/CLAUDE.md
-# Edit it — every section has <TODO> markers. Replace company-specific paths.
-
-# 2. Safety hooks (see "Just give me safety guardrails" above)
-
-# 3. Project-level scaffolding for a specific repo
-cp -r tools/claude/scaffolding/.claude/ /path/to/your-project/.claude/
-# Edit /path/to/your-project/.claude/CLAUDE.md — replace <TODO> markers.
+set -eu
+if [ -L "$HOME/.claude" ] || [ -e "$HOME/.claude/CLAUDE.md" ] || [ -L "$HOME/.claude/CLAUDE.md" ]; then
+  printf '%s\n' 'Configuration collision: compare and merge manually.' >&2
+  exit 1
+fi
+mkdir -p "$HOME/.claude"
+cp tools/claude/examples/config/global-CLAUDE.md "$HOME/.claude/CLAUDE.md"
 ```
 
-Then read [`tools/claude/guides/claude-best-practices.md`](tools/claude/guides/claude-best-practices.md) for the why behind the patterns.
+<!-- /adoption:basic -->
 
-### Assemble a smaller Claude Code setup
+### Optional project operations profile
 
-The example `global-CLAUDE.md` keeps stack-specific rules out of the global file: cloud authentication, Kubernetes contexts and Terraform discipline belong in a project's `.claude/`. To start smaller than the full example, build a personal CLAUDE.md from the stack-agnostic principles under [`shared/principles/`](shared/principles/) — `tone-and-style.md`, `tool-safety.md`, `operational-safety-patterns.md`, `modular-composition.md` — and add stack-specific rules per project from `tools/claude/examples/rules/`.
+Copy-ready after explicit selection: [operations.md](tools/claude/examples/profiles/operations.md) contains six rules for stateful infrastructure work, with no stack or companion-file dependency. Set `PROJECT_DIR` to an existing project you selected (for example, `export PROJECT_DIR="/path/to/your project"`). It loads throughout that project as `.claude/rules/operations.md`, never globally. The scaffold below is a separate starter; review overlap before combining them.
+
+<!-- adoption:operations -->
+
+```bash
+set -eu
+: "${PROJECT_DIR:?Select an existing project with PROJECT_DIR}"
+[ -d "$PROJECT_DIR" ]
+if [ -L "$PROJECT_DIR/.claude" ] || [ -L "$PROJECT_DIR/.claude/rules" ] || [ -e "$PROJECT_DIR/.claude/rules/operations.md" ] || [ -L "$PROJECT_DIR/.claude/rules/operations.md" ]; then
+  printf '%s\n' 'Configuration collision: compare and merge manually.' >&2
+  exit 1
+fi
+mkdir -p "$PROJECT_DIR/.claude/rules"
+cp tools/claude/examples/profiles/operations.md "$PROJECT_DIR/.claude/rules/operations.md"
+```
+
+<!-- /adoption:operations -->
+
+### Optional core safety hooks
+
+Copy-ready dependency bundle: Bash, jq, Perl, git for repository checks, and ordinary shell utilities are required. An authenticated `gh` is optional for the own-PR force-push exemption; without it, that operation asks rather than receiving the exemption. These guards cover their documented patterns, not every possible mutation.
+
+<!-- adoption:hooks -->
+
+```bash
+set -eu
+if [ -L "$HOME/.claude" ] || [ -L "$HOME/.claude/hooks" ]; then
+  printf '%s\n' 'Configuration collision: compare and merge manually.' >&2
+  exit 1
+fi
+for name in destructive-guard stateful-op-reminder pr-create-guard _lib; do
+  if [ -e "$HOME/.claude/hooks/$name" ] || [ -L "$HOME/.claude/hooks/$name" ]; then
+    printf '%s\n' 'Hook collision: compare and merge manually.' >&2
+    exit 1
+  fi
+done
+mkdir -p "$HOME/.claude/hooks"
+cp -R tools/claude/examples/hooks/destructive-guard "$HOME/.claude/hooks/"
+cp -R tools/claude/examples/hooks/stateful-op-reminder "$HOME/.claude/hooks/"
+cp -R tools/claude/examples/hooks/pr-create-guard "$HOME/.claude/hooks/"
+cp -R tools/claude/examples/hooks/_lib "$HOME/.claude/hooks/"
+```
+
+<!-- /adoption:hooks -->
+
+The complete `_lib` directory is required, including `hook-diag.sh`, `pr-author.sh`, `resolve-workdir.sh`, `strip-cmd.sh`, `strip-quoted-args.pl`, and `split-cmd-segments.pl`. Keep it beside the three hook directories. Registration is a separate manual activation step in `~/.claude/settings.json`, using each hook's README and these actual nested script paths (quote paths containing spaces in command strings):
+
+- `~/.claude/hooks/destructive-guard/destructive-guard.sh`
+- `~/.claude/hooks/stateful-op-reminder/stateful-op-reminder.sh`
+- `~/.claude/hooks/pr-create-guard/pr-create-guard.sh`
+
+The optional [merge-grant](tools/claude/examples/hooks/merge-grant/) remains a separate choice with its own dependency and registration review; without it, the destructive guard's default merge policy remains intact. Optional companions and test documentation use public upstream help links; all local Markdown links remain within the selected bundle.
+
+### Optional infrastructure project scaffold
+
+Copy-ready starter after selecting `PROJECT_DIR` as above. It installs `.claude/` rules, agents, skills, docs, and specs; review and customize its TODOs and infrastructure assumptions before use. Public repository links in the copied scaffold are optional help; all local Markdown links stay within the copied tree. No settings registration or hook installation is included.
+
+<!-- adoption:scaffold -->
+
+```bash
+set -eu
+: "${PROJECT_DIR:?Select an existing project with PROJECT_DIR}"
+[ -d "$PROJECT_DIR" ]
+if [ -e "$PROJECT_DIR/.claude" ] || [ -L "$PROJECT_DIR/.claude" ]; then
+  printf '%s\n' 'Configuration collision: compare and merge manually.' >&2
+  exit 1
+fi
+cp -R tools/claude/scaffolding/.claude "$PROJECT_DIR/.claude"
+```
+
+<!-- /adoption:scaffold -->
+
+### Advanced reference and specialized examples
+
+[global-CLAUDE-advanced.md](tools/claude/examples/config/global-CLAUDE-advanced.md) preserves the full opinionated author profile for browsing and section-by-section adaptation in its source layout. It is reference-only, not a complete runtime installation. Specialized [rules](tools/claude/examples/rules/) remain browse/adapt material; do not bulk activate them.
 
 ### Cursor starter pack
 
@@ -88,38 +142,13 @@ The full per-tool sections below cover the same paths plus the rest of the optio
 
 ## Claude Code
 
-### 1. Fastest path: grab the global CLAUDE.md template
+Use the four guarded recipes above; they are the only Claude copy-ready routes declared here. The [manifest](.claude/evals/adoption-manifest.json) lists the artifacts, required destination paths, and optional upstream source links. CI executes the actual delimited snippets in isolated temporary homes and projects, checks bytes and dependencies, checks all copied Markdown links, and rejects collisions. This verifies copy/setup behavior, not live Claude integration.
 
-The single highest-leverage file:
+The `tools/claude/examples/hooks/` directory includes retained executable examples and migration stubs. [RETIRED.md](tools/claude/examples/RETIRED.md) maps withdrawn scripts and examples moved into maintained plugins. Remove any retired settings registration before deleting its local script.
 
-```bash
-cp tools/claude/examples/config/global-CLAUDE.md ~/.claude/CLAUDE.md
-```
+Start with `destructive-guard` (hard-blocks pushes to main — force included — and destructive AWS commands), `stateful-op-reminder` (nudges before AWS/K8s/DB mutations), and `pr-create-guard` (checks PR creation prerequisites). Select Kubernetes targets explicitly with kubectl `--context` or Helm `--kube-context`; the automatic context injector is retired.
 
-Edit it — every section has `<TODO>` markers and inline comments. Replace company-specific paths, add your own on-demand docs, prune domains you don't work in.
-
-### 2. Extend with hooks
-
-The `tools/claude/examples/hooks/` directory has 30 production-tested hook directories, each with a script (most with a README), plus 5 pointer stubs for hooks that moved into maintained plugins ([RETIRED.md](tools/claude/examples/RETIRED.md) maps those).
-
-```bash
-# Copy a hook:
-cp -r tools/claude/examples/hooks/destructive-guard ~/.claude/hooks/
-
-# Register it in ~/.claude/settings.json (see the hook's README for exact JSON).
-```
-
-Start with `destructive-guard` (hard-blocks pushes to main — force included — and destructive AWS commands), `stateful-op-reminder` (nudges before AWS/K8s/DB mutations), and `kubectl-context-inject` (auto-injects `--context` on every kubectl command).
-
-### 3. Project-level `.claude/`
-
-For repo-scoped rules, agents, and skills, use the scaffolding:
-
-```bash
-cp -r tools/claude/scaffolding/.claude/ /path/to/your-project/.claude/
-```
-
-Then read [`tools/claude/guides/claude-best-practices.md`](tools/claude/guides/claude-best-practices.md) end-to-end — it's the reference for what goes in `.claude/CLAUDE.md`, when to define agents, and when to write skills.
+Read [claude-best-practices.md](tools/claude/guides/claude-best-practices.md) for the broader reference. Other tools below retain their paste, conversion, and translation routes; these checks do not validate their live UIs.
 
 ## Cursor
 

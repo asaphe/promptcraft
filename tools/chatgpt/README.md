@@ -2,7 +2,7 @@
 
 ## Overview
 
-ChatGPT has character limits (~1500 chars per field) for custom instructions, requiring condensed versions of our comprehensive rules. This directory provides optimized ChatGPT instruction sets.
+ChatGPT has character limits (~1500 chars per field) for custom instructions, requiring condensed versions of our comprehensive rules. This directory provides condensed global and project instruction examples to paste and adapt. It is not an automated setup or a live-UI-tested installation.
 
 ## Structure
 

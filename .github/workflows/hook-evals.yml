@@ -25,6 +25,11 @@ jobs:
       # Printed rather than assumed: runner.py's annotations need 3.10+, and a failure here should name the reason.
       - run: python3 --version
 
+      - name: Check documented adoption recipes and checker failure controls
+        run: |
+          python3 .claude/scripts/check-adoption.py
+          python3 .claude/scripts/test-check-adoption.py
+
       # Before the suite: it only exercises the .claude/ copy, so drift in the published example is invisible to it.
       - name: Check dogfooded copies match the published examples
         run: python3 .claude/scripts/check-mirrors.py
@@ -35,6 +40,13 @@ jobs:
 
       - name: Run hook evals
         run: python3 .claude/evals/runner.py
+
+      - name: Check published output contracts and metadata-only diagnostics
+        run: |
+          python3 tools/claude/examples/hook-tests/probe-hooks.py --hooks-dir tools/claude/examples/hooks
+          python3 tools/claude/examples/hook-tests/probe-hooks.py --selftest
+          python3 tools/claude/examples/hook-tests/test-hook-contracts.py
+          python3 tools/claude/examples/hook-tests/test-hook-diag.py
 
       # Every suite a mutation runs must also pass unmutated in this job: the scorer counts a red suite as a catch.
       - name: Check Bash expansion semantics and published guard fixtures

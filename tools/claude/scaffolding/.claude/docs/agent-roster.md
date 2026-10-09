@@ -20,7 +20,9 @@ Review agents are read-only — they produce findings but never modify files.
 
 ## Adding more agents
 
-Use [`../../../templates/agents/agent-template.md`](../../../templates/agents/agent-template.md) as the starting point. Common follow-on agents to consider as your project grows:
+Public repository links are optional upstream browsing help.
+
+Use [`../../../templates/agents/agent-template.md`](https://github.com/asaphe/promptcraft/blob/main/tools/claude/templates/agents/agent-template.md) as the starting point. Common follow-on agents to consider as your project grows:
 
 - A **deploy-expert** for deployment-specific Terraform (workspace patterns, helm-values config, ST/MT distinctions).
 - A **k8s-troubleshooter** for pod-level failures (OOM, networking, readiness probes).

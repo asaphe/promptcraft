@@ -84,6 +84,8 @@ Register the Stop hook in `~/.claude/settings.json`:
 
 `session-log.sh` finds `session-log-derive.py` beside itself and `_lib/hook-diag.sh` one directory up, so keep the layout of this repo when copying — or edit the two paths at the top of the script.
 
+Its helper diagnostics contain only the closed metadata described in [`_lib/`](../_lib/), including fixed degradation events and `notify`; they retain no transcript paths, derive errors or session IDs. This restriction applies to diagnostic logs, not the intentional per-session Markdown log described above.
+
 The hook never blocks and never writes to stderr on a non-zero exit. Both are deliberate: a Stop hook that forces narration pushes the session's real answer above the fold, and a logger that can wedge a yield is worse than no logger.
 
 ## Reading the logs

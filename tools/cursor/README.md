@@ -1,6 +1,8 @@
 # Cursor Integration
 
-Cursor-specific adaptations of promptcraft content. Universal rules live under `../../shared/`; this directory holds Cursor-specific adaptations and starter rules in Cursor's two native formats (User Rules and Project Rules).
+Cursor-specific adaptations of promptcraft content. Cross-tool guidance lives under `../../shared/`; this directory holds Cursor-specific adaptations and starter rules in Cursor's two native formats (User Rules and Project Rules).
+
+The collection provides pasteable User Rules, one ready Project Rule (`kubernetes-helm.mdc`), and JSON templates that require conversion. It is reference material, not a complete validated Cursor installation; the repository's Claude copy checks do not test the Cursor UI.
 
 ## Layout
 
@@ -57,7 +59,7 @@ Recommended starter set:
 
 - `core-principles.md` — communication discipline, verification, scope.
 - `code-quality.md` — linting, formatting, review gates.
-- `general-principles.md` — universal naming and environment conventions.
+- `general-principles.md` — source identifier conventions and environment guidance.
 
 Add language- or infra-specific files as relevant to your work.
 

@@ -53,7 +53,7 @@ Hooks are defined in `settings.json` (global `~/.claude/settings.json` or projec
 
 - **Empty string `""`** — Matches all tool calls / all events
 - **Tool name `"Bash"`** — Matches only that specific tool
-- **Glob pattern `"Bash(*git*)*"`** — Matches tool calls where the input contains the pattern
+- **Regex `"^(Bash|Edit)$"`** — Matches tool names. Filter command content inside the script or with a documented handler `if` condition, not a tool-name matcher.
 
 ### Hook Input
 
@@ -80,53 +80,35 @@ Hooks receive a JSON payload on stdin with context about the event:
 
 ### Hook Output
 
-Hooks communicate back via exit codes and optional stdout/stderr:
+Hooks communicate through exit codes and event-specific JSON. [Official hooks documentation](https://code.claude.com/docs/en/hooks#pretooluse-decision-control) defines the contract; the published tests validate harness output, not live client integration.
 
-| Exit Code | Effect |
-|-----------|--------|
-| `0` | Tool call proceeds (default). Optional JSON stdout for advisory signals. |
-| `2` | **Hard block** — tool call is stopped before permission rules are evaluated. Reason on stderr is shown to Claude. |
-| Other non-zero | Treated as hook error; tool call proceeds. |
+| Output | Meaning for PreToolUse |
+|---|---|
+| Exit 0, silent | No decision; normal permission flow continues. |
+| Exit 2 with stderr | Blocking error with a visible reason. |
+| Nested `permissionDecision: allow` / `ask` / `deny` | Allow, request user permission, or deny the call. |
+| Nested `permissionDecision: defer` | Defer to a calling integration in non-interactive mode; ignored in interactive sessions. |
+| Legacy top-level `decision: approve` / `block` | Deprecated aliases for `allow` / `deny`. |
+| Nested `permissionDecision: block` | Invalid enum; never use it. |
 
-#### Hard Blocks (exit 2) vs Soft Blocks (JSON)
-
-This distinction is critical for hooks that coexist with wildcard permissions like `Bash(*)`:
-
-| Method | How | Overridden by allow list? |
-|--------|-----|--------------------------|
-| `exit 2` + stderr | Hard block — stops before permissions | **No** — always blocks |
-| JSON `"decision": "block"` + `exit 0` | Soft signal — evaluated with permissions | **Yes** — `Bash(*)` overrides it |
-
-**Always use exit code 2 for safety guardrails.** If your hook uses JSON `"decision": "block"` with exit 0, and the user has `Bash(*)` in their allow list, the block is silently overridden — the command executes without any prompt.
+Exit-0 stderr is not delivered to Claude. Nonzero codes other than 2 with no valid structured output are non-blocking errors; current documentation also permits valid JSON to determine the outcome on those codes. Prefer exit 0 for structured decisions and exit 2 for a blocking error.
 
 ```bash
-# Hard block pattern (recommended for safety hooks)
 if [ -n "$REASON" ]; then
   echo "$REASON" >&2
   exit 2
 fi
-
-# Soft block pattern (for advisory hooks where allow list should win)
-if [ -n "$REASON" ]; then
-  jq -n --arg r "$REASON" '{"decision":"block","reason":$r}'
-  exit 0
-fi
 ```
 
-#### The third mechanism: `permissionDecision`
-
-Exit codes and `"decision"` are not the whole surface. A PreToolUse hook can also return a `hookSpecificOutput` object whose `permissionDecision` is `allow`, `ask`, or `deny`:
+For a legitimate operation that requires confirmation, return `ask` with its reason:
 
 ```bash
-# Force a prompt for this specific invocation, even under a broad allow list
 jq -n --arg r "$REASON" \
   '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"ask",permissionDecisionReason:$r}}'
 exit 0
 ```
 
-`ask` is the mechanism with no equivalent among the exit codes: it neither blocks nor waves through, it puts the decision in front of the user with your reason attached. That makes it the right choice for a command that is legitimate but whose blast radius the user should see first — where `exit 2` would be too strict and a soft block too weak.
-
-The same object carries `updatedInput`, which is how a rewrite hook returns a modified command alongside `permissionDecision: "allow"`.
+`hookSpecificOutput.updatedInput` can carry an object with revised tool input for PreToolUse. Select environments explicitly; rewriting a command is not a substitute for approving its target.
 
 #### Stop hooks can block the yield
 
@@ -152,7 +134,8 @@ INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 if echo "$COMMAND" | grep -qE '(git push --force|git reset --hard|rm -rf)'; then
-  echo '{"decision": "block", "reason": "Destructive command blocked. Use --force-with-lease or confirm with user first."}'
+  echo "Destructive command blocked. Confirm the exact operation with the user." >&2
+  exit 2
 fi
 ```
 
@@ -168,36 +151,33 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 if echo "$COMMAND" | grep -q 'git commit'; then
   if ! npm test --silent 2>/dev/null; then
-    echo '{"decision": "block", "reason": "Tests failing. Fix tests before committing."}'
+    echo "Tests failing. Fix tests before committing." >&2
+    exit 2
   fi
 fi
 ```
 
 ### 3. Self-Check Reminders (Stop)
 
-Display non-blocking reminders after Claude finishes:
+Display a non-blocking reminder to the user after Claude finishes. `systemMessage` does not ask Claude to perform another check; use a precise Stop blocking condition and `reason` when that is required.
 
 ```bash
 #!/bin/bash
-# stop-check.sh — Analyze edited files for risky patterns
 INPUT=$(cat)
-# Parse session context, check for patterns like try-catch without logging,
-# async without error handling, DB operations without transactions
-echo '{"message": "Reminder: Check error handling in async functions and DB operations."}'
+echo '{"systemMessage": "Reminder: Check error handling in async functions and DB operations."}'
 ```
 
-### 4. Skill Auto-Activation (PreToolUse)
+### 4. Skill Auto-Activation (UserPromptSubmit)
 
-Inject skill reminders based on prompt content. This solves the problem of manual skills being forgotten ~90% of the time:
+Inject a reminder based on prompt content; this suggests an installed skill and does not activate it automatically:
 
 ```bash
 #!/bin/bash
-# auto-activate.sh — Matched on UserPromptSubmit
 INPUT=$(cat)
-PROMPT=$(echo "$INPUT" | jq -r '.tool_input.prompt // empty')
+PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty')
 
 if echo "$PROMPT" | grep -qiE '(deploy|release|rollout)'; then
-  echo '{"message": "Consider using /deploy skill for this task."}'
+  echo '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"Consider using /deploy skill for this task."}}'
 fi
 ```
 
@@ -355,28 +335,18 @@ Hooks follow the same layering as settings:
 |-----------|-----------|-----|
 | Auto-lint on edit (PostToolUse) | **Project** | Everyone benefits from consistent formatting |
 | Destructive command guard (PreToolUse) | **Global** | Personal safety preference, applies everywhere |
-| Pre-push quality gate (PreToolUse) | **Global** | Personal quality bar, may differ between team members |
+| Repository lint/test gate | **Project / CI** | Uses that repository’s actual commands and dependencies |
 | Learning capture (SessionStart/End) | **Project** | Shared learning system, team-wide benefit |
 | Stale reference detection | **Project** | Repo-specific validation, committed with the repo |
 | Notification on idle (Notification) | **Global** | Personal workflow preference |
 
 **Principle:** If the hook enforces a team standard (linting, formatting, testing), put it at project level. If it reflects a personal preference (safety guards, notifications, quality bar), put it at global level. If it's experimental, put it at local level until proven.
 
-### Multiple hooks on one event: the override race
+### Multiple hooks on one event
 
-Multiple hooks registered on the same event run sequentially, but **"any block wins" is not a guarantee you can rely on when the hooks return different kinds of output.** A hook that returns `updatedInput` — a rewriter, a proxy, a context injector — is returning a decision about the same tool call as an earlier hook's block, and the later response can end up being the one that takes effect. The failure is silent: the command runs, rewritten, with no sign that a guard ever objected.
+[Matching hooks run in parallel](https://code.claude.com/docs/en/hooks), not in registration order. PreToolUse permission decisions combine with precedence `deny > defer > ask > allow`; do not assume a rewriter overrides a block or that one hook receives another hook's rewritten input.
 
-This matters most in the arrangement that invites it: a chain of separately-registered PreToolUse hooks where one rewrites commands and another blocks dangerous ones. That is a guard which fails *open*, and it fails open on exactly the commands the guard exists for.
-
-**The fix is structural, not ordering.** Consolidate everything that can decide the fate of one tool call into a single authority script with an explicit internal precedence:
-
-```text
-block  >  ask  >  rewrite  >  allow
-```
-
-One hook registration, one exit path, one place where precedence is written down and can be tested. Sub-checks become functions inside it rather than separate registrations. You lose the tidiness of one file per concern and gain a guard whose failure mode you can actually reason about — and a single fixture suite can then assert the precedence directly, which is impossible when the outcome depends on registration order.
-
-If you keep hooks separate, never mix a blocking guard and a rewriting hook on the same event and matcher.
+If your checks must run in a particular sequence, use one wrapper with explicit precedence and test that sequence. Independent checks can remain separate registrations. A wrapper is an implementation choice, not a workaround for a demonstrated block-override defect.
 
 ## Token Optimization via Command Rewriting
 
@@ -399,7 +369,7 @@ See `../examples/hooks/rtk/` for a production implementation.
 
 A two-tier PreToolUse hook for destructive operations. **Hard blocks** (exit 2) for irreversible data loss — cannot be overridden. **Soft blocks** (JSON + exit 0) for risky-but-approvable actions — user sees a warning and can approve in the permission prompt.
 
-This solves the tension between safety and usability: `exit 2` for everything is too strict (blocks operations the user explicitly asked for), while JSON-only is too weak (`Bash(*)` silently overrides it).
+This solves the tension between safety and usability: `exit 2` for everything is too strict (blocks operations the user explicitly asked for), while an `ask` decision gives the user an approval path.
 
 See `../examples/hooks/destructive-guard/` for a production implementation with two-tier blocking, customization examples for Terraform, kubectl, Helm, and AWS.
 
@@ -427,8 +397,8 @@ Hooks can fail silently, leaving the impression they're protecting you when they
 | Failure Mode | Symptom | Prevention |
 |-------------|---------|------------|
 | Script not executable | Tool call proceeds unblocked | `chmod +x` and test before registering |
-| Invalid JSON output | Claude treats output as empty (proceeds) | Pipe through `jq` in testing |
-| Script exits non-zero without JSON | Treated as "no opinion" (proceeds) | Always exit 0; use JSON `decision` field to block |
+| Invalid JSON output | No valid hook decision | Test JSON shape and event-specific enums, not just parseability |
+| Exit 1 mistaken for a block | Non-blocking error without valid JSON | Use exit 2 with stderr for a blocking error |
 | Matcher too broad | Every tool call triggers the hook | Test matcher against common tool calls (`Edit`, `Read`, `Bash`) |
 | Matcher too narrow | Hook never fires for target pattern | Test with exact tool input strings from a real session |
 | Hook timeout | Kills hook, proceeds without it | Add `timeout 2` wrapper; profile with `time` |
@@ -440,7 +410,7 @@ Hooks can fail silently, leaving the impression they're protecting you when they
 echo '{"tool_name":"Bash","tool_input":{"command":"git push --force"}}' | ./your-hook.sh
 ```
 
-Verify the output is valid JSON and the exit code is 0.
+Verify the expected event-specific output and exit status, including positive and negative controls.
 
 ## Performance Considerations
 
@@ -489,11 +459,11 @@ See the [Session Analytics Guide](session-analytics-guide.md) for queries and me
 
 A soft block that fires on work the user would have approved anyway costs more than a keystroke: an approver who clicks through ten routine prompts clicks through the eleventh. Prune prompts by measurement, never by feel:
 
-1. **Label every ask with its trigger.** An ask and a plain allow both exit 0, so prompt volume is invisible unless the hook records it. `destructive-guard` sets `HOOK_DIAG_DECISION=ask:<trigger>`, and [`hook-diag.sh`](../examples/hooks/_lib/README.md) appends each one to an ask log: `grep '^decision=ask' ~/.claude/local/hook-ask-decisions.log | sort | uniq -c | sort -rn`.
-2. **Count asks per trigger over a real window**, then read a sample of each high-volume trigger's commands and sort them. Would your rules have the agent run this unasked — its own branch, its own PR, a read the pattern misclassifies — or does it need a human?
-3. **Exempt only the class you measured, with a predicate that proves membership from live state** — who opened the PR, which commits a push overwrites — never from a name, a path or a branch prefix. Every lookup it makes fails closed, back to the prompt.
-4. **Ship each exemption with three controls known in advance:** a case it must exempt, a case that must still ask, and one with its input unavailable, where it must keep the prompt. Disable the predicate and confirm the exempt case goes red.
-5. **Re-measure after shipping**, at every site the exemption touches. A trigger whose volume did not move was exempted for the wrong class.
+1. **Count ask volume as closed metadata.** `destructive-guard` sets `HOOK_DIAG_DECISION=ask`; [`hook-diag.sh`](../examples/hooks/_lib/README.md) writes JSON Lines with no command or reason content. Count with `jq -r '.decision' ~/.claude/local/hook-ask-decisions.log | sort | uniq -c`.
+2. **Investigate a high count with deliberate, inert reproductions.** These logs cannot group by trigger or reconstruct commands. Do not infer an exemption from counts alone.
+3. **Exempt only a verified class with a predicate proving membership from live state**, such as PR authorship and overwritten commits; every lookup fails closed to the prompt.
+4. **Ship three controls:** one that must exempt, one that must ask, and one with unavailable input that must retain the prompt. Disable the predicate and confirm the exempt case goes red.
+5. **Re-measure after shipping**, retaining isolated log paths for tests.
 
 Two moves stay off the table: turning a prompt into a silent pass for a class nobody measured, and turning a hard block into a standing prompt because blocks are inconvenient — that trades "unapprovable" for "approvable by a stray keystroke". The narrower move is a grant the user's own words arm for one turn. Worked examples: [destructive-guard's own-PR lease](../examples/hooks/destructive-guard/README.md#own-pr-lease) and the [PR grant](../examples/hooks/merge-grant/README.md#the-pr-grant).
 
@@ -501,7 +471,7 @@ Two moves stay off the table: turning a prompt into a silent pass for a class no
 
 | Mistake | Fix |
 |---------|-----|
-| Hook blocks everything because matcher is too broad | Use specific tool names or glob patterns |
+| Hook blocks everything because matcher is too broad | Use specific tool names or tool-name regexes; filter command content inside the script or a handler `if` condition |
 | Hook silently fails (no output) | Always test with sample JSON before registering |
 | Hook consumes too many resources | Profile with `time` command; keep under 100ms |
 | Hook output isn't valid JSON | Validate with `jq` before deploying |
@@ -512,7 +482,7 @@ Two moves stay off the table: turning a prompt into a silent pass for a class no
 
 ## Hook Catalog
 
-Production-tested hook examples with README documentation:
+Retained hook examples and retired migration stubs with README documentation:
 
 ### Safety & Guardrails
 
@@ -520,23 +490,23 @@ Production-tested hook examples with README documentation:
 |------|------|---------|---------|
 | [Destructive Guard](../examples/hooks/destructive-guard/) | PreToolUse | Two-tier blocking for irreversible operations | Hard (exit 2) + Soft (JSON) |
 | [Merge Grant](../examples/hooks/merge-grant/) | UserPromptSubmit, PostToolUse | Arms one-turn merge and PR grants from the user's own prompt (PR only from a menu answer), read by Destructive Guard | No (context) |
-| [Review Verification Guard](../examples/hooks/review-verification-guard/) | PreToolUse | Verification checklist before posting PR reviews/comments | Soft |
+| [Review Verification Guard](../examples/hooks/review-verification-guard/) | Migration stub | Review protocol/kernel and maintained review plugin | Retired |
 | [Memory Guard](../examples/hooks/memory-guard/) | PreToolUse (Write) | Blocks project memory writes for multi-clone repos | Hard (exit 2) |
 | [1Password Read Guard](../examples/hooks/op-read-guard/) | PreToolUse | Blocks raw secret reads, redirects to a masked cache (ships in [claude-secret-guard](https://github.com/asaphe/claude-secret-guard)) | Hard |
-| [CI Polling Guard](../examples/hooks/ci-polling-guard/) | PreToolUse | Blocks sleep-based CI polling loops | Soft |
+| [CI Polling Guard](../examples/hooks/ci-polling-guard/) | Migration stub | Use `gh run watch --exit-status` where supported; deliberate sleeps remain valid | Retired |
 
 ### Command Rewriting & Optimization
 
 | Hook | Type | Purpose | Blocks? |
 |------|------|---------|---------|
 | [RTK Rewrite](../examples/hooks/rtk/) | PreToolUse | Token-optimized command rewriting via external binary | No (rewrites) |
-| [kubectl Context Inject](../examples/hooks/kubectl-context-inject/) | PreToolUse | Auto-injects `--context` into kubectl/helm commands | No (rewrites) |
+| [kubectl Context Inject](../examples/hooks/kubectl-context-inject/) | Migration stub | Select target explicitly; kubectl `--context`, Helm `--kube-context` | Retired |
 
 ### Quality Gates
 
 | Hook | Type | Purpose | Blocks? |
 |------|------|---------|---------|
-| [Pre-Push Quality](../examples/hooks/pre-push-quality/) | PreToolUse | Multi-language linting gate before `git push` | Soft |
+| [Pre-Push Quality](../examples/hooks/pre-push-quality/) | Migration stub | Use repository-native lint/test commands and CI | Retired |
 | [Auto Lint](../examples/hooks/auto-lint/) | PostToolUse | Run linter/formatter after file edits | No (auto-fix) |
 | [Stale Ref Detection](../examples/hooks/stale-ref-detection/) | PreToolUse | Detect deleted files still referenced in docs | Soft |
 | [PR Edit Counter](../examples/hooks/pr-edit-counter/) | PreToolUse | Warns after 2+ body edits on same PR | No (advisory) |

@@ -38,14 +38,15 @@ gh pr diff "$PR_NUMBER"
 
 If a finding cannot be mapped to a specific diff line (e.g., a missing file or a repo-wide consistency issue), include it in the `body` summary instead.
 
-## Posting strategy — per-comment endpoint primary, bulk-review only for the summary
+## Posting strategy — choose and verify the result
 
-> **Important:** the `POST /pulls/{n}/reviews` endpoint with a `comments[]` array (the "bulk" path) is known to **silently drop inline comments** in some cases — comments don't appear on the PR even when the API returns 201. The reliable pattern is:
->
-> 1. Post each inline finding via `POST /pulls/{n}/comments` per-comment with `commit_id`, `path`, `line`, `side: "RIGHT"`.
-> 2. Then submit a final review with `gh pr review --request-changes` / `--comment` and a `--body` that summarizes counts. This sets the review state visible on the PR page; without it, the inline comments aren't grouped under a "review" event.
->
-> The bulk path (`POST /reviews` with `comments[]`) is shown below for reference and remains useful for **CI contexts** where a single atomic API call is preferred and the silent-drop risk is acceptable, or for posting a summary with zero inline comments. For interactive review by an agent, prefer the per-comment path.
+The [GitHub create-review API](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request) supports a `comments` array. This guide prefers individual comment requests so each finding has its own response to inspect; it does not establish a defect in bulk review creation.
+
+1. Post each inline finding via `POST /pulls/{n}/comments` with `commit_id`, `path`, `line`, and `side: "RIGHT"`.
+2. Read back the returned comment IDs and verify the intended path, line and body.
+3. Submit a final review with `gh pr review --request-changes` or `--comment` and a summary. This sets the review state; it does not retroactively attach previously posted standalone comments to that review.
+
+Alternatively, create a review with its inline comments in one request. For either method, inspect errors and read back the created review and comments before claiming publication succeeded.
 
 ## Build the per-comment posts (recommended)
 
@@ -73,7 +74,7 @@ REVIEWEOF
 # or --comment for advisory-only review
 ```
 
-## Bulk-review payload (alternative, with caveat above)
+## Bulk-review payload (supported alternative)
 
 Write the review payload to a temp file — this avoids shell quoting issues with the `gh api` call.
 

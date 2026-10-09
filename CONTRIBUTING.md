@@ -39,6 +39,22 @@ Thank you for considering a contribution. This repository is a living collection
 - Keep headings hierarchical (no skipping levels)
 - Run `markdownlint .` before submitting — CI enforces it
 
+## Adoption and Markdown coverage checks
+
+Run these from the repository root after changing copy routes, dependencies, or lint inputs:
+
+```bash
+python3 .claude/scripts/check-adoption.py
+python3 .claude/scripts/test-check-adoption.py
+python3 .claude/scripts/test-markdownlint-inputs.py
+python3 .claude/scripts/markdownlint-inputs.py
+markdownlint -c .markdownlint.yaml '**/*.md'
+```
+
+The local markdownlint command remains available. CI instead uses `git ls-files -z` to select tracked `.md` and `.markdown` files, including hidden directories, minus the nine exact paths in `.markdownlintignore`. The generator emits `:path` literal inputs directly to the pinned CLI2 action; it does not use shell-expanded globs. Newly created files enter this corpus when tracked. Keep the exclusions unchanged unless a separate decision approves a format or scope change.
+
+The adoption checker executes only the four delimited copy/setup snippets from ADOPTION in temporary homes/projects, without settings registration, model invocation, network calls, or cloud tools. Temporary HOME provides test isolation, not a security sandbox; snippets are reviewed repository code. Local Markdown links in copied artifacts and the manifest's optional public source links are checked locally against repository targets. Optional companions remain public browsing references, not additional installed dependencies.
+
 ## Code of Conduct
 
 Be respectful, constructive, and focused on making the repository better. Disagreements about patterns are welcome — frame them as trade-offs, not absolutes.

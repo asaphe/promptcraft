@@ -36,7 +36,7 @@ Soft blocks emit `permissionDecision: ask` JSON on stdout and exit 0. Claude Cod
 
 | Pattern | Why |
 |---------|-----|
-| `gh pr create` | Visible shared action; no prompt in a turn whose prompt asked for a PR ([`merge-grant`](../merge-grant/)) |
+| `gh pr create` | Visible shared action; no prompt in a turn whose prompt asked for a PR ([`merge-grant`](https://github.com/asaphe/promptcraft/blob/main/tools/claude/examples/hooks/merge-grant/README.md)) |
 | `gh stack submit/link/unstack` | Acts on every PR in the stack, not one |
 | `gh issue <mutating verb>`, `gh api .../issues` with a method or field | Files an external artifact under your GitHub identity |
 | `gh run delete` | Permanently removes CI run history |
@@ -106,7 +106,7 @@ The loop form **extracts the body between `do` and `done`** rather than matching
 
 The four merge forms share one gate, and each hard-block message names all four, because a reader who trips one retries with another. On its own this hook hard-blocks all of them. The GraphQL form carries its mutation in quoted data or a heredoc body, both of which the parsed views drop, so that rule reads `mergePullRequest` and `enablePullRequestAutoMerge` from the raw command; a mutation in a `--input` or `-F query=@file` payload never reaches the hook as text.
 
-Installed with [`merge-grant`](../merge-grant/), a merge becomes a permission prompt in exactly one case: the user's latest prompt asked for it. The prompt quotes that request so the approver can check the PR is one it names. The grant lasts until the user's next prompt, is scoped to its session, and every unusable state — no session id, an expired or unparseable grant, one written for another session — falls back to the hard block. `gh stack merge` says in its prompt that every layer beneath the target must be one the user named, since it lands all of them.
+Installed with [`merge-grant`](https://github.com/asaphe/promptcraft/blob/main/tools/claude/examples/hooks/merge-grant/README.md), a merge becomes a permission prompt in exactly one case: the user's latest prompt asked for it. The prompt quotes that request so the approver can check the PR is one it names. The grant lasts until the user's next prompt, is scoped to its session, and every unusable state — no session id, an expired or unparseable grant, one written for another session — falls back to the hard block. `gh stack merge` says in its prompt that every layer beneath the target must be one the user named, since it lands all of them.
 
 A grant never lifts a hard block raised by anything else in the same command: `gh pr merge --admin` — checked on the values view, so `F=--admin; gh pr merge 17 $F` counts — or a merge chained with `git clean -f` still exits 2.
 
@@ -180,7 +180,7 @@ This hook ships twice: `tools/claude/examples/hooks/destructive-guard/` is what 
 }
 ```
 
-Requires `jq` and `perl` on PATH, plus `../_lib/hook-diag.sh`, `../_lib/strip-quoted-args.pl`, and `../_lib/split-cmd-segments.pl` installed under the same parent directory as the hook. The [own-PR lease](#own-pr-lease) also needs `../_lib/pr-author.sh` and an authenticated `gh`; without them that push asks, as every other force-push does. Update the guard and helpers together. To let the agent merge, or open a PR without a second prompt, when the user asks, also register [`merge-grant`](../merge-grant/); the guard reads its store from `$CLAUDE_MERGE_GRANT_DIR` (default `~/.claude/merge-grants`).
+Requires `jq` and `perl` on PATH, plus `../_lib/hook-diag.sh`, `../_lib/strip-quoted-args.pl`, and `../_lib/split-cmd-segments.pl` installed under the same parent directory as the hook. The [own-PR lease](#own-pr-lease) also needs `../_lib/pr-author.sh` and an authenticated `gh`; without them that push asks, as every other force-push does. Update the guard and helpers together. To let the agent merge, or open a PR without a second prompt, when the user asks, also register [`merge-grant`](https://github.com/asaphe/promptcraft/blob/main/tools/claude/examples/hooks/merge-grant/README.md); the guard reads its store from `$CLAUDE_MERGE_GRANT_DIR` (default `~/.claude/merge-grants`).
 
 ## Testing
 
@@ -188,7 +188,7 @@ The repo's own copy of this hook is covered by `.claude/evals/destructive-guard/
 
 Cases whose behaviour depends on real git state carry `setup`/`cleanup` shell snippets — branch detection cannot be exercised without a repository to detect a branch in. A failing `setup` fails the case rather than letting it pass against a fixture that was never created.
 
-The published [hook tests](../../hook-tests/) also exercise expansion syntax against Bash with inert command stubs, then check the guard verdict. Run `python3 tools/claude/examples/hook-tests/test-expansion-semantics.py` from the repository root. Its selected fixture scripts execute with a temporary-only `PATH`, controlled startup files, and temporary working directories; the corpus must still be reviewed before execution.
+The published [hook tests](https://github.com/asaphe/promptcraft/blob/main/tools/claude/examples/hook-tests/README.md) also exercise expansion syntax against Bash with inert command stubs, then check the guard verdict. Run `python3 tools/claude/examples/hook-tests/test-expansion-semantics.py` from the repository root. Its selected fixture scripts execute with a temporary-only `PATH`, controlled startup files, and temporary working directories; the corpus must still be reviewed before execution.
 
 The own-PR lease reads live state — the commits under the lease and the PR's author — so `tools/claude/examples/hook-tests/test-force-push-lease.py` builds it per case: a real repository whose `origin` is a GitHub URL and a `gh` stub on `PATH`. Every `allow` case there answers `ask` with the predicate disabled.
 
@@ -232,4 +232,4 @@ The two-tier approach gives you both: unconditional safety for irreversible oper
 
 - **[`stateful-op-reminder`](../stateful-op-reminder/)** — Nudges (does not block) when detecting mutations to external systems. Catches plausible-looking API calls that destructive-guard can't pattern-match.
 - **[`pr-create-guard`](../pr-create-guard/)** — Verifies pre-creation conditions before allowing `gh pr create`.
-- **[`merge-grant`](../merge-grant/)** — Turns a merge into a permission prompt, and drops the `gh pr create` prompt, for the one turn whose prompt asked for it.
+- **[`merge-grant`](https://github.com/asaphe/promptcraft/blob/main/tools/claude/examples/hooks/merge-grant/README.md)** — Turns a merge into a permission prompt, and drops the `gh pr create` prompt, for the one turn whose prompt asked for it.

@@ -1,8 +1,8 @@
 # Hooks Reference
 
-An example of documenting a full hook set as an execution-order + cost reference. Execution order within each event follows the array order in `settings.json`.
+An example of documenting a hook set by event and cost. [Matching hooks run in parallel](https://code.claude.com/docs/en/hooks); table order is for reading, not execution order.
 
-**The rows are an illustration of a real config, not an index of this repo.** Some of the hooks named below are published under [`../hooks/`](../hooks/) and some are not — the names are here to show what a row looks like and how the events compose, so treat any given filename as a worked example rather than a file you can open. Adapt the org-specific rows (context injection, cluster context, repo identity) to your own setup.
+**The rows are an illustration of a real config, not an index of this repo.** Some of the hooks named below are published under [`../hooks/`](../hooks/) and some are not — the names are here to show what a row looks like and how the events compose, so treat any given filename as a worked example rather than a file you can open. Adapt the org-specific rows (context injection and repo identity) to your own setup. The four withdrawn executables are migration stubs in [RETIRED.md](../RETIRED.md), not registrations to copy.
 
 **Each heading states its entry count, and that is the technique worth copying.** A count is the cheapest drift check available: if a heading disagrees with your `settings.json`, the doc is stale, and you find that out by counting rather than by reading. Keep the counts accurate or don't write them — a stale count is worse than none, because it asserts a check that isn't happening. The numbers below describe *this example*, not any real installation, so they are the pattern to imitate rather than figures to compare your own config against. Plugin-wired hooks are registered separately and are **not** included; see the last section.
 
@@ -26,7 +26,7 @@ Note the matcher on the `post-compact-reinject.sh` row. Re-injecting context aft
 
 Compaction is the one boundary where in-session reasoning is destroyed while anything derived from it survives — which is what makes spending tokens here worthwhile.
 
-## UserPromptSubmit — 6 entries (every prompt, in order)
+## UserPromptSubmit — 6 entries (every prompt)
 
 | Hook | Purpose | Output | Cost |
 |------|---------|--------|------|
@@ -37,23 +37,19 @@ Compaction is the one boundary where in-session reasoning is destroyed while any
 | `session-budget-warn.sh` | Nudges `/clear` when session is very old or context is very large | ~300 chars additionalContext (throttled 1/hr per session) | Every prompt (stat + transcript tail) |
 | `pr-context-inject.sh` | Injects active PR URLs from all repos | 1–5 lines additionalContext | **Once per session** (stamp), seeded from cache |
 
-## PreToolUse: Bash — 15 entries (in order)
+## PreToolUse: Bash — 12 entries
 
 | Hook | Matcher | Purpose | Output | Cost |
 |------|---------|---------|--------|------|
 | `rtk-rewrite.sh` | All Bash | Rewrites commands to use a token-optimizing proxy | Rewrites tool input | Per call, fast |
-| `kubectl-context-inject.sh` | All Bash | Injects `--context <your-cluster>` on kubectl/helm | Rewrites tool input | Per call, exits early if no k8s cmd |
-| `ci-polling-guard.sh` | `sleep *` | Blocks polling loops | Blocks or warns | Conditional |
 | `op-read-guard.sh` | `op *` | Blocks raw secret reads, redirects to a masked cache ([claude-secret-guard](https://github.com/asaphe/claude-secret-guard)) | Blocks or warns | Conditional |
 | `stateful-op-reminder.sh` | All Bash | Nudges on external state mutations | `additionalContext` reminder | Per call, pattern-match only |
 | `destructive-guard.sh` | All Bash | Blocks/soft-blocks destructive ops | Hard block (exit 2) or soft block | Per call, most calls exit early |
-| `review-verification-guard.sh` | `gh *` | Enforces review verification before posting | Blocks if missing | Conditional |
 | `agent-config-review-guard.sh` | `git commit*` | Flags agent config changes on commit | Warning | Conditional |
 | `commit-attribution-guard.sh` | `git *` | Hard-blocks AI attribution markers in commit messages and bot branch prefixes | Hard block (exit 2) | Conditional |
 | `worktree-preflight.sh` | `git *` | Hard-blocks git WRITE ops on a repo root when root is not on main (signals another session active) | Hard block (exit 2) | Conditional |
 | `gha-lint-guard.sh` | `git commit*` | Runs actionlint on GHA workflows | Blocks on lint errors | Conditional |
 | `agent-config-review-guard.sh` | `git push*` | Flags agent config changes on push | Warning | Conditional |
-| `pre-push-lint-guard.sh` | `git push*` | Runs the linter before push | Blocks on errors | Conditional |
 | `pr-create-guard.sh` | `gh *` | Pre-flight checklist for PR creation, and for `gh stack submit` | Blocks or warns | Conditional |
 | `session-log.sh` | Stop | Appends the turn to a per-session log; nudges when its newest `state` line is stale | `systemMessage` to the user | Conditional |
 | `pr-edit-counter.sh` | `gh pr edit*` | Tracks PR edit count | Advisory | Conditional |
@@ -85,7 +81,7 @@ Compaction is the one boundary where in-session reasoning is destroyed while any
 
 An MCP tool is matched by its full tool name. One script registered against several tool names counts as one entry per registration — keep that in mind when reconciling the count against `settings.json`.
 
-## PostToolUse: Bash — 5 entries (in order)
+## PostToolUse: Bash — 5 entries
 
 Read this section before writing any `PostToolUse` hook — the payload shape has two traps that both fail silently.
 
@@ -138,20 +134,22 @@ Two consequences worth internalizing. A hook you moved into a plugin and a copy 
 
 ## Reading the `hook-diag` log
 
-[`_lib/hook-diag.sh`](../hooks/_lib/hook-diag.sh) writes one record per hook decision. The record format carries two properties that are load-bearing rather than cosmetic, and both defend the same failure: a log that *reports a dead hook as active*, which is a false all-clear in the one tool whose entire job is detecting dead hooks.
+[`_lib/hook-diag.sh`](../hooks/_lib/hook-diag.sh) persists JSON Lines with exactly `ts`, `hook`, `exit`, `decision` and `event`. Timestamp is UTC; exit records carry an integer status, while explicit pre-exit events carry null. Hook names, decisions and events use closed categories; unknown strings become `unknown`. See the [helper contract](../hooks/_lib/README.md#hook-diagsh) for the complete categories and destinations.
 
-- **Fields are newline-free by construction.** `\n` and `\r` are flattened to spaces in the command, stderr and input-head fields at capture time. Without that, a logged command containing a line equal to the record separator — a heredoc, a markdown rule, a prompt separator — starts a phantom record, and the lines after it are read as that record's own header fields. The serious half is that a command which merely *mentions* a hook name then gets counted as that hook having run.
-- **The reader anchors by position.** A timestamp field is accepted only as a record's first line and only if it parses as a timestamp; the hook-name field only as its second. That keeps records already on disk from forging either. The two defences are independent — the writer's flattening protects new records, the reader's anchoring covers the corpus you already have — so do not drop one because the other exists.
+Commands, input, stderr, reasons, paths, session IDs and caller detail are absent. The hook’s user/model-facing stderr and permission reason remain separate from diagnostics. Failed diagnostic writes do not change the hook’s exit status or decision.
 
-Two practical traps when analysing the corpus:
+Count decisions without reconstructing command content:
 
-- **The log file is shared, and other checkouts write to it.** Any copy of `hook-diag.sh` on the machine defaults to the same log path, so a second working tree running its own eval suite contaminates your counts with synthetic commands — and it inflates exactly the commands the corpus gets consulted for, since fixture data is repetitive by design. Emit a field that only your writers set (a session id) and filter on it, rather than trying to contain the foreign writers.
-- **Command text is flattened, so a trailing newline becomes a trailing space.** Comparing stripped fixture text against unstripped log text returns zero matches and reads as a clean corpus. Strip both sides.
+```bash
+jq -r '[.hook, .decision, .event] | @tsv' ~/.claude/local/hook-ask-decisions.log | sort | uniq -c
+```
+
+Test harnesses redirect logs to isolated temporary paths. New JSON Lines readers must not parse older separator-based corpora as this schema; old records are not converted. Metadata counts cannot identify which commands triggered a rule.
 
 ## Notes
 
-- `destructive-guard.sh`, `stateful-op-reminder.sh`, `rtk-rewrite.sh`, and `kubectl-context-inject.sh` run on every Bash call and exit early for non-matching commands — unavoidable, they need broad coverage.
-- An unconditional hook should think twice before sourcing `hook-diag.sh`: it writes a record on every single call, which shortens the log's retention window for every other hook.
+- `destructive-guard.sh`, `stateful-op-reminder.sh`, and `rtk-rewrite.sh` run on every Bash call and exit early for non-matching commands — unavoidable, they need broad coverage.
+- An unconditional hook should think twice before sourcing `hook-diag.sh`: enabling allow logging writes a record on every call, shortening retention for other hooks.
 - `terraform-output-reminder.sh` uses a narrow `if: "Bash(terraform *)"` matcher to avoid firing on every Bash call.
 - The `aws-auth-check.sh` first-prompt cost is inherent to the STS calls through SSO; acceptable given the multi-hour token TTL.
 - PR cache keys are repo-scoped (`<prefix>-<repo>-<branch>`) to prevent collision when multiple repos share a branch name.

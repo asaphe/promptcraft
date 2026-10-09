@@ -760,6 +760,9 @@ ask	git -C $(git rev-parse --show-toplevel) push -f origin topic-1
 ask	git -C $(dirname $PWD/x) push origin :topic-1
 allow	git -C $(git rev-parse --show-toplevel) stash push -- ':!README.txt'
 
+# WHY: a deferred heredoc containing only a print must settle without treating the printed text as code.
+allow	echo "$(cat <<'EOF'\nprintf '%s\\n' 'git push origin main'\nEOF\n)" | sh
+
 # --- input unavailable: the extraction returns nothing, which is indistinguishable from
 # "no command to guard". Pinned so a later edit cannot flip it silently.
 allow	<absent>

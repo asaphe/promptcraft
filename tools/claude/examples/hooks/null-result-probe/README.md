@@ -23,7 +23,15 @@ Suspicious constructs: a self-declared control probe, a git pathspec after `--`,
 - **Exit 0 always** — never blocks
 - On a nudge, emits `hookSpecificOutput.additionalContext` JSON on stdout
 - Observed, not documented: the Bash `tool_response` also carries `noOutputExpected` and `backgroundTaskId`, which the hook uses to stay silent, and the Bash tool reports an exit 1 from `grep`, `rg`, `find`, `diff` or `test` as a successful result. The documented fields are `stdout`, `stderr`, `interrupted` and `isImage`; if the undocumented ones disappear, the hook nudges more often rather than less
-- Every Bash call appends one line to a log (timestamp, `fire=0|1`, reason; command text only on a fire), so the fire rate against all calls can be measured. If it is high, the nudge is noise and the hook should go
+- Each classified Bash result appends a JSON Lines record with exactly `ts` (UTC), fixed `hook: null-result-probe`, and `event`. Closed events are `empty`, `zero`, `backgrounded`, `no_output_expected`, `has_output`, `stdout_redirected`, `no_construct_empty`, `no_construct_zero`, and `unknown`. No command, response, reason, or path is retained; logging failures do not change the warning or exit status. Invalid input and missing commands return before logging.
+
+Count nudges against classified calls without command samples:
+
+```bash
+jq -r '.event' ~/.claude/local/null-result-probe.log | sort | uniq -c
+```
+
+`empty` and `zero` are nudge categories. Archive old text-format logs before using this query; they are not converted.
 
 ## Configuration
 

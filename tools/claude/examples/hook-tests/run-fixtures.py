@@ -15,13 +15,14 @@ Recognised outcomes:
 
     allow   exit 0, clean stderr, nothing on stdout the harness understands
     ctx     exit 0 carrying hookSpecificOutput.additionalContext
+    defer   exit 0 carrying permissionDecision "defer"
     ask     exit 0 carrying permissionDecision "ask"
     deny    exit 0 carrying permissionDecision "deny"
     soft    exit 1  (NOT a block — Claude Code prints a notice and runs the tool)
     hard    exit 2  (the only blocking code)
     block   exit 0 carrying top-level {"decision": "block"} — a Stop hook refusing
     halt    exit 0 carrying top-level {"continue": false} — stops the whole turn
-    error   exit 0 with output on stderr, or an unrecognised permissionDecision
+    error   exit 0 with stderr, malformed structured output, or an invalid decision
     raw     for a rewrite hook: ran, but emitted no updatedInput
     =<cmd>  for a rewrite hook: emitted exactly this rewritten command
 
@@ -86,9 +87,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import fixture_env  # noqa: E402
 
 NUMERIC_ALIAS = {"0": "allow", "1": "soft", "2": "hard"}
-OUTCOMES = ("allow", "ask", "deny", "soft", "hard", "ctx", "block", "halt", "error", "TIMEOUT")
-# Only these three are permission verdicts; a decision typo must not reach the exit-code namespace.
-PERMISSION_DECISIONS = ("allow", "ask", "deny")
+OUTCOMES = ("allow", "ask", "deny", "defer", "soft", "hard", "ctx", "block", "halt", "error", "TIMEOUT")
+PERMISSION_DECISIONS = ("allow", "ask", "deny", "defer")
 # An unsubstituted token runs the case against the harness cwd, which is what #!setup exists to prevent.
 TOKEN_RE = re.compile(r"\{[a-z_][a-z0-9_]*\}")
 # Each tool carries new content under a different key; a hook reads exactly one.
@@ -151,16 +151,19 @@ def unescape_cmd(field):
     return "".join(out)
 
 
-def rewritten(rc, stdout):
+def rewritten(rc, stdout, stderr="", event="PreToolUse"):
     if rc != 0:
         return "exit%d" % rc
+    if classify(rc, stdout, stderr, event) == "error":
+        return "error"
     try:
-        return REWRITE + json.loads(stdout)["hookSpecificOutput"]["updatedInput"]["command"]
+        command = json.loads(stdout)["hookSpecificOutput"]["updatedInput"]["command"]
+        return REWRITE + command if isinstance(command, str) else "error"
     except (ValueError, TypeError, KeyError):
         return "raw"
 
 
-def classify(rc, stdout, stderr=""):
+def classify(rc, stdout, stderr="", event=None):
     """Outcome of one run. `stderr` is load-bearing — see the `error` case below."""
     if rc == 2:
         return "hard"
@@ -173,23 +176,43 @@ def classify(rc, stdout, stderr=""):
     # Exit 0 with stderr is a hook that broke, not one that passed. see: README.md § Why three
     if stderr.strip():
         return "error"
+    if not stdout.strip():
+        return "allow"
     try:
         parsed = json.loads(stdout)
     except ValueError:
-        return "allow"
+        return "error"
     if not isinstance(parsed, dict):
-        return "allow"
+        return "error"
+    if "continue" in parsed and not isinstance(parsed["continue"], bool):
+        return "error"
+    if "hookSpecificOutput" in parsed and not isinstance(parsed["hookSpecificOutput"], dict):
+        return "error"
+    out = parsed.get("hookSpecificOutput", {})
+    if "hookSpecificOutput" in parsed and not isinstance(out.get("hookEventName"), str):
+        return "error"
+    if event is None:
+        event = out.get("hookEventName", "PreToolUse")
+    if "hookEventName" in out and out["hookEventName"] != event:
+        return "error"
+    if "permissionDecision" in out:
+        decision = out["permissionDecision"]
+        if event != "PreToolUse" or decision not in PERMISSION_DECISIONS:
+            return "error"
+    if "additionalContext" in out and not isinstance(out["additionalContext"], str):
+        return "error"
+    if "updatedInput" in out and (event != "PreToolUse" or not isinstance(out["updatedInput"], dict)):
+        return "error"
+    if "decision" in parsed:
+        valid = ("approve", "block") if event == "PreToolUse" else ("block",)
+        if event not in ("PreToolUse", "PostToolUse", "Stop", "SubagentStop", "UserPromptSubmit") or parsed["decision"] not in valid:
+            return "error"
     if parsed.get("continue") is False:
         return "halt"
+    if "permissionDecision" in out:
+        return out["permissionDecision"]
     if parsed.get("decision") == "block":
-        return "block"
-    out = parsed.get("hookSpecificOutput")
-    if not isinstance(out, dict):
-        return "allow"
-    decision = out.get("permissionDecision")
-    if decision:
-        # An unrecognised value is a typo or a rename, never a considered allow.
-        return decision if decision in PERMISSION_DECISIONS else "error"
+        return "deny" if event == "PreToolUse" else "block"
     if out.get("additionalContext"):
         return "ctx"
     return "allow"
@@ -308,9 +331,9 @@ def run_case(index, case, cwd, env, args, hook_path, tmp):
     except subprocess.TimeoutExpired:
         return expected, "TIMEOUT", cmd, ""
     if expected == "raw" or expected.startswith(REWRITE):
-        got = rewritten(proc.returncode, proc.stdout)
+        got = rewritten(proc.returncode, proc.stdout, proc.stderr, event)
     else:
-        got = classify(proc.returncode, proc.stdout, proc.stderr)
+        got = classify(proc.returncode, proc.stdout, proc.stderr, event)
     return expected, got, cmd, proc.stderr
 
 

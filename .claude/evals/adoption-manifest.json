@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "recipes": [
+    {
+      "id": "basic",
+      "root": "home",
+      "artifacts": [
+        {
+          "source": "tools/claude/examples/config/global-CLAUDE.md",
+          "destination": ".claude/CLAUDE.md",
+          "kind": "file"
+        }
+      ],
+      "runtime_dependencies": [],
+      "upstream_links": []
+    },
+    {
+      "id": "operations",
+      "root": "project",
+      "artifacts": [
+        {
+          "source": "tools/claude/examples/profiles/operations.md",
+          "destination": ".claude/rules/operations.md",
+          "kind": "file"
+        }
+      ],
+      "runtime_dependencies": [],
+      "upstream_links": []
+    },
+    {
+      "id": "hooks",
+      "root": "home",
+      "artifacts": [
+        {
+          "source": "tools/claude/examples/hooks/destructive-guard",
+          "destination": ".claude/hooks/destructive-guard",
+          "kind": "tree"
+        },
+        {
+          "source": "tools/claude/examples/hooks/stateful-op-reminder",
+          "destination": ".claude/hooks/stateful-op-reminder",
+          "kind": "tree"
+        },
+        {
+          "source": "tools/claude/examples/hooks/pr-create-guard",
+          "destination": ".claude/hooks/pr-create-guard",
+          "kind": "tree"
+        },
+        {
+          "source": "tools/claude/examples/hooks/_lib",
+          "destination": ".claude/hooks/_lib",
+          "kind": "tree"
+        }
+      ],
+      "runtime_dependencies": [
+        ".claude/hooks/destructive-guard/destructive-guard.sh",
+        ".claude/hooks/stateful-op-reminder/stateful-op-reminder.sh",
+        ".claude/hooks/pr-create-guard/pr-create-guard.sh",
+        ".claude/hooks/_lib/hook-diag.sh",
+        ".claude/hooks/_lib/pr-author.sh",
+        ".claude/hooks/_lib/resolve-workdir.sh",
+        ".claude/hooks/_lib/strip-cmd.sh",
+        ".claude/hooks/_lib/strip-quoted-args.pl",
+        ".claude/hooks/_lib/split-cmd-segments.pl"
+      ],
+      "upstream_links": [
+        {
+          "url": "https://github.com/asaphe/promptcraft/blob/main/tools/claude/examples/hooks/merge-grant/README.md",
+          "target": "tools/claude/examples/hooks/merge-grant/README.md"
+        },
+        {
+          "url": "https://github.com/asaphe/promptcraft/blob/main/tools/claude/examples/hook-tests/README.md",
+          "target": "tools/claude/examples/hook-tests/README.md"
+        }
+      ]
+    },
+    {
+      "id": "scaffold",
+      "root": "project",
+      "artifacts": [
+        {
+          "source": "tools/claude/scaffolding/.claude",
+          "destination": ".claude",
+          "kind": "tree"
+        }
+      ],
+      "runtime_dependencies": [
+        ".claude/CLAUDE.md",
+        ".claude/agents/infra-expert.md",
+        ".claude/agents/devops-reviewer.md",
+        ".claude/rules/operational-safety.md",
+        ".claude/rules/terraform-apply.md",
+        ".claude/rules/pr-review.md",
+        ".claude/skills/deploy/SKILL.md",
+        ".claude/skills/verify-deploy/SKILL.md",
+        ".claude/skills/checkpoint/SKILL.md",
+        ".claude/docs/agent-roster.md",
+        ".claude/docs/architecture.md",
+        ".claude/specs/ci-cd-spec.md"
+      ],
+      "upstream_links": [
+        {
+          "url": "https://github.com/asaphe/promptcraft/blob/main/tools/claude/guides/CLAUDE.md",
+          "target": "tools/claude/guides/CLAUDE.md"
+        },
+        {
+          "url": "https://github.com/asaphe/promptcraft/blob/main/tools/claude/templates/agents/agent-template.md",
+          "target": "tools/claude/templates/agents/agent-template.md"
+        },
+        {
+          "url": "https://github.com/asaphe/promptcraft/blob/main/tools/claude/templates/skills/skill-template.md",
+          "target": "tools/claude/templates/skills/skill-template.md"
+        }
+      ]
+    }
+  ]
+}
