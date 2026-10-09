@@ -22,13 +22,13 @@ SESSION=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null)
 TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 [ -n "$SESSION" ] || exit 0
 if [ -z "$TRANSCRIPT" ] || [ ! -f "$TRANSCRIPT" ]; then
-  hook_diag_event TRANSCRIPT_UNREADABLE "${TRANSCRIPT:-<empty>}" 2>/dev/null
+  hook_diag_event transcript_unreadable 2>/dev/null
   exit 0
 fi
 
 DERIVE="$(dirname "$0")/session-log-derive.py"
 if [ ! -r "$DERIVE" ]; then
-  hook_diag_event DERIVE_SCRIPT_MISSING "$DERIVE" 2>/dev/null
+  hook_diag_event derive_script_missing 2>/dev/null
   exit 0
 fi
 
@@ -44,7 +44,7 @@ DERIVE_ERR=$(mktemp -t session-log-err.XXXXXX) || exit 0
 RESULT=$(python3 "$DERIVE" --transcript "$TRANSCRIPT" --session "$SESSION" \
                            --sessions-dir "$SESSIONS_DIR" 2>"$DERIVE_ERR")
 if [ -z "$RESULT" ]; then
-  hook_diag_event DERIVE_PRODUCED_NOTHING "$(head -c 300 "$DERIVE_ERR")" 2>/dev/null
+  hook_diag_event derive_produced_nothing 2>/dev/null
   rm -f "$DERIVE_ERR"
   exit 0
 fi
@@ -52,7 +52,7 @@ rm -f "$DERIVE_ERR"
 
 LOG_PATH=$(printf '%s' "$RESULT" | jq -r '.path // empty' 2>/dev/null)
 if [ -z "$LOG_PATH" ]; then
-  hook_diag_event DERIVE_RETURNED_NO_PATH "$RESULT" 2>/dev/null
+  hook_diag_event derive_returned_no_path 2>/dev/null
   exit 0
 fi
 
@@ -69,7 +69,7 @@ if [ ! -f "$PRUNED" ] && [ "$PRUNE_OK" -eq 1 ]; then
           -mtime "+${SESSION_LOG_RETENTION_DAYS:-90}" -exec rm -rf {} + 2>/dev/null; then
     : > "$PRUNED"
   else
-    hook_diag_event PRUNE_FAILED "$SESSIONS_DIR" 2>/dev/null
+    hook_diag_event prune_failed 2>/dev/null
   fi
 fi
 
@@ -92,7 +92,7 @@ fi
 [ "$STALE" -eq 1 ] || exit 0
 
 # shellcheck disable=SC2034  # read by the sourced hook-diag.sh
-HOOK_DIAG_DECISION="notify:session-log"
+HOOK_DIAG_DECISION="notify"
 jq -n --arg p "$LOG_PATH" \
   '{systemMessage:("Session log has no recent state entry. Append one line to " + $p + " :  - HH:MM state · objective … | decided … | open … | next …")}'
 exit 0

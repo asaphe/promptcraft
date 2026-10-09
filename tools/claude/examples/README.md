@@ -48,8 +48,8 @@ Supporting documentation referenced by agents and skills:
 - **`post-push-hygiene/`** — Reminds to resolve threads, update PR body, update tracker after a successful `git push`.
 - **`pr-create-guard/`** — Blocks `gh pr create` when prerequisites are missing (zero diff, unpushed commits, uncommitted changes).
 - **`pr-edit-counter/`** — Warns after 2+ body edits on the same PR.
-- **`pre-push-quality/`** — Pre-push lint enforcement; blocks the push on lint failures.
-- **`review-verification-guard/`** — Emits verification checklists before posting PR reviews / comments.
+- **`pre-push-quality/`** — Retired; migration stub points to repository lint/test commands and CI.
+- **`review-verification-guard/`** — Retired; migration stub points to the review protocol/kernel and maintained review plugin.
 - **`session-log/`** — Stop hook plus a reader: appends what each turn did to a per-session markdown log, so "where did that session stop" is a `grep` rather than a transcript reconstruction. Backs the `/recap` and `/sessions` skills.
 - **`stateful-op-reminder/`** — Nudges on mutations to external systems — identity providers, IAM, databases, Kubernetes, Helm, Terraform apply — and appends a team heads-up template (draft a chat message for user approval — never auto-send; gates further mutations in the same change window).
 - **`post-apply-state-check/`** — PostToolUse nudge after a successful `terraform apply` / `kubectl apply`: exit 0 proves syntax, not correctness — verify the resource live.
@@ -58,7 +58,7 @@ Supporting documentation referenced by agents and skills:
 - **`null-result-probe/`** — PostToolUse nudge: a command that returned nothing, or a scanner that reported a confident zero, while containing a construct that collapses silently (unquoted glob or expansion, git pathspec, `find` on `/tmp`) needs a control probe before the emptiness is read as a finding. Backs `rules/general/evidence-nulls.md`.
 - **`rtk/`** — PreToolUse hook that rewrites Bash commands through RTK (Rust Token Killer) for token savings.
 - **`statusline/`** — Statusline command showing directory, git branch/worktree, AWS profile, model name, effort level, context-window usage, PR review state, lines changed, and rate-limit reset.
-- Plus several auto-lint, AWS auth check, and kubectl context inject hook examples.
+- Plus auto-lint and AWS auth check examples. `ci-polling-guard/` and `kubectl-context-inject/` are retired migration stubs; see [RETIRED.md](RETIRED.md).
 
 ### `rules/`
 
@@ -86,7 +86,7 @@ User-invocable slash-command skills:
 
 ### `hook-tests/`
 
-Three harnesses for testing hooks, each covering an axis the others cannot: `run-fixtures.py` (one hook deeply, asserting the *outcome* rather than the exit code), `probe-hooks.py` (every hook shallowly, asserting which stream carried the payload — a hook can be individually correct and collectively unarmed), and `mutate-fixtures.py` (breaks each hook on purpose and requires the suite to notice). `fixture_env.py` builds the git state that state-reading guards decide from.
+Three harnesses for testing hooks, each covering an axis the others cannot: `run-fixtures.py` (one hook deeply, asserting the *outcome* rather than the exit code), `probe-hooks.py` (every hook shallowly, asserting which stream carried the payload — a hook can be individually correct and collectively unarmed), and `mutate-fixtures.py` (breaks each hook on purpose and requires the suite to notice). `fixture_env.py` builds the git state that state-reading guards decide from. `test-hook-contracts.py` pins event-aware output classification; `test-hook-diag.py` checks closed metadata logs and enforcement preservation. These are harness checks, not live Claude integration.
 
 ### `evals/`
 

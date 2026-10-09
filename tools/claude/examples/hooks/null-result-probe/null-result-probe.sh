@@ -16,22 +16,22 @@ set -uo pipefail
 LOG="${NULL_RESULT_PROBE_LOG:-$HOME/.claude/local/null-result-probe.log}"
 LOG_MAX=1048576
 
-# Fire rate is the documented kill criterion for this hook, so the denominator — every Bash
-# call, fired or not — has to be recorded too. Command text is written only on a fire.
 log_line() {
   [ -n "${CLAUDE_HOOK_FIXTURE_RUN:-}" ] && return 0
-  local dir
-  dir=$(dirname "$LOG")
-  [ -d "$dir" ] || mkdir -p "$dir" 2>/dev/null || return 0
-  if [ -f "$LOG" ] && [ "$(wc -c < "$LOG" 2>/dev/null | tr -d ' ')" -gt "$LOG_MAX" ]; then
-    mv "$LOG" "${LOG}.prev" 2>/dev/null
-  fi
-  # One physical line per call or the fire rate cannot be counted: a multi-line command
-  # otherwise emits continuation lines that read as extra calls with no verdict.
-  local flat=""
-  [ -n "${3:-}" ] && flat=" cmd=$(printf '%s' "${3:0:400}" | tr '\n\t' '  ' | cut -c1-160)"
-  printf '%s fire=%s why=%s%s\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" "$flat" >> "$LOG" 2>/dev/null
+  local category="$2"
+  case "$category" in
+    backgrounded|no_output_expected|has_output|stdout_redirected|no_construct_empty|no_construct_zero|empty|zero) ;;
+    *) category=unknown ;;
+  esac
+  (
+    umask 077
+    mkdir -p "$(dirname "$LOG")" 2>/dev/null || exit 0
+    if [ -f "$LOG" ] && [ "$(wc -c < "$LOG" 2>/dev/null | tr -d ' ')" -gt "$LOG_MAX" ]; then
+      mv "$LOG" "${LOG}.prev" 2>/dev/null || exit 0
+    fi
+    printf '{"ts":"%s","hook":"null-result-probe","event":"%s"}\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$category" >> "$LOG"
+  ) 2>/dev/null || :
   return 0
 }
 
@@ -136,6 +136,6 @@ else
   CTX="NULL-RESULT PROBE — this scan reported zero findings, and the command contains ${WHY}. A scanner handed a collapsed file list prints the same confident zero it prints for a genuinely clean tree, so this output does not yet show the scan ran over the files you meant. Confirm how many files it actually opened before treating the result as clean. Rule: the shell-traps rule (rules/general/shell-traps.md)."
 fi
 
-log_line 1 "$ARM" "$CMD"
+log_line 1 "$ARM"
 jq -n --arg ctx "$CTX" \
   '{hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: $ctx}}'

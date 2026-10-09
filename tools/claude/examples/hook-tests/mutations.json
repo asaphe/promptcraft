@@ -1315,7 +1315,7 @@
       }
     },
     {
-      "why": "a heredoc found to be code after its body was rendered stays data, so `echo \"$(cat <<'EOF' \u2026)\" | sh` passes",
+      "why": "a deferred heredoc never gets its settling pass, so a harmless print piped to sh fails closed",
       "suite": "destructive-guard",
       "replace": {
         "from": "    last unless %LATE;\n",

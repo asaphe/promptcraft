@@ -27,7 +27,8 @@ Tool-agnostic — applies to any AI coding assistant.
 
 - [tools/claude/guides/](tools/claude/guides/): end-to-end guides — best practices, hooks, skills, agents, PR review, learning systems, GHA integration, MCP management.
 - [tools/claude/templates/](tools/claude/templates/): starter files — agent templates, skill templates, rule file templates, project-level doc templates.
-- [tools/claude/examples/](tools/claude/examples/): complete reference `.claude/` directory — hooks, agents, rules, skills, evals, config, docs. [RETIRED.md](tools/claude/examples/RETIRED.md) maps examples that moved into maintained plugins.
+- [tools/claude/examples/](tools/claude/examples/): complete reference `.claude/` directory — hooks, agents, rules, skills, evals, config, docs. [RETIRED.md](tools/claude/examples/RETIRED.md) maps examples that moved into maintained plugins and withdrawn executables, with migration stubs.
+- [tools/claude/examples/hook-tests/](tools/claude/examples/hook-tests/): fixture, delivery, event-output contract, metadata-only diagnostic and mutation checks; harness validation rather than live client integration.
 - [tools/claude/scaffolding/](tools/claude/scaffolding/): ready-to-copy `.claude/` skeleton for a new repo.
 - [tools/claude/specs/](tools/claude/specs/): RFC-style specifications (CI/CD standard).
 

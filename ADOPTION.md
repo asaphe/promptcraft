@@ -100,7 +100,7 @@ Edit it — every section has `<TODO>` markers and inline comments. Replace comp
 
 ### 2. Extend with hooks
 
-The `tools/claude/examples/hooks/` directory has 30 production-tested hook directories, each with a script (most with a README), plus 5 pointer stubs for hooks that moved into maintained plugins ([RETIRED.md](tools/claude/examples/RETIRED.md) maps those).
+The `tools/claude/examples/hooks/` directory includes retained executable examples and migration stubs. [RETIRED.md](tools/claude/examples/RETIRED.md) maps withdrawn scripts and examples moved into maintained plugins. Remove any retired settings registration before deleting its local script.
 
 ```bash
 # Copy a hook:
@@ -109,7 +109,7 @@ cp -r tools/claude/examples/hooks/destructive-guard ~/.claude/hooks/
 # Register it in ~/.claude/settings.json (see the hook's README for exact JSON).
 ```
 
-Start with `destructive-guard` (hard-blocks pushes to main — force included — and destructive AWS commands), `stateful-op-reminder` (nudges before AWS/K8s/DB mutations), and `kubectl-context-inject` (auto-injects `--context` on every kubectl command).
+Start with `destructive-guard` (hard-blocks pushes to main — force included — and destructive AWS commands), `stateful-op-reminder` (nudges before AWS/K8s/DB mutations), and `pr-create-guard` (checks PR creation prerequisites). Select Kubernetes targets explicitly with kubectl `--context` or Helm `--kube-context`; the automatic context injector is retired.
 
 ### 3. Project-level `.claude/`
 

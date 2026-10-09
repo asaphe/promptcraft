@@ -50,7 +50,7 @@ Requires `jq` on PATH.
 
 ## Customization
 
-**Kube context:** the suggested `kubectl` verification commands include `--context ${KUBE_DEFAULT_CONTEXT}`. Set that env var to your cluster context (it pairs naturally with the [kubectl-context-inject](../kubectl-context-inject/) hook's default); unset, the commands show a `<cluster-context>` placeholder.
+**Kube context:** the suggested `kubectl` verification commands include `--context ${KUBE_DEFAULT_CONTEXT}`. Select and verify the target explicitly, then set that env var to its context; unset, the commands show a `<cluster-context>` placeholder.
 
 **Cloud provider:** the Terraform checklist suggests AWS verification commands (`aws iam get-role`, `aws ssm get-parameter`). Swap for your provider's describe/get equivalents.
 

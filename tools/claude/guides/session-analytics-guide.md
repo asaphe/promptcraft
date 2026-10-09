@@ -130,24 +130,24 @@ Realistic baseline from one analysis (~80 unique sessions over 30 days):
 
 ### Example Baseline
 
-From an analysis of 716 sessions / 86,693 tool calls:
+Illustrative counts for a hypothetical 86,693-call corpus; these are not evidence for enforcement or a reason to install a retired guard:
 
 | Waste Category | Calls | % of Total | Fix |
 |---------------|-------|-----------|-----|
-| CI polling (sleep + status check) | 5,700 | 6.6% | [CI polling guard](../examples/hooks/ci-polling-guard/) |
+| CI polling (sleep + status check) | 5,700 | 6.6% | `gh run watch --exit-status` where supported; deliberate waits remain valid |
 | AWS auth boilerplate (export + profile) | 6,700 | 7.7% | [AWS auth check](../examples/hooks/aws-auth-check/) |
 | Sequential secret reads | 2,800 | 3.2% | Batch script |
-| kubectl --context repetition | 1,200 | 1.4% | [kubectl context inject](../examples/hooks/kubectl-context-inject/) |
+| Kubernetes target selection | 1,200 | 1.4% | Explicit kubectl `--context` / Helm `--kube-context` after verifying the target |
 | 1Password re-reads | 700 | 0.8% | [claude-secret-guard](https://github.com/asaphe/claude-secret-guard)'s masked cache |
 | **Total addressable** | **~17,100** | **~20%** | |
 
-## Hook Ordering — consolidate, don't sequence
+## Metadata-only hook counts
 
-When multiple PreToolUse hooks fire on the same command they run sequentially in registration order, and a hook that rewrites the command via `updatedInput` changes what later hooks see. It is tempting to solve this by ordering the registrations — rewriters first, proxies second, guards last.
+The [diagnostic helper](../examples/hooks/_lib/README.md#hook-diagsh) logs closed `hook`, `decision`, `event`, UTC `ts`, and integer/null `exit` fields. The [null-result probe](../examples/hooks/null-result-probe/) has a separate JSON Lines logger with `ts`, fixed `hook`, and a stable `event` category. Count asks, exits, degradation events and nudges; these logs cannot recover commands or sample trigger reasons. Test runs use isolated paths. Session transcripts and the intentional session Markdown logs are separate data sources and are not covered by this diagnostic minimisation claim.
 
-**Don't.** Ordering separate registrations is exactly the arrangement in which a rewriting hook's response can silently override an earlier guard's block, and it fails open on the commands the guard exists for. Put every check that can decide the fate of one tool call into a **single authority script** with explicit internal precedence — `block > ask > rewrite > allow` — and make the sub-checks functions inside it rather than separate registrations.
+## Hook concurrency
 
-The token savings in the table above are unaffected by this: the rewrite still happens, it just happens inside the one script that also owns the guards, after they have had their say. See [hooks-guide.md](hooks-guide.md) § Multiple hooks on one event for the full argument.
+Matching hooks run in parallel. Registration order does not establish a pipeline of rewritten inputs. Keep independent checks separate; when checks require sequencing, use a tested wrapper that makes the dependency explicit. See [hooks-guide.md](hooks-guide.md#multiple-hooks-on-one-event) for the documented permission precedence and its limits.
 
 ## POSIX Compatibility
 
