@@ -12,7 +12,7 @@ Three harnesses for testing Claude Code hooks, each covering an axis the others 
 
 A hook test is unusually easy to write so that it cannot fail, and there are three distinct ways to get there.
 
-**Comparing exit codes scores a working hook and a silent one identically.** A guard that emits `permissionDecision: "ask"` exits 0, and so does a guard that decided to do nothing. A reminder that emits `additionalContext` exits 0 too. So `run-fixtures.py` asserts an *outcome* — `allow` / `ctx` / `ask` / `deny` / `soft` / `hard` / `block` — rather than a number.
+**Comparing exit codes scores a working hook and a silent one identically.** A guard that emits `permissionDecision: "ask"` exits 0, and so does a guard that decided to do nothing. A reminder that emits `additionalContext` exits 0 too. So `run-fixtures.py` asserts an *outcome* — `allow` / `ctx` / `ask` / `deny` / `defer` / `soft` / `hard` / `block` — rather than a number.
 
 **A hook can be individually correct and collectively unarmed.** Claude Code discards stderr when a hook exits 0, treats exit 1 as a non-blocking error rather than a block, and adds bare stdout to context only on `UserPromptSubmit`, `UserPromptExpansion` and `SessionStart`. A hook writing its advice to the wrong stream does everything else right and delivers nothing — and every exit-code assertion in the world scores it as passing. `probe-hooks.py` asserts the channel.
 
@@ -29,6 +29,8 @@ python3 run-fixtures.py destructive-guard --hooks-dir ../hooks --jobs 8
 # Delivery contracts across every hook, plus the selftest that proves they fire
 python3 probe-hooks.py --hooks-dir ../hooks
 python3 probe-hooks.py --selftest
+python3 test-hook-contracts.py
+python3 test-hook-diag.py
 
 # Break each hook on purpose; every mutation must be caught
 python3 mutate-fixtures.py --hooks-dir ../hooks
@@ -49,7 +51,7 @@ python3 test-merge-grant.py
 python3 test-force-push-lease.py
 ```
 
-`--hooks-dir` resolves both layouts: flat `<dir>/<name>.sh`, which is how hooks sit in an installed `~/.claude/hooks/`, and nested `<dir>/<name>/<name>.sh`, which is how they sit in this repo. Installed alongside your own hooks as `~/.claude/hooks/tests/`, the default is already right and the flag can be dropped.
+`--hooks-dir` resolves both layouts: flat `<dir>/<name>.sh`, which is how hooks sit in an installed `~/.claude/hooks/`, and nested `<dir>/<name>/<name>.sh`, which is how they sit in this repo. `probe-hooks.py` defaults to the published sibling `hooks/` directory and fails if zero hooks execute, including an all-skipped or empty-filter run. Pass an explicit directory for installed layouts.
 
 Cases run one at a time unless `--jobs N` is given, to `run-fixtures.py` or to `mutate-fixtures.py`, which passes it on. Each case is its own hook process, so N of them can run at once; results are read back in file order, so the output, the pass count and the `--fail-fast` stop are the same as a serial run. Keep the default for a hook whose verdict reads state an earlier case leaves behind, such as a counter, a throttle or a file it writes and reads back: cases would then race. None of the hooks with a fixture here does: `merge-grant` writes a grant file, but its verdict reads only the prompt.
 
@@ -59,15 +61,24 @@ Each mutation runs its suite with `run-fixtures.py --fail-fast`, which stops at 
 
 An `#!oracle` line selects the following TSV case. Its tab-separated fields are the case name, expected stub trace (`-` for no calls), optional setup name, and optional setup-specific verdict. The ordinary fixture runner ignores these lines; a cross-repository checkout case needs the oracle's two-repository setup to exercise the hard block. Missing or invalid quote helpers are tested separately against temporary hook copies. Decoded payloads pass tripwires for absolute paths, destructive filesystem commands, and environment overrides before execution.
 
+## Contract and diagnostic checks
+
+`test-hook-contracts.py` pins documented event-specific enums independently of classifier constants, and proves its controls catch nested `block`, malformed JSON and invalid object shapes. Silent stdout remains an allow control. PreToolUse’s deprecated top-level `block` classifies as `deny`; Stop’s top-level `block` remains `block`. A present `hookSpecificOutput` must be an object; an absent optional field is valid. Fixture events reach classification; legacy direct classifier callers may omit the event, using the declared output event or PreToolUse by default.
+
+This is a deliberately strict structured-output gate, not a full Claude client parser or live integration check. The client can treat some plain text as debug output; the harness rejects nonempty non-JSON output for these structured examples. Exit-0 stderr is an error signal in the harness even though the client discards it. See the [official contract](https://code.claude.com/docs/en/hooks#pretooluse-decision-control).
+
+`test-hook-diag.py` checks exact JSON Lines keys and closed values, inert-marker absence, byte-preserved stderr and reason/status behavior, every helper category, log-write failures, rotation, mirrors, all five helper consumers and the separate null-result logger. Temporary homes, repositories, hook copies and logs remain under `/tmp`.
+
 ## Fixture format
 
 `fixtures/<hook>.tsv`, one case per line as `expected <TAB> command`, `#` for comments.
 
 | Outcome | Means |
 |---|---|
-| `allow` | exit 0, nothing the harness recognises on stdout |
+| `allow` | exit 0, silent/whitespace stdout or valid JSON with no decision/context |
 | `ctx` | exit 0 carrying `hookSpecificOutput.additionalContext` — a reminder fired |
-| `ask` / `deny` | exit 0 carrying that `permissionDecision` |
+| `ask` / `deny` / `defer` | exit 0 carrying that PreToolUse `permissionDecision` |
+| `error` | exit-0 stderr or invalid nonempty structured output (malformed JSON, wrong shape, event mismatch or invalid enum) |
 | `soft` | exit 1 — **not a block**; Claude Code prints a notice and runs the tool |
 | `hard` | exit 2 — the only blocking code |
 | `block` | exit 0 carrying top-level `{"decision": "block"}` — a Stop hook refusing the yield |

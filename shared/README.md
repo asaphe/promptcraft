@@ -1,6 +1,6 @@
 # shared/
 
-Tool-agnostic content — applies to any AI assistant (Claude Code, Cursor, ChatGPT, Codex, Copilot, Aider).
+Cross-tool source material for AI assistants (Claude Code, Cursor, ChatGPT, Codex, Copilot, Aider). Cross-tool does not mean mandatory in every project: select relevant principles and adapt language, backend, environment and workflow conventions to their actual contracts.
 
 ## What's here
 

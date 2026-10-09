@@ -1,6 +1,6 @@
 # Scaffolding: Example `.claude/` Directory
 
-A complete, anonymized example of a production `.claude/` directory structure. Copy this to your repository and customize.
+An optional infrastructure-oriented starter `.claude/` directory. Select it explicitly through the guarded [scaffold recipe](../../../ADOPTION.md#optional-infrastructure-project-scaffold), then customize before use. Review overlapping rules before combining it with the operations profile. Public repository links are optional upstream help, not runtime dependencies.
 
 ## Directory Structure
 
@@ -24,7 +24,7 @@ scaffolding/
 │   │   └── architecture.md        # Service inventory, databases, structure
 │   └── specs/                       # Standards and specifications
 │       └── ci-cd-spec.md          # RFC-style CI/CD rules
-└── global-claude-md-example.md      # Example ~/.claude/CLAUDE.md
+└── global-claude-md-example.md      # Pointer to baseline and advanced reference
 
 ```
 
@@ -74,11 +74,7 @@ scaffolding/
 
 ## Quick Start
 
-1. **Copy the `.claude/` directory to your repo root:**
-
-   ```bash
-   cp -r scaffolding/.claude /path/to/your/repo/
-   ```
+1. **Select a project and use the guarded [scaffold recipe](../../../ADOPTION.md#optional-infrastructure-project-scaffold).** Existing `.claude/` configuration must be compared and merged manually.
 
 2. **Customize `CLAUDE.md`:**
    - Replace `<placeholder>` service names with your actual services
@@ -101,8 +97,8 @@ scaffolding/
    - Format: `- **Rule title** — What to do and why.`
 
 6. **Set up global config:**
-   - Copy `global-claude-md-example.md` to `~/.claude/CLAUDE.md`
-   - Customize with your auth profiles, commit policy, and preferences
+   - Follow [global-claude-md-example.md](global-claude-md-example.md) to the canonical standalone baseline and guarded recipe.
+   - Browse the advanced author profile separately; do not copy this pointer as configuration.
 
 ## What to Customize vs Keep
 

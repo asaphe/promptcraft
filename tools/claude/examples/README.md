@@ -6,16 +6,23 @@ Several examples that used to live here now ship as maintained Claude Code plugi
 
 ## Directory Structure
 
+The four copy-ready routes are declared in [ADOPTION.md](../../../ADOPTION.md). Everything else is browse/adapt material with its own dependencies and activation steps.
+
 ### `agents/`
 
 Specialist agent definitions — design agents (architecture, implementation planning), operational agents (deployment, Terraform, K8s troubleshooting, Karpenter, cheap-tier read-only batching) and review agents (security, DevOps, bash, Python, Datadog, ClickHouse, agent-config, general code). Each agent has a focused domain, clear boundaries, and explicit deferral rules. See `docs/agent-roster.md` for the routing table, kept in sync with disk by hand (the generator script targets an adopter's `.claude/` layout, not this repo's).
 
 ### `config/`
 
-- **`global-CLAUDE.md`** ⭐ — A `~/.claude/CLAUDE.md` template covering behavioral constraints, operational safety, review quality, git discipline, hook authoring, rule authoring, and CI/CD gotchas. **Start here if you're an infra / platform / DevOps engineer.** Drop it at `~/.claude/CLAUDE.md` and adjust the few opinionated sections (worktree convention, Task-Local Context) to your workflow.
+- **[global-CLAUDE.md](config/global-CLAUDE.md)** — Standalone, stack-neutral baseline with no companion dependency. Start with the guarded [basic recipe](../../../ADOPTION.md#standalone-global-baseline).
+- **[global-CLAUDE-advanced.md](config/global-CLAUDE-advanced.md)** — Reference-only, opinionated author profile; adapt selected sections in the source layout rather than installing it wholesale.
 - Annotated `settings.json` excerpts showing two key patterns:
   - **`settings-permissions.jsonc`** — Permission allowlists using Bash wildcards, MCP tool namespaces, WebFetch domain restrictions, and Skill permissions.
   - **`settings-hooks.jsonc`** — Hook configuration for PreToolUse command rewriting and statusline display.
+
+### `profiles/`
+
+[operations.md](profiles/operations.md) is an optional project-only profile for stateful infrastructure work. Use its guarded recipe after choosing a project; review overlap with the infrastructure scaffold.
 
 ### `docs/`
 
@@ -48,8 +55,8 @@ Supporting documentation referenced by agents and skills:
 - **`post-push-hygiene/`** — Reminds to resolve threads, update PR body, update tracker after a successful `git push`.
 - **`pr-create-guard/`** — Blocks `gh pr create` when prerequisites are missing (zero diff, unpushed commits, uncommitted changes).
 - **`pr-edit-counter/`** — Warns after 2+ body edits on the same PR.
-- **`pre-push-quality/`** — Pre-push lint enforcement; blocks the push on lint failures.
-- **`review-verification-guard/`** — Emits verification checklists before posting PR reviews / comments.
+- **`pre-push-quality/`** — Retired; migration stub points to repository lint/test commands and CI.
+- **`review-verification-guard/`** — Retired; migration stub points to the review protocol/kernel and maintained review plugin.
 - **`session-log/`** — Stop hook plus a reader: appends what each turn did to a per-session markdown log, so "where did that session stop" is a `grep` rather than a transcript reconstruction. Backs the `/recap` and `/sessions` skills.
 - **`stateful-op-reminder/`** — Nudges on mutations to external systems — identity providers, IAM, databases, Kubernetes, Helm, Terraform apply — and appends a team heads-up template (draft a chat message for user approval — never auto-send; gates further mutations in the same change window).
 - **`post-apply-state-check/`** — PostToolUse nudge after a successful `terraform apply` / `kubectl apply`: exit 0 proves syntax, not correctness — verify the resource live.
@@ -58,13 +65,13 @@ Supporting documentation referenced by agents and skills:
 - **`null-result-probe/`** — PostToolUse nudge: a command that returned nothing, or a scanner that reported a confident zero, while containing a construct that collapses silently (unquoted glob or expansion, git pathspec, `find` on `/tmp`) needs a control probe before the emptiness is read as a finding. Backs `rules/general/evidence-nulls.md`.
 - **`rtk/`** — PreToolUse hook that rewrites Bash commands through RTK (Rust Token Killer) for token savings.
 - **`statusline/`** — Statusline command showing directory, git branch/worktree, AWS profile, model name, effort level, context-window usage, PR review state, lines changed, and rate-limit reset.
-- Plus several auto-lint, AWS auth check, and kubectl context inject hook examples.
+- Plus auto-lint and AWS auth check examples. `ci-polling-guard/` and `kubectl-context-inject/` are retired migration stubs; see [RETIRED.md](RETIRED.md).
 
 ### `rules/`
 
 Operational rules captured from real incidents. Organized by scope:
 
-- **`general/`** — Cross-cutting principles that apply regardless of stack: git safety, PR workflows, operational discipline, idempotent operations, communication discipline, security scanning. Three of them are the always-loaded companions to `config/global-CLAUDE.md` — `evidence-nulls.md` (result shapes that look like answers), `shell-traps.md` (commands that return a confident wrong answer instead of an error), and `review-verdicts.md` (which review state to pick, and how to grade a finding).
+- **`general/`** — Cross-cutting principles that apply regardless of stack: git safety, PR workflows, operational discipline, idempotent operations, communication discipline, security scanning. Three of them are companion references in `config/global-CLAUDE-advanced.md` — `evidence-nulls.md` (result shapes that look like answers), `shell-traps.md` (commands that return a confident wrong answer instead of an error), and `review-verdicts.md` (which review state to pick, and how to grade a finding).
 - **`devops/`** — DevOps-domain rules: AWS / IAM / SSO / VPC gotchas, Terraform module structure and discipline, GHA authoring, Kyverno validation style, ESO Go templates, Datadog config gotchas, S3 lifecycle, EKS+VPC gotchas, AWS WAF on ALB, security-group co-management, ElastiCache auth-token rotation.
 - **`observability/`** — OTel resource-attribute precedence.
 - **`frontend/`** — Stack-locked frontend rules (e.g., React + TanStack + Radix/Shadcn + Tailwind quality).
@@ -86,7 +93,7 @@ User-invocable slash-command skills:
 
 ### `hook-tests/`
 
-Three harnesses for testing hooks, each covering an axis the others cannot: `run-fixtures.py` (one hook deeply, asserting the *outcome* rather than the exit code), `probe-hooks.py` (every hook shallowly, asserting which stream carried the payload — a hook can be individually correct and collectively unarmed), and `mutate-fixtures.py` (breaks each hook on purpose and requires the suite to notice). `fixture_env.py` builds the git state that state-reading guards decide from.
+Three harnesses for testing hooks, each covering an axis the others cannot: `run-fixtures.py` (one hook deeply, asserting the *outcome* rather than the exit code), `probe-hooks.py` (every hook shallowly, asserting which stream carried the payload — a hook can be individually correct and collectively unarmed), and `mutate-fixtures.py` (breaks each hook on purpose and requires the suite to notice). `fixture_env.py` builds the git state that state-reading guards decide from. `test-hook-contracts.py` pins event-aware output classification; `test-hook-diag.py` checks closed metadata logs and enforcement preservation. These are harness checks, not live Claude integration.
 
 ### `evals/`
 
@@ -98,7 +105,7 @@ These examples reflect one team's usage patterns and conventions. They are opini
 
 ## How to Use
 
-1. **Browse for patterns** — These are reference implementations, not copy-paste templates. Read through to understand the patterns, then adapt for your project.
+1. **Choose a route or browse** — Use the four declared recipes for copy-ready artifacts; read and adapt the remaining references with their dependencies.
 2. **Start with what you need** — You don't need all of this. A single `CLAUDE.md` with good rules is more valuable than a complex multi-agent setup used poorly.
 3. **Customize the specifics** — Replace `<org>`, `<company>`, `<your-cluster>` and other placeholders with your actual values. Adjust agent boundaries, review routing, and skill workflows to match your team's structure.
 

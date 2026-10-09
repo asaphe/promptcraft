@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with DevOps infrastructure code in this repository.
+This is a project-specific infrastructure template for Claude Code. The numbered layers, workspace layout, resource defaults and workflows are examples to customize, not universal infrastructure requirements.
 
 ---
 
@@ -69,7 +69,7 @@ module-name/
 
 ### Backend Configuration Standard
 
-**ALWAYS use this backend pattern:**
+**Example S3 backend for a Terraform version supporting S3 lockfiles:**
 
 ```terraform
 terraform {
@@ -80,7 +80,6 @@ terraform {
     region               = "us-east-1"
     encrypt              = true
     use_lockfile         = true
-    dynamodb_table       = "terraform-state-lock"
 
     assume_role = {
       role_arn = "arn:aws:iam::<AWS_ACCOUNT_ID>:role/<state-access-role>"
@@ -90,13 +89,15 @@ terraform {
 
 ```
 
+[S3 backend locking documentation](https://developer.hashicorp.com/terraform/language/backend/s3#state-locking) describes version-dependent configuration. DynamoDB locking is deprecated. Existing S3/DynamoDB configurations may coexist while legacy clients migrate; do not delete an existing locking table until every consumer has migrated.
+
 **Key Points:**
 
 - `workspace_key_prefix` organizes state files by category/purpose
 
 - `key = "terraform.tfstate"` is consistent across all modules
 
-- State file S3 path: `s3://bucket/{workspace_key_prefix}/{workspace}/terraform.tfstate`
+- Non-default workspace state path: `s3://bucket/{workspace_key_prefix}/{workspace}/terraform.tfstate`; the default workspace uses `s3://bucket/terraform.tfstate`
 - Workspaces enable environment/tenant separation
 
 ### Workspace Naming Conventions
@@ -657,14 +658,7 @@ terraform apply plan.tfplan
 
 **State lock errors:**
 
-```bash
-# Force unlock (use with caution)
-terraform force-unlock <lock-id>
-
-# Check lock in DynamoDB
-aws dynamodb scan --table-name terraform-state-lock
-
-```
+Read the lock error and verify the backend, workspace and owning operation. Wait for active writers. Only after confirming the lock is stale and obtaining approval, use `terraform force-unlock <lock-id>` in the matching backend/workspace. Inspect locks using the configured backend mechanism; a DynamoDB scan is not a default S3 lockfile check.
 
 **Wrong workspace:**
 

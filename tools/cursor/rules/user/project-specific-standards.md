@@ -1,6 +1,6 @@
 # Project-Specific Infrastructure Standards
 
-> **Context**: These standards apply specifically to infrastructure projects. These are organizational conventions and patterns that should be followed when working on infrastructure code, Terraform modules, Helm charts, and CI/CD pipelines.
+> **Context**: These standards apply specifically to infrastructure projects. These are example organizational conventions for infrastructure code, Terraform modules, Helm charts, and CI/CD pipelines. Adapt the layer layout and workspace scheme to the project.
 
 ## Terraform Standards
 
@@ -14,9 +14,11 @@
 ### State Management
 
 - Use S3 backend
-- Enable encryption and use DynamoDB for state locking ("terraform-state-locking")
+- Enable encryption and state locking using a mechanism supported by the backend and pinned Terraform version. For S3, use `use_lockfile = true` where supported; DynamoDB locking is deprecated.
 - Use Terraform workspaces for environment and service separation
 - Follow workspace naming: `{env}-{service}-{region}` or `{env}_{tenant}-{service}`
+
+See [S3 state locking](https://developer.hashicorp.com/terraform/language/backend/s3#state-locking). Retain S3/DynamoDB coexistence only for a planned legacy-client migration; do not remove an existing table until its consumers have migrated.
 
 ### Cross-Account Access
 

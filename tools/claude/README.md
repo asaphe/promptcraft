@@ -1,6 +1,6 @@
 # tools/claude/
 
-Claude Code configurations, guides, templates, and production examples.
+Claude Code configurations, guides, templates, and examples drawn from production use. The collection is broad; harness tests cover the documented adoption recipes and named guard contracts, not every example or live Claude client behavior.
 
 ## What's here
 
@@ -11,6 +11,8 @@ Claude Code configurations, guides, templates, and production examples.
 - `examples/` — sanitized production configs from real projects (agents, hooks, skills, rules).
 
 ## When to read
+
+For first adoption, use the [standalone baseline](examples/config/global-CLAUDE.md) and the four guarded recipes in [ADOPTION.md](../../ADOPTION.md). The [operations profile](examples/profiles/README.md), hooks and infrastructure scaffold are separate opt-in additions. The [advanced global profile](examples/config/global-CLAUDE-advanced.md) and specialized rules are reference-only; do not bulk activate examples.
 
 - Setting up Claude Code in a new repo → `scaffolding/` + `guides/`.
 - Adding a new agent/skill/hook → `templates/` + `guides/`.

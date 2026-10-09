@@ -37,6 +37,7 @@ re-emit rule, but it is directly observable only for uninstrumented hooks.
 """
 
 import argparse
+import importlib.util
 import json
 import os
 import pathlib
@@ -46,6 +47,10 @@ import sys
 import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
+
+SPEC = importlib.util.spec_from_file_location("run_fixtures", HERE / "run-fixtures.py")
+RUNNER = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(RUNNER)
 
 # Assembled: a comment-discipline guard reads Edit/Write content, so a literal run blocks this file.
 HASH = "#"
@@ -98,7 +103,7 @@ CASES = [
 ]
 
 
-def classify(rc, stdout, stderr):
+def classify(rc, stdout, stderr, event="PreToolUse"):
     if stderr.strip():
         return "stderr"
     if not stdout.strip():
@@ -109,7 +114,11 @@ def classify(rc, stdout, stderr):
         return "stdout-raw"
     if not isinstance(obj, dict):
         return "stdout-raw"
-    hso = obj.get("hookSpecificOutput") or {}
+    if RUNNER.classify(0, stdout, "", event) == "error":
+        return "invalid"
+    hso = obj.get("hookSpecificOutput", {})
+    if not isinstance(hso, dict):
+        return "invalid"
     if "permissionDecision" in hso:
         return hso["permissionDecision"]
     if "additionalContext" in hso:
@@ -117,7 +126,9 @@ def classify(rc, stdout, stderr):
     if "updatedInput" in hso:
         return "rewrite"
     if obj.get("decision") == "block":
-        return "block"
+        return "deny" if event == "PreToolUse" else "block"
+    if obj.get("decision") == "approve":
+        return "allow"
     return "stdout-raw"
 
 
@@ -130,12 +141,9 @@ def invariants(event, rc, stdout, stderr):
         bad.append("exit 2 discards stdout - the block reason must go to stderr")
     if rc == 0 and stderr.strip():
         bad.append("exit 0 discards stderr - this message reaches no one")
-    if rc == 0 and stdout.strip() and event in ("PreToolUse", "PostToolUse"):
-        try:
-            json.loads(stdout)
-        except ValueError:
-            bad.append("bare stdout on %s goes to the debug log - wrap it in "
-                       "hookSpecificOutput" % event)
+    if rc == 0 and stdout.strip() and event in ("PreToolUse", "PostToolUse", "Stop"):
+        if RUNNER.classify(rc, stdout, "", event) == "error":
+            bad.append("invalid %s structured output - wrap it in hookSpecificOutput with event-valid fields" % event)
     return bad
 
 
@@ -169,6 +177,13 @@ SELFTESTS = [
      'echo "advice nobody receives" >&2\nexit 0\n', "exit 0 discards stderr"),
     ("bare stdout on PreToolUse is flagged",
      'echo "context that goes to the debug log"\nexit 0\n', "wrap it in hookSpecificOutput"),
+    ("nested block is rejected",
+     """echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"block"}}'\n""", "invalid PreToolUse"),
+    ("unknown decision is rejected",
+     """echo '{"hookSpecificOutput":{"permissionDecision":"typo"}}'\n""", "invalid PreToolUse"),
+    ("non-object hook output is rejected",
+     """echo '{"hookSpecificOutput":null}'\n""", "invalid PreToolUse"),
+
 ]
 
 
@@ -196,7 +211,7 @@ def selftest(env):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--hooks-dir", default=str(HERE.parent))
+    ap.add_argument("--hooks-dir", default=str(HERE.parent / "hooks"))
     ap.add_argument("--only", default="", help="run cases whose name contains this")
     ap.add_argument("--selftest", action="store_true",
                     help="prove each contract invariant actually fires")
@@ -227,7 +242,7 @@ def main():
                 print("skip %-46s (no %s under %s)" % (name[:46], hook, hooks_dir))
                 continue
             rc, out, err = run(path, event, payload, str(hooks_dir), env)
-            got = classify(rc, out, err)
+            got = classify(rc, out, err, event)
             if want_chan == "context-free":
                 # May pass silently or with context, but must not flag.
                 ok = rc == want_exit and got in ("silent", "context")
@@ -251,6 +266,9 @@ def main():
 
     ran = len(cases) - len(skipped)
     print("\n%d/%d passed (%d skipped)" % (ran - len(failures), ran, len(skipped)))
+    if ran == 0:
+        print("FAIL: no hooks executed")
+        sys.exit(1)
     if failures:
         print("\n%d FAILURES:" % len(failures))
         for name, we, wc, rc, got, broken in failures:

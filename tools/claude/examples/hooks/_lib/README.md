@@ -7,7 +7,7 @@ This directory holds shell utilities that other hooks source. The leading unders
 | File | Purpose |
 |------|---------|
 | [`strip-cmd.sh`](strip-cmd.sh) | `strip_cmd "$CMD"` blanks heredoc bodies and `-m`/`--message` contents; `strip_quoted_args "$CMD"` blanks quoted literals. Both keep pattern matching on the command surface rather than on text a command carries. |
-| [`hook-diag.sh`](hook-diag.sh) | Diagnostic wrapper. Sourced AFTER reading stdin into `$INPUT`. Logs hook name, exit code, command and stderr tail to a rotating log, re-emits captured stderr on exit 1 and exit 2 so the reason reaches the model, and records a hook that wrote to stderr on exit 0 — where the harness discards it. |
+| [`hook-diag.sh`](hook-diag.sh) | Diagnostic wrapper. Sourced AFTER reading stdin into `$INPUT`. Logs closed metadata to rotating JSON Lines files, re-emits captured stderr on exit 1 and exit 2 so the reason reaches the model, and records a hook that wrote to stderr on exit 0 — where the harness discards it. |
 | [`strip-quoted-args.pl`](strip-quoted-args.pl) | Reads raw shell text on stdin and preserves executable expansions while blanking quoted data; `--values` retains argument values for extraction. |
 | [`split-cmd-segments.pl`](split-cmd-segments.pl) | Splits executable shell segments and recognised command substitutions into NUL-delimited records. |
 | [`resolve-workdir.sh`](resolve-workdir.sh) | `resolve_workdir "$CMD"` returns the repository a git command acts on — via `git -C <dir>` or a leading `cd <dir> &&` — or nothing. |
@@ -75,27 +75,26 @@ Every predicate fails closed: an unresolvable target, a missing `gh`, a timeout,
 
 ### `hook-diag.sh`
 
-A common Claude Code hook authoring pitfall: a hook exits 1 or 2 with a `>&2` message, but Claude Code's UI shows "No stderr output" and the model doesn't know why it was blocked. The cause is that Claude Code captures stderr through a pipe, and depending on shell-buffering / FD layout the message can be lost.
+The wrapper saves stderr in a temporary file and re-emits its bytes on exit 1 or 2 through the original descriptor, preserving the hook’s exit status. Exit-0 stderr is suppressed and recorded as `lost_stderr_on_exit_0`; model-facing advice belongs in stdout JSON.
 
-`hook-diag.sh` solves this by saving the original stderr to FD 3, redirecting FD 2 to a temp file, and on exit re-emitting the captured content via `exec 2>&3; echo "$captured" >&2`. The model sees the reason; the user sees a clean log at `/tmp/claude-hook-diag.log` for non-zero exits.
+Persisted records have exactly `ts`, `hook`, `exit`, `decision`, and `event`. `ts` is UTC; `exit` is an integer for exit records (including lost stderr) and null for events emitted before exit. No input, command, reason, stderr, path, session ID or caller detail is recorded.
 
-Exit 2 is the only code that blocks the tool call. On exit 1 the tool still runs, and **on exit 0 the harness discards stderr entirely** — so a hook that computes an advisory, writes it to stderr and exits 0 is talking to nobody, looks correct in review, and never fires. Because this wrapper captures FD 2, it is also what hides that. It now logs the combination as `event=LOST_STDERR_ON_EXIT_0`. A reminder that must reach the model on a pass path belongs on **stdout**, as `hookSpecificOutput.additionalContext`.
+| Field | Closed values |
+|---|---|
+| `hook` | `destructive-guard`, `worktree-preflight`, `skill-arg-substitution-guard`, `session-log`, `commit-attribution-guard`, `unknown` |
+| `decision` | `none`, `allow`, `ask`, `deny`, `defer`, `notify`, `unknown` |
+| `event` | `exit`, `lost_stderr_on_exit_0`, `invalid_json`, `splitter_missing`, `transcript_unreadable`, `derive_script_missing`, `derive_produced_nothing`, `derive_returned_no_path`, `prune_failed`, `unknown` |
 
-Optional logging, off unless you opt in:
+Unrecognised categories become `unknown`. `hook_diag_event <event>` ignores extra arguments for compatibility; callers should pass only a fixed category. `HOOK_DIAG_DECISION` defaults to `none` and must be a closed value, such as `ask`, never a reason prefix.
 
 | Variable | Effect |
-|----------|--------|
-| `HOOK_DIAG_LOG` | Override the block log path — a replay or test harness must not append to the corpus it reads. |
-| `HOOK_DIAG_LOG_ALLOWS` | Set to any non-empty value to log exit-0 decisions to `HOOK_DIAG_ALLOW_LOG`. Off by default: allows outnumber blocks by orders of magnitude. |
-| `HOOK_DIAG_DECISION` | Set by the hook before returning, e.g. `ask:<trigger>`. An ask and a plain allow are both exit 0, so without this, prompt volume is unmeasurable. Any value starting `ask` is also appended to `HOOK_DIAG_ASK_LOG`. |
+|---|---|
+| `HOOK_DIAG_LOG` | Nonzero exits and degradation events; default `/tmp/claude-hook-diag.log`. |
+| `HOOK_DIAG_LOG_ALLOWS` | Any nonempty value enables exit-0 records in `HOOK_DIAG_ALLOW_LOG`. |
+| `HOOK_DIAG_ALLOW_LOG` | Default `$HOME/.claude/local/hook-allow-decisions.log`. |
+| `HOOK_DIAG_ASK_LOG` | Exit-0 `ask` records, independently of allow logging; default `$HOME/.claude/local/hook-ask-decisions.log`. |
 
-`hook_diag_event <NAME> [detail]` records something a hook notices about **itself** — a degraded dependency, a missing helper. Exit 0 discards stderr, so without it a hook that quietly falls back to a weaker mode leaves no trace at all; `destructive-guard` uses it to record `SPLITTER_MISSING`.
-
-Newlines are flattened out of every logged field. The log is a line-oriented record format, so an unflattened field lets a command body forge a `---`, `ts=` or `hook=` line and desynchronise anything parsing it.
-
-**These records contain verbatim command text, which can include credential material** — `kubectl patch secret … -p '{"data":{...}}'` is on the ask-trigger list, so it lands in the ask log in full. Log files are therefore created with `umask 077`, and the two decision logs default to `$HOME/.claude/local/` rather than a predictable name in a world-writable directory. `HOOK_DIAG_LOG` keeps its historical `/tmp` default for compatibility; on a shared host, point it somewhere private.
-
-Rotation uses `wc -c`, not `stat -f%z` — the latter is BSD-only, and on Linux it silently never rotated, which mattered most for the one file holding raw command text.
+Files are created with `umask 077` and rotate to `.prev` past 1 MB using portable `wc -c`. Log failures never change enforcement or exit status. Test harnesses must redirect all three destinations into isolated temporary directories. Archive old text-format logs before using JSON Lines readers; existing records are not converted.
 
 ## Usage in a hook
 
@@ -104,7 +103,7 @@ Rotation uses `wc -c`, not `stat -f%z` — the latter is BSD-only, and on Linux 
 # my-hook.sh
 
 INPUT=$(cat)                              # MUST be first — hook-diag reads $INPUT
-HOOK_DIAG_NAME="my-hook"                  # optional, otherwise uses basename
+HOOK_DIAG_NAME="my-hook"
 source "$(dirname "$0")/../_lib/hook-diag.sh"
 
 # ... extract CMD, do work, source strip-cmd if needed:

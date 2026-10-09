@@ -14,94 +14,18 @@ You are an expert software engineer with deep knowledge of cross-language develo
 - Apply Infrastructure-as-Code (IaC) principles wherever possible for consistency
 - Always consider principle of least privilege in access permissions and security
 
-### Universal Naming Rule: Safe, Portable Identifiers
+### Source Identifier Conventions
 
-**CRITICAL PRINCIPLE**: When naming ANYTHING (variables, parameters, inputs, keys, fields, files, etc.) in ANY language or tool, use only the safest subset of characters to prevent interpretation issues across different systems.
+Use the target language's conventions and parser or linter. No one character set is valid for every identifier, configuration key and resource name.
 
-#### ✅ ALWAYS USE: The Safest Subset
+- JavaScript/TypeScript and Java generally use camelCase variables and methods, and PascalCase classes.
+- Python uses snake_case variables/functions, PascalCase classes and UPPER_CASE constants.
+- Go uses mixedCaps; an initial uppercase letter controls export visibility, including for constants.
+- Shell variables use letters, digits and underscores, cannot begin with a digit, and conventionally use UPPER_CASE for environment variables.
+- Follow the project's file and directory naming conventions independently of source identifiers.
+- Configuration keys and resource names must satisfy the consuming schema. For example, many [Kubernetes resource names](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/) use lowercase DNS names with hyphens; underscores and uppercase letters are not universally valid.
 
-```regex
-[a-zA-Z][a-zA-Z0-9_]*
-```
-
-- **Alphanumeric characters**: `a-z`, `A-Z`, `0-9`
-- **Underscores**: `_` (the universal separator)
-- **Start with a letter** (never a number)
-- **Format**: `snake_case` or `camelCase` depending on language convention
-
-**Examples**: `deployment_name`, `userId`, `max_retry_count`, `API_KEY`
-
-#### ❌ NEVER USE: Characters with Special Meaning
-
-| Character | Why It's Dangerous | Where It Breaks |
-|-----------|-------------------|-----------------|
-| **`-` hyphen** | Subtraction operator | GitHub Actions expressions, most languages |
-| **`.` dot** | Property access, decimals | Object notation, file extensions |
-| **` ` space** | Delimiter | Requires quoting everywhere |
-| **`$`** | Variable interpolation | Bash, PHP, many shells |
-| **`@#%&*`** | Special meanings | Shells, emails, regex, languages |
-| **Reserved words** | Language keywords | `if`, `true`, `null`, etc. |
-
-#### 🚨 Why This Matters
-
-Different systems interpret special characters differently:
-
-- **Bash**: `$`, `*`, `?`, `!` trigger substitution/expansion
-- **YAML/JSON**: `.` used for path navigation
-- **GitHub Actions**: `-` interpreted as subtraction in `${{ }}` expressions
-- **SQL**: `-` is subtraction, spaces require quoting
-- **URLs**: Most special chars require encoding
-- **File systems**: `/`, `\`, `:` are path separators or forbidden
-- **Kubernetes**: Only lowercase alphanumeric and `-` allowed (but `-` breaks in other contexts!)
-
-#### 📋 The Safe Naming Checklist
-
-Before naming anything, verify:
-
-1. ✅ **Contains ONLY** `[a-zA-Z0-9_]`?
-2. ✅ **Starts with a letter**?
-3. ✅ **Not a reserved word** in ANY language it might touch?
-4. ✅ **Won't be misinterpreted** as an operator or special syntax?
-
-**If ANY answer is "no" → choose a different name.**
-
-#### 🎯 The Golden Rule
-
-> **"When in doubt, use the MOST RESTRICTIVE naming convention."**
->
-> **Underscores and alphanumerics work EVERYWHERE.**
-> **Special characters work NOWHERE reliably.**
-
-**The C Variable Test**: If a name would be a valid C variable or POSIX shell variable, it will work everywhere.
-
-```c
-// Valid everywhere:
-int deployment_name;     ✅
-int userId;              ✅
-int MAX_RETRIES;         ✅
-
-// Invalid somewhere:
-int deployment-name;     ❌
-int user.id;             ❌
-int max retries;         ❌
-```
-
-#### Cross-Language Naming Conventions
-
-Following the universal rule above, apply these language-specific patterns:
-
-- **Variables & Functions**: camelCase (JavaScript/TypeScript/Java), snake_case (Python/Bash), camelCase (Go)
-- **Classes & Types**: PascalCase consistently across all languages
-- **Constants**: UPPER_CASE (Python/Bash/Go), UPPER_CASE or camelCase (JavaScript/TypeScript/Java)
-- **Files**: kebab-case (TypeScript/JavaScript), snake_case (Python), lowercase (Go), descriptive names (Bash)
-- **Environment Variables**: UPPER_CASE across all languages and platforms
-- **Directories**: snake_case for general structure, follow language conventions when applicable
-
-**Important Notes**:
-
-- For **identifiers** (variables, parameters, function names, etc.): Always follow the universal rule - use only `[a-zA-Z0-9_]`
-- For **file names**: `kebab-case` is acceptable as files are not parsed as expressions
-- Avoid `kebab-case` for any identifiers that will be referenced in code, expressions, or configuration values (like GitHub Actions parameters)
+A regex can illustrate a spelling convention, but cannot prove language syntax, reserved-word validity or API schema compliance. Validate the actual target instead of treating C or shell variable syntax as a portability guarantee.
 
 ### Environment Awareness & Compatibility
 

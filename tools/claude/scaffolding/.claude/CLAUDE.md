@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-`<TODO>` Replace this paragraph with one or two sentences describing your project: what it is, primary languages, services, infrastructure surface, and branch model. Keep it under 200 lines total in this file — see [`tools/claude/guides/CLAUDE.md`](../../guides/CLAUDE.md) for design guidance.
+`<TODO>` Replace this paragraph with one or two sentences describing your project: what it is, primary languages, services, infrastructure surface, and branch model. Keep it under 200 lines total in this file — see [`tools/claude/guides/CLAUDE.md`](https://github.com/asaphe/promptcraft/blob/main/tools/claude/guides/CLAUDE.md) for design guidance.
 
 ## On-Demand Reference (read when relevant)
 
@@ -10,7 +10,7 @@
 
 ## Specialized Agents
 
-This scaffold ships two starter agents in `.claude/agents/` to demonstrate the pattern. Add more as your domain grows; see [`tools/claude/templates/agents/agent-template.md`](../../templates/agents/agent-template.md) for the shape and [`.claude/docs/agent-roster.md`](docs/agent-roster.md) for the cross-agent deferral table.
+This scaffold ships two starter agents in `.claude/agents/` to demonstrate the pattern. Add more as your domain grows; see [`tools/claude/templates/agents/agent-template.md`](https://github.com/asaphe/promptcraft/blob/main/tools/claude/templates/agents/agent-template.md) for the shape and [`.claude/docs/agent-roster.md`](docs/agent-roster.md) for the cross-agent deferral table.
 
 | Agent | When to Use |
 |-------|-------------|
@@ -37,7 +37,9 @@ When you encounter a correction, failure, or unexpected behavior during a sessio
 
 ## Adapting this scaffold
 
+Public repository links are optional upstream browsing help, not local runtime dependencies.
+
 - Replace every `<TODO>` marker.
 - Add subdirectory `CLAUDE.md` files for any directory whose conventions diverge from the root (e.g., `frontend/CLAUDE.md`, `infrastructure/CLAUDE.md`). Claude Code loads the nearest one based on cwd.
-- Add agents under `.claude/agents/` as new domains emerge — start from [`tools/claude/templates/agents/agent-template.md`](../../templates/agents/agent-template.md).
-- Add skills under `.claude/skills/` for repeat workflows — see [`tools/claude/templates/skills/skill-template.md`](../../templates/skills/skill-template.md).
+- Add agents under `.claude/agents/` as new domains emerge — start from [`tools/claude/templates/agents/agent-template.md`](https://github.com/asaphe/promptcraft/blob/main/tools/claude/templates/agents/agent-template.md).
+- Add skills under `.claude/skills/` for repeat workflows — see [`tools/claude/templates/skills/skill-template.md`](https://github.com/asaphe/promptcraft/blob/main/tools/claude/templates/skills/skill-template.md).

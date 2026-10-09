@@ -8,17 +8,17 @@ Distilled from real production use. Copy what fits, ignore what doesn't, adapt t
 
 Pick your assistant:
 
-- **Claude Code** → [`tools/claude/`](tools/claude/) — CLAUDE.md patterns, hooks, agents, skills, full example config.
+- **Claude Code** → [`tools/claude/`](tools/claude/) — a standalone baseline, optional hooks/scaffolding, and broad reference material for agents and skills.
 - **Codex** → [`tools/codex/`](tools/codex/) — running a Claude Code setup under Codex: the config map, the fields that need absolute paths, and a dispatcher that keeps ported guard hooks blocking.
-- **Cursor** → [`tools/cursor/`](tools/cursor/) — `.cursor/rules/*.mdc` project rules, user-rules UI copy-paste, MCP configuration.
+- **Cursor** → [`tools/cursor/`](tools/cursor/) — pasteable user rules, one ready project rule, JSON templates requiring conversion, and MCP references.
 - **ChatGPT** → [`tools/chatgpt/`](tools/chatgpt/) — Custom Instructions (global) and Project Instructions (scoped).
 
-The universal content — principles, language standards, infra patterns, CI/CD, quality — lives in [`shared/`](shared/) and is referenced by the tool directories.
+The cross-tool content — principles, language standards, infra patterns, CI/CD, quality — lives in [`shared/`](shared/) and is referenced by the tool directories.
 
 ## What you can take from it
 
 - **Guard hooks** — [`tools/claude/examples/hooks/`](tools/claude/examples/hooks/): PreToolUse hooks that block or confirm risky commands — a push to the default branch, destructive git and cloud operations, a PR opened before its branch is pushed — each with a README. The main guards ship fixture tests and a mutation suite in [`hook-tests/`](tools/claude/examples/hook-tests/).
-- **A complete Claude Code config** — global rules in [`global-CLAUDE.md`](tools/claude/examples/config/global-CLAUDE.md), the agents, skills, rules and on-demand docs around it in [`tools/claude/examples/`](tools/claude/examples/), and a per-repo `.claude/` in [`tools/claude/scaffolding/`](tools/claude/scaffolding/).
+- **A standalone Claude baseline** — [`global-CLAUDE.md`](tools/claude/examples/config/global-CLAUDE.md), with separate opt-in [operations rules](tools/claude/examples/profiles/README.md), core hooks and project scaffold. The [advanced author profile](tools/claude/examples/config/global-CLAUDE-advanced.md) is reference-only. Use the four guarded recipes in [`ADOPTION.md`](ADOPTION.md).
 - **Guides and templates** — how to write agents, skills, hooks and `CLAUDE.md` files, and what belongs in each: [`tools/claude/guides/`](tools/claude/guides/) and [`tools/claude/templates/`](tools/claude/templates/).
 - **Conventions for any assistant** — principles, language standards and infrastructure patterns in [`shared/`](shared/), with ready-to-paste forms for Cursor and ChatGPT under `tools/<tool>/`.
 
@@ -32,7 +32,7 @@ The strongest ideas in this repo are concentrated in a handful of files. If you 
 - **Stateful operations protocol** — query-state → backup-full-object → mutate → verify-against-backup, for any change to external systems (cloud, DB, K8s, secrets, identity). [`shared/principles/operational-safety-patterns.md`](shared/principles/operational-safety-patterns.md).
 - **Approval interpretation** — "looks good" ≠ "execute everything"; "show me X" ≠ "run X". Explicit phrases gate destructive operations. Same file: [`operational-safety-patterns.md`](shared/principles/operational-safety-patterns.md).
 - **Hooks as deterministic guardrails** — enforce rules at the tool layer (PreToolUse hooks) rather than relying on the agent to remember. Safer and cheaper than instruction-only enforcement. [`tools/claude/examples/hooks/`](tools/claude/examples/hooks/).
-- **Context management is the #1 success factor** — most agent failures trace to bloated or stale context, not weak reasoning. Manage the window obsessively. [`tools/claude/guides/claude-best-practices.md`](tools/claude/guides/claude-best-practices.md).
+- **Keep context relevant and current** — remove stale assumptions, retain task decisions and load guidance when needed. This is practical guidance, not a measured ranking of failure causes. [`tools/claude/guides/claude-best-practices.md`](tools/claude/guides/claude-best-practices.md).
 
 ## Repo layout
 
@@ -58,7 +58,7 @@ The strongest ideas in this repo are concentrated in a handful of files. If you 
 └── .claude/              # Contributor config (loaded when editing this repo)
 ```
 
-Each second-level directory has its own README listing contents and when to use them.
+Each second-level directory has its own README listing contents and when to use them. The four Claude adoption recipes and named guard/dispatcher suites are tested; coverage varies by artifact. These checks do not certify every example or validate each tool's live UI.
 
 ## Adopting content
 
@@ -66,9 +66,9 @@ See [`ADOPTION.md`](ADOPTION.md) for step-by-step per-tool setup.
 
 TL;DR:
 
-- **Claude Code:** drop files from `tools/claude/examples/` into your own `.claude/` directory and edit to taste.
+- **Claude Code:** start with the standalone global baseline; select operations rules, core hooks or the infrastructure scaffold separately through the guarded recipes in `ADOPTION.md`. Other examples are browse/adapt references.
 - **Codex:** map your `.claude/` setup with `tools/codex/claude-code-translation.md`; run your Claude Code Bash hooks through `tools/codex/bash-hook-dispatcher.sh`.
-- **Cursor:** copy `tools/cursor/rules/user/*.md` into Settings → Rules → User Rules; drop `tools/cursor/rules/mdc/*.mdc` into your repo's `.cursor/rules/`.
+- **Cursor:** copy `tools/cursor/rules/user/*.md` into Settings → Rules → User Rules; copy the selected `tools/cursor/rules/mdc/kubernetes/kubernetes-helm.mdc` into your repo's `.cursor/rules/`; convert JSON templates before use.
 - **ChatGPT:** paste `tools/chatgpt/global/*.md` into Settings → Custom Instructions; paste `tools/chatgpt/projects/*.md` into a Project's instructions.
 
 ## Built with this
@@ -93,7 +93,7 @@ Standalone tools:
 
 ## Conventions
 
-- **Shared is canonical.** Universal rules live in `shared/` once; tool dirs reference them, not duplicate.
+- **Shared is canonical.** Cross-tool guidance lives in `shared/` once; tool dirs reference them, not duplicate.
 - **Nothing here is a hard dependency.** Every file assumes you will read, edit, and adapt — not consume verbatim.
 - **Zero PII.** This is a public repo. No company names, internal service names, account IDs, or personal data.
 
