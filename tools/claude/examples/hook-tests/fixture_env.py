@@ -115,6 +115,9 @@ def destructive_guard(tmp):
     _base_commit(feature)
     same_repo_main = os.path.join(tmp, "push-feature-main")
     _git(feature, "worktree", "add", "-q", "-b", "main", same_repo_main)
+    # Directories named like the placeholders, so a guard that reads one as a path finds a checkout instead of nothing.
+    for placeholder in ("SUBSTITUTION", "QUOTED_ARG"):
+        os.makedirs(os.path.join(feature, placeholder))
     spaced = _init(os.path.join(tmp, "push main wt"))
     # HOME is a checkout off the default branch, so `cd -P && git push` reads a branch no other repo here holds.
     env = dict(_grant_dir(tmp), HOME=_init(os.path.join(tmp, "home"), branch="home"))
