@@ -181,6 +181,9 @@ ctx	the build did pass, so open a PR
 # WHY: a `create PR` that a later colon labels is a report line, not a request.
 allow	Report:\n- create PR: failed\n- ok
 
+# WHY: the verb reaches only the next four words, so a PR mentioned later in the clause is not the thing opened.
+allow	open the dashboard and check whether the PR builds
+
 # --- menu answers: PostToolUse on AskUserQuestion, the question and the label picked ---
 #!event PostToolUse
 #!tool AskUserQuestion

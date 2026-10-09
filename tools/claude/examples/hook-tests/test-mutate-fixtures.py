@@ -27,6 +27,9 @@ WORKFLOW = HERE.parents[3] / ".github" / "workflows" / "hook-evals.yml"
 COMMENT = "# Per-turn grants"
 NO_OP = {"why": "a comment-only change, which no fixture can see",
          "replace": {"from": COMMENT, "to": "# Per turn grants"}}
+# Sleeps past any --timeout below, so every case times out however fast the runner is.
+SLOW = {"why": "a hook that sleeps past the per-case timeout",
+        "replace": {"from": COMMENT, "to": "sleep 5\n# Per turn grants"}}
 
 
 def real_mutation(index=0):
@@ -47,7 +50,7 @@ class MutateFixturesTest(unittest.TestCase):
 
     def test_a_run_that_only_timed_out_is_inconclusive_and_fails(self):
         self.assertIn(COMMENT, (HOOKS / "merge-grant" / "merge-grant.sh").read_text())
-        proc = self.score([NO_OP], "--timeout", "0.05")
+        proc = self.score([SLOW], "--timeout", "0.2")
         self.assertEqual(proc.returncode, 1, proc.stdout)
         self.assertIn("INCONCLUSIVE", proc.stdout)
         self.assertIn("0/1 mutations caught", proc.stdout)
