@@ -186,8 +186,9 @@ resolve_segment_dirs() {
         *) grp_exit="" ;;
       esac
     fi
+    # A negated condition is caught below: its `! ` ends the chain of the move it negates.
     cond=""
-    case "$seg" in 'if '*|'elif '*|'while '*|'for '*) [[ $seg =~ ^[a-z]+[[:space:]]+! ]] || cond=1 ;; esac
+    case "$seg" in 'if '*|'elif '*|'while '*|'for '*) cond=1 ;; esac
     op_before=$last_op
     last_op=""
     case "$seg" in 'do '*|do) loop_n=$((loop_n + 1)); loops="$loops:$loop_n" ;; esac

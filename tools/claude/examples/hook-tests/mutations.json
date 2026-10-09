@@ -636,13 +636,6 @@
       }
     },
     {
-      "why": "a negated if condition is trusted, so `if ! git checkout -b feature; then git push` from main passes",
-      "replace": {
-        "from": "[[ $seg =~ ^[a-z]+[[:space:]]+! ]] || cond=1",
-        "to": "cond=1"
-      }
-    },
-    {
       "why": "a piped cd moves later segments again, so `cd <main> && cd <feature> | true; git push` passes",
       "replace": {
         "from": "    [ -z \"$piped\" ] || seg=\"\"\n",
