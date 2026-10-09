@@ -4,8 +4,8 @@
     {
       "why": "a negated request arms the grant, so \"don't merge yet\" makes a merge approvable",
       "replace": {
-        "from": "$0 == \"merge\" && !negated && prev != \"no\" { found = 1 }",
-        "to": "$0 == \"merge\" { found = 1 }"
+        "from": "$0 == \"merge\" && !negated && prev != \"no\" &&",
+        "to": "$0 == \"merge\" &&"
       }
     },
     {
@@ -245,6 +245,45 @@
       "replace": {
         "from": " && label != \"answer\") tent = 0",
         "to": ") tent = 0"
+      }
+    },
+    {
+      "why": "a `-` or `_` compound stops being a name, so `merge-grant` in a prompt arms the merge grant",
+      "delete_matching": "mergename"
+    },
+    {
+      "why": "a determiner stops making merge a noun, so \"an `eval` or a merge command\" arms the merge grant",
+      "replace": {
+        "from": " && !((prev in ndet) && !(prev2 in doer))",
+        "to": ""
+      }
+    },
+    {
+      "why": "a verb before the determiner stops counting, so \"do the merge\" arms nothing",
+      "replace": {
+        "from": " && !(prev2 in doer))",
+        "to": ")"
+      }
+    },
+    {
+      "why": "a status reads as a request, so \"the PR is ready to merge\" arms the merge grant",
+      "replace": {
+        "from": " && !(prev == \"to\" && prev2 == \"ready\")",
+        "to": ""
+      }
+    },
+    {
+      "why": "a question about the past asks for a merge, so \"did you merge 17?\" arms the merge grant",
+      "replace": {
+        "from": "prev != \"no\" && !asked && !((prev",
+        "to": "prev != \"no\" && !((prev"
+      }
+    },
+    {
+      "why": "the word two back is never recorded, so \"do the merge\" arms nothing and \"ready to merge\" arms",
+      "replace": {
+        "from": "{ prev2 = prev; prev = $0 }",
+        "to": "{ prev = $0 }"
       }
     }
   ],

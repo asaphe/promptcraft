@@ -45,6 +45,19 @@ allow	never (ever) merge without me
 ctx	no, merge it
 ctx	ok: merge 17
 
+# --- allow: a mention names a merge, it does not ask for one ---
+# WHY: after a determiner merge is a noun, before a `-` or `_` it is part of a name, and `ready to merge` is a status.
+allow	the per-turn PR grant in `merge-grant` arms on a request
+allow	commands with a push, an `eval` or a merge command go in a script file
+allow	CI is green and the PR is ready to merge
+allow	merge_gate reads the grant file
+# WHY: `did` with a subject asks about the past, as it does for a PR.
+allow	did you merge 17?
+# WHY: after do or run the merge is still the thing asked for, and a compound that ends in merge is still one.
+ctx	do the merge
+ctx	run the merge for 17
+ctx	squash-merge 17
+
 # --- a notification is not the user speaking; text around a pasted one is ---
 allow	<task-notification>agent finished: ready to merge</task-notification>
 ctx	<task-notification>x</task-notification> looks good, merge 17

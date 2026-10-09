@@ -235,6 +235,19 @@ class MergeGrantTest(unittest.TestCase):
             self.assertEqual(self.prompt("thanks"), "allow")
             self.assert_verdict(PR_CREATE, "ask")
 
+    def test_a_mention_of_a_merge_clears_the_grant_and_a_request_arms_only_merge(self):
+        for text in ("the per-turn PR grant in `merge-grant` arms on a request",
+                     "commands with an `eval` or a merge command go in a script file",
+                     "CI is green and the PR is ready to " + "merge", "did you merge 17?"):
+            self.prompt("merge 17")
+            self.assertEqual(self.prompt(text), "allow", text)
+            self.assert_verdict(MERGE, "hard")
+        for text in ("do the merge", "run the merge for 17", "squash-merge 17"):
+            self.assertEqual(self.prompt(text), "ctx", text)
+            self.assert_verdict(MERGE, "ask", text)
+            self.assert_verdict(PR_CREATE, "ask")
+            self.prompt("thanks")
+
     def test_a_held_open_prs_drops_at_a_comma_but_the_merge_still_arms(self):
         self.assertEqual(self.prompt("open PRs, then merge them"), "ctx")
         self.assert_verdict(MERGE, "ask")
