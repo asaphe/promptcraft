@@ -3,26 +3,47 @@ use strict;
 use warnings;
 
 my $values = @ARGV && $ARGV[0] eq '--values';
+# see: README.md § strip-quoted-args.pl, "--bodies" — the raw command with only its data heredoc bodies stripped
+my $bodies = @ARGV && $ARGV[0] eq '--bodies';
 my $input = do { local $/; <STDIN> };
 $input = '' unless defined $input;
 
 my $SHELL = qr{(?:^|/)(?:bash|sh|zsh|ksh|mksh|pdksh|oksh|loksh|lksh|dash|ash|posh|yash|csh|tcsh|fish)$};
 my $LANG = qr{(?:^|/)(python3?|perl|ruby|node)$};
 my $STDIN_WRAPPER = qr{(?:^|/)(?:timeout|gtimeout|nice|nohup|sudo|doas|stdbuf|setsid|ionice|caffeinate|arch|runuser|chroot|unbuffer|chrt|taskset|busybox)$};
+# Anything in a non-shell body that can start a process; such a body that is unreadable as shell fails closed.
+my $CAPABLE = qr{\bqx\s*[^\w\s]|%x\s*[^\w\s]|\b(?:subprocess|Open3|child_process|pty)\b|\b(?:system|exec\w*|spawn\w*|popen|Popen|check_output|check_call|getoutput|getstatusoutput)\s*[(\["']};
 # A heredoc's id is its context plus its offset, so a body rendered as code on a later pass shifts no other id.
 our $CTX = 'top';
-our (%FORCE, %LATE);
+our (%FORCE, %LATE, @TOPDOCS, @EXTRA);
+# A backtick body with no escapes is a verbatim slice of the input, so its heredocs keep input offsets.
+our ($BASE, $VERBATIM) = (0, 1);
 
 # see: README.md § strip-quoted-args.pl — a heredoc found to be code after its body was rendered re-runs the scan
 my $output;
 for (1 .. 64) {
     %LATE = ();
+    @TOPDOCS = ();
+    @EXTRA = ();
     ($output) = scan($input, 0, '', 0);
     last unless %LATE;
     $FORCE{$_} = $LATE{$_} for keys %LATE;
 }
 die "Heredoc classification did not settle\n" if %LATE;
+$output = raw_bodies() if $bodies;
 print $output;
+
+sub raw_bodies {
+    my @edits;
+    for my $doc (grep { !$_->{executed} && $_->{span} } @TOPDOCS) {
+        push @edits, [@{$doc->{span}}, ''], [@{$doc->{open}}, '<<STRIPPED_HEREDOC>>'];
+    }
+    my $raw = $input;
+    for my $edit (sort { $b->[0] <=> $a->[0] } @edits) {
+        substr($raw, $edit->[0], $edit->[1] - $edit->[0]) = $edit->[2];
+    }
+    return @EXTRA ? join("\n", $raw, @EXTRA) : $raw;
+}
 
 sub mark {
     my ($kind, @docs) = @_;
@@ -145,11 +166,65 @@ sub file_reader {
     return 0;
 }
 
-# `$( … )` at command position runs its output; `X=$( … )` assigns it.
+# `$( … )` at command position runs its output, and so does one a wrapper runs (`sudo $( … )`); `X=$( … )` assigns it.
 sub at_command_position {
     my ($simple) = @_;
-    return 0 if command_words($simple);
-    return $simple !~ /\S/ || $simple =~ /\s\z/;
+    return 0 unless $simple !~ /\S/ || $simple =~ /\s\z/;
+    my @words = command_words($simple);
+    return 1 unless @words;
+    return $words[0] =~ $STDIN_WRAPPER || $words[0] =~ m{(?:^|/)xargs$} ? 1 : 0;
+}
+
+# A Python, Perl, Ruby or Node inline-code flag right before the string: `python3 -c '…'`, `perl -e '…'`.
+sub lang_inline {
+    my @words = program_words($_[0]);
+    return 0 unless @words >= 2 && $words[0] =~ $LANG;
+    my ($language, $flag) = ($1, $words[-1]);
+    return $flag =~ /^-[^-]*c$/ if $language =~ /^python/;
+    return $flag =~ /^-[^-]*[eE]$/ if $language eq 'perl';
+    return $flag =~ /^-[^-]*e$/ if $language eq 'ruby';
+    return $flag =~ /^(?:-[^-]*[ep]|--eval|--print)$/;
+}
+
+# One here-string word, unquoted piece by piece: `'git push'" main"`, `git\ push`, `$'…'`. A substitution in it runs wherever it is, so it stays visible.
+sub here_word {
+    my ($text, $i) = @_;
+    my ($value, $visible, @docs) = ('', '');
+    while ($i < length $text) {
+        my $char = substr($text, $i, 1);
+        last if $char =~ /[\s;&|<>()]/;
+        if ($char eq '\\') {
+            $value .= substr($text, $i + 1, 1);
+            $i += 2;
+            next;
+        }
+        my $ansi = 0;
+        if ($char eq '$' && substr($text, $i + 1, 1) =~ /["']/) {
+            $i++;
+            $char = substr($text, $i, 1);
+            $ansi = $char eq "'";
+        }
+        if ($char eq '"' || $char eq "'") {
+            my ($rendered, $next, $inner) = quoted($text, $i, 1, $ansi);
+            push @docs, @$inner;
+            $visible .= ' ' . (quoted($text, $i, 0, $ansi))[0] if @$inner || $rendered =~ /\$\(/;
+            $rendered = $2 if $rendered =~ /\A(["'])(.*)\1\z/s;
+            $value .= $rendered;
+            $i = $next;
+            next;
+        }
+        if ($char eq '`' || substr($text, $i, 2) eq '$(') {
+            my ($code, $next, $inner) = expansion($text, $i);
+            push @docs, @$inner;
+            $value .= $code;
+            $visible .= ' ' . $code;
+            $i = $next;
+            next;
+        }
+        $value .= $char;
+        $i++;
+    }
+    return ($value, $i, \@docs, $visible);
 }
 
 sub backtick {
@@ -178,6 +253,8 @@ sub expansion {
     if (substr($text, $start, 1) eq '`') {
         my ($body, $next) = backtick($text, $start);
         local $CTX = "$CTX/bt$start";
+        local $BASE = $BASE + $start + 1;
+        local $VERBATIM = $VERBATIM && $body eq substr($text, $start + 1, $next - $start - 2);
         my ($rendered, undef, $docs) = scan($body, 0, '', 0);
         return ('$(' . $rendered . ')', $next, $docs);
     }
@@ -375,7 +452,7 @@ sub exec_calls {
     my ($doc, $body) = @_;
     my $out = '';
     my $calls = qr{(?:os\.(?:system|popen|exec\w*|spawn\w*)|subprocess\.\w+|\b(?:Popen|check_output|check_call|system|execSync|execFileSync|execFile|exec|spawnSync|spawn))\b};
-    while ($body =~ /$calls\s*\(?\s*\[?\s*/g) {
+    while ($body =~ /$calls\s*\(?\s*(?:\w+\s*=\s*)?\[?\s*/g) {
         my ($pos, @parts) = (pos($body));
         while (my ($value, $next) = string_literal($body, $pos)) {
             push @parts, $value;
@@ -385,17 +462,29 @@ sub exec_calls {
         }
         pos($body) = $pos;
         next unless @parts;
+        push @EXTRA, join(' ', @parts) if $bodies;
         local $CTX = "$doc->{id}/call$pos";
         my $code = eval { (scan(join(' ', @parts), 0, '', 0))[0] };
         $out .= "\$($code)\n" if defined $code;
     }
-    while ($body =~ /(?:\bqx|%x)\s*([({\[<])/g) {
-        my $close = {qw/( ) { } [ ] < >/}->{$1};
-        my $start = pos($body);
-        my $end = index($body, $close, $start);
-        last if $end < 0;
+    # Any delimiter, and a bracket pair nests: `qx/…/`, `qx{…}`, `qx(echo (a) b)`.
+    while ($body =~ /(?:\bqx|%x)\s*([^\w\s])/g) {
+        my $open = $1;
+        my $close = {qw/( ) { } [ ] < >/}->{$open} // $open;
+        my ($start, $j, $depth) = (pos($body), pos($body), 1);
+        while ($j < length $body) {
+            my $char = substr($body, $j, 1);
+            if ($char eq '\\') { $j += 2; next; }
+            if ($char eq $close) { last unless --$depth; }
+            elsif ($char eq $open) { $depth++; }
+            $j++;
+        }
+        last if $j >= length $body;
+        my $command = substr($body, $start, $j - $start);
+        pos($body) = $j + 1;
+        push @EXTRA, $command if $bodies;
         local $CTX = "$doc->{id}/qx$start";
-        my $code = eval { (scan(substr($body, $start, $end - $start), 0, '', 0))[0] };
+        my $code = eval { (scan($command, 0, '', 0))[0] };
         $out .= "\$($code)\n" if defined $code;
     }
     return $out;
@@ -405,15 +494,20 @@ sub exec_calls {
 sub render_body {
     my ($doc, $body) = @_;
     local $CTX = $doc->{id};
+    local $VERBATIM = 0;
+    push @EXTRA, $body if $bodies && defined $doc->{inline} && $doc->{executed};
     if (($doc->{executed} || 0) == 2) {
         my ($code) = scan($body, 0, '', 0);
         return '$(' . $code . ")\n";
     }
     if ($doc->{executed}) {
+        if ($bodies) { push @EXTRA, $1 while $body =~ /`([^`]*)`/g; }
         my $calls = exec_calls($doc, $body);
         my $code = eval { (scan($body, 0, '', 0))[0] };
         return '$(' . $code . ")\n" . $calls if defined $code;
+        die "Unreadable non-shell body that can run commands\n" if $body =~ $CAPABLE;
         my $out = ($doc->{quoted} ? '' : interpolations($body)) . $calls;
+        # Perl and Ruby run a backtick span; in Node it is a template literal, so one that is not shell is skipped.
         while ($body =~ /`([^`]*)`/g) {
             my $span = $1;
             local $CTX = "$doc->{id}/bt" . pos($body);
@@ -430,24 +524,31 @@ sub scan {
     my ($out, $simple, $i, $depth) = ('', '', $start, 0);
     # The chunks of one word share its verdict: `'a '\''b'\'' c'` is one shell string, not a string and then data.
     my $word_keep = 0;
-    my (@docs, @command_docs, @piped_docs, @frames, @all);
+    # A substitution in an argument feeds the command's output, never its stdin: `sh -s -- "$( … )"` is data.
+    my (@docs, @command_docs, @arg_docs, @piped_docs, @frames, @all);
     my $pipe_pending = 0;
+    my $open_braces = sub {
+        my ($prefix) = @_;
+        while ($prefix =~ s/\A(\s*(?:!\s+|time\s+|if\s+|then\s+|else\s+|elif\s+|while\s+|until\s+|do\s+)*)\{(?=\s|\z)/$1/) {
+            push @frames, {kind => 'brace', stdin => [@piped_docs], out => []};
+        }
+        return $prefix;
+    };
     # see: README.md § strip-quoted-args.pl — a group's stdin reaches every command in it, and its output is every command's
     my $finish = sub {
         my ($prefix, $pipe) = @_;
-        while ($prefix =~ s/\A(\s*)\{(?=\s|\z)/$1/) {
-            push @frames, {kind => 'brace', stdin => [@piped_docs], out => []};
-        }
+        $prefix = $open_braces->($prefix);
         while ($prefix =~ s/\A(\s*)\}(?=\s|\z)/$1/) {
             last unless @frames && $frames[-1]{kind} eq 'brace';
-            push @command_docs, @{(pop @frames)->{out}};
+            push @arg_docs, @{(pop @frames)->{out}};
         }
         my $kind = interpreter($prefix);
         mark($kind, @command_docs, @piped_docs, map { @{$_->{stdin}} } @frames) if $kind;
-        push @{$frames[-1]{out}}, @command_docs, @piped_docs if @frames;
-        @piped_docs = $pipe ? (@piped_docs, @command_docs) : ();
+        push @{$frames[-1]{out}}, @command_docs, @arg_docs, @piped_docs if @frames;
+        @piped_docs = $pipe ? (@piped_docs, @command_docs, @arg_docs) : ();
         $pipe_pending = $pipe ? 1 : 0;
         @command_docs = ();
+        @arg_docs = ();
     };
     my $flush_inline = sub {
         my $rendered = join '', map { $_->{rendered} = 1; render_body($_, $_->{inline}) } grep { defined $_->{inline} } @docs;
@@ -458,7 +559,7 @@ sub scan {
         my ($docs, $code) = @_;
         return unless @$docs;
         push @all, @$docs;
-        if ($code) { mark(2, @$docs); } else { push @command_docs, @$docs; }
+        if ($code) { mark(2, @$docs); } else { push @arg_docs, @$docs; }
     };
     while ($i < length $text) {
         my $char = substr($text, $i, 1);
@@ -467,6 +568,19 @@ sub scan {
             $finish->($simple, 0);
             $out .= $flush_inline->();
             return ($out, $i + length $stop, \@all);
+        }
+        # A here-string is its command's stdin, as a heredoc body is, so the same rules decide whether it is code.
+        if (!$arithmetic && $simple =~ /<<<\s*\z/ && $char !~ /\s/) {
+            my ($value, $next, $inner, $visible) = here_word($text, $i);
+            my $id = "$CTX:hs$i";
+            my $doc = {id => $id, inline => $value, quoted => 1, executed => $FORCE{$id} || 0};
+            push @docs, $doc;
+            push @command_docs, $doc, @$inner;
+            push @all, $doc, @$inner;
+            $out .= ' HERESTRING' . $visible . ' ';
+            $simple .= 'HERESTRING';
+            $i = $next;
+            next;
         }
         if ($char eq '\\' && $i + 1 < length $text) {
             my $next = substr($text, $i + 1, 1);
@@ -483,22 +597,14 @@ sub scan {
             $ansi = $char eq "'";
         }
         if ($char eq '"' || $char eq "'") {
-            # A here-string fed to an interpreter is its code, rendered after the line as a heredoc body is.
-            if ($simple =~ /<<<\s*\z/ && !$arithmetic) {
-                (my $reader = $simple) =~ s/<<<\s*\z//;
-                if (my $kind = interpreter($reader)) {
-                    my ($rendered, $next, $inner) = quoted($text, $i, 1, $ansi);
-                    $substituted->($inner, 1);
-                    $rendered = $2 if $rendered =~ /\A(["'])(.*)\1\z/s;
-                    my $id = "$CTX:hs$i";
-                    push @docs, {id => $id, inline => $rendered, quoted => 1, executed => ($FORCE{$id} || 0) > $kind ? $FORCE{$id} : $kind};
-                    $out .= ' HERESTRING ';
-                    $simple .= 'HERESTRING';
-                    $i = $next;
-                    next;
-                }
-            }
             my $keep = $word_keep || executable_string($simple);
+            # `python3 -c '…'` is that language's code: read like a heredoc body it runs.
+            if (!$keep && !$arithmetic && lang_inline($simple)) {
+                my ($code) = quoted($text, $i, 1, $ansi);
+                $code = $2 if $code =~ /\A(["'])(.*)\1\z/s;
+                my $id = "$CTX:lc$i";
+                push @docs, {id => $id, inline => $code, quoted => 1, executed => ($FORCE{$id} || 0) > 1 ? $FORCE{$id} : 1};
+            }
             $word_keep = $keep;
             my ($rendered, $next, $inner) = quoted($text, $i, $keep, $ansi);
             $substituted->($inner, $keep || at_command_position($simple));
@@ -535,6 +641,8 @@ sub scan {
             my ($doc, $next) = delimiter($text, $i);
             $doc->{id} = "$CTX:$i";
             $doc->{executed} = $FORCE{$doc->{id}} || 0;
+            $doc->{open} = [$BASE + $i, $BASE + $next];
+            push @TOPDOCS, $doc if $VERBATIM;
             push @docs, $doc;
             push @command_docs, $doc;
             push @all, $doc;
@@ -552,7 +660,11 @@ sub scan {
             $out .= "\n";
             for my $doc (@docs) {
                 my $body = $doc->{inline};
-                ($body, $i) = heredoc_body($text, $i, $doc) unless defined $body;
+                unless (defined $body) {
+                    my $from = $i;
+                    ($body, $i) = heredoc_body($text, $i, $doc);
+                    $doc->{span} = [$BASE + $from, $BASE + $i];
+                }
                 $out .= render_body($doc, $body);
                 $doc->{rendered} = 1;
             }
@@ -564,9 +676,12 @@ sub scan {
             my $before = $i > 0 ? substr($text, $i - 1, 1) : '';
             if ($before =~ /[<>]/) {
                 (my $reader = $simple) =~ s/[<>]\z//;
+                # `>( … )` reads what the outer command writes, so the outer command's heredocs are its stdin.
+                my @stdin = $before eq '>' ? (@command_docs, @arg_docs, @piped_docs) : ();
                 $finish->($simple, 0);
-                push @frames, {kind => 'proc', depth => $depth, reader => $reader, stdin => [], out => []};
-            } elsif ($simple !~ /\S/) {
+                push @frames, {kind => 'proc', depth => $depth, reader => $reader, stdin => \@stdin, out => []};
+            } elsif (!command_words($simple) && $simple !~ /[<>]\s*\z/) {
+                $open_braces->($simple);
                 push @frames, {kind => 'sub', depth => $depth, stdin => [@piped_docs], out => []};
             } else {
                 $finish->($simple, 0);
@@ -578,15 +693,16 @@ sub scan {
             next;
         }
         if ($char eq ')') {
+            # Finished first: a `{ …; }` ending here closes before the `( … )` around it is matched.
+            $finish->($simple, 0);
             my $closes = @frames && ($frames[-1]{depth} || 0) == $depth && $depth;
             $depth-- if $depth;
-            $finish->($simple, 0);
             if ($closes) {
                 my $frame = pop @frames;
                 if ($frame->{kind} eq 'proc') {
                     mark(file_reader($frame->{reader}), @{$frame->{out}});
                 } else {
-                    push @command_docs, @{$frame->{out}};
+                    push @arg_docs, @{$frame->{out}};
                 }
             }
             $simple = '';

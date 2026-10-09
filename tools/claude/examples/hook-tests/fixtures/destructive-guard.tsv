@@ -464,6 +464,42 @@ hard	perl - <<'EOF'\nprint q(it's); my $o = `git push origin main`;\nEOF
 hard	ruby - <<'EOF'\nsystem 'git push origin main'\nEOF
 hard	node - <<'EOF'\nrequire('child_process').execSync('git push origin main')\nEOF
 allow	python3 script.py <<'EOF'\nos.system('git push origin main')\nEOF
+# WHY: a non-shell body that does not parse as shell fails closed when it can start a process.
+hard	perl - <<'EOF'\nprint 'it\\'s';\nqx/git push origin main/;\nEOF
+hard	ruby - <<'EOF'\nputs 'it\\'s'\nIO.popen("git push origin main")\nEOF
+hard	python3 - <<'EOF'\nprint('it\\'s')\nimport os\ncmd = "git push origin main"; os.system(cmd)\nEOF
+allow	python3 - <<'EOF'\nimport os\nprint('it\\'s the file system at', os.path.join('a', 'b'))\nEOF
+allow	node - <<'EOF'\nconsole.log(`it's ${1}`)\nEOF
+hard	python3 - <<'EOF'\nimport subprocess\nsubprocess.run(args=["git", "push", "origin", "main"])\nEOF
+hard	perl - <<'EOF'\nmy $o = qx/git push origin main/;\nEOF
+hard	perl - <<'EOF'\nprint 'it\\'s';\nmy $o = qx(echo (a) git push origin main);\nEOF
+# WHY: an inline-code flag makes its string that language's code.
+hard	python3 -c 'import os; os.system("git push origin main")'
+hard	perl -e 'system("git push origin main")'
+allow	python3 -c 'import json,sys; print(json.load(sys.stdin)["x"])'
+allow	python3 -c 'print("git push origin main")'
+# WHY: a brace group closes before the paren group around it, and a group after a reserved word is still a group.
+hard	( { cat <<'EOF'; } ) | sh\ngit push origin main\nEOF
+hard	( { cat <<'EOF'; }) | sh\ngit push origin main\nEOF
+hard	! (cat <<'EOF') | sh\ngit push origin main\nEOF
+hard	time (cat <<'EOF') | sh\ngit push origin main\nEOF
+hard	if (cat <<'EOF') | sh; then :; fi\ngit push origin main\nEOF
+# WHY: a here-string is one word however it is quoted, and it is its command's stdin like a heredoc body.
+hard	bash <<< 'git push origin'" main"
+hard	bash <<< git' push origin main'
+hard	bash <<< git\\ push\\ origin\\ main
+hard	cat <<< 'git push origin main' | sh
+allow	cat <<< 'git push origin main' | grep push
+allow	python3 <<< "$(cat <<'EOF'\nprint('it\\'s')\nEOF\n)"
+# WHY: a wrapper runs a substitution's output as the command, as a bare substitution does.
+hard	nohup $(cat <<'EOF'\ngit push origin main\nEOF\n)
+hard	sudo $(cat <<'EOF'\ngit push origin main\nEOF\n)
+# WHY: `>( … )` reads what the outer command writes, so the outer command's heredoc is its stdin.
+hard	cat <<'EOF' > >(sh)\ngit push origin main\nEOF
+hard	cat <<'EOF' | tee >(sh)\ngit push origin main\nEOF
+allow	cat <<'EOF' | tee >(grep push)\ngit push origin main\nEOF
+# WHY: a substitution in an argument is data to the command, even one that reads stdin as code.
+allow	bash -s -- "$(cat <<'EOF'\nIt's a note\nEOF\n)" < deploy.sh
 # WHY: wrappers pass a static -c payload to Bash for execution.
 #!oracle	env-bash-c	env:bash,-c,git push origin main|bash:-c,git push origin main|git:push,origin,main
 hard	env bash -c 'git push origin main'
