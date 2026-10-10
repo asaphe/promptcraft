@@ -96,13 +96,13 @@ jobs:
             echo "hooks=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # A diff that cannot be read runs the mutations rather than skipping them.
-          if ! changed=$(git diff --name-only "$BASE...$HEAD"); then
+          # An unreadable diff runs the mutations; quotePath=false leaves only control-character paths quoted, which the pattern allows.
+          if ! changed=$(git -c core.quotePath=false diff --name-only "$BASE...$HEAD"); then
             echo "hooks=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           printf '%s\n' "$changed"
-          if printf '%s\n' "$changed" | grep -qE '^(tools/claude/examples/(hooks|hook-tests)/|\.github/workflows/hook-evals\.yml$)'; then
+          if printf '%s\n' "$changed" | grep -qE '^"?(tools/claude/examples/(hooks|hook-tests)/|\.github/workflows/hook-evals\.yml$)'; then
             echo "hooks=true" >> "$GITHUB_OUTPUT"
           else
             echo "hooks=false" >> "$GITHUB_OUTPUT"
