@@ -38,6 +38,8 @@ ctx	bash <<EOF\nkubectl apply -f deploy.yaml\nEOF
 # WHY: an exec wrapper hands its stdin to the shell it runs, before or after a pipe.
 ctx	sudo bash <<EOF\nkubectl apply -f deploy.yaml\nEOF
 ctx	cat <<'EOF' | sudo sh\nkubectl apply -f deploy.yaml\nEOF
+# WHY: an unquoted data body's substitution runs, so strip_cmd keeps that body.
+ctx	cat <<EOF\n$(kubectl apply -f deploy.yaml)\nEOF
 
 # --- input unavailable ---
 allow	<absent>
