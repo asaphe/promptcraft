@@ -500,6 +500,25 @@ hard	cat <<'EOF' | tee >(sh)\ngit push origin main\nEOF
 allow	cat <<'EOF' | tee >(grep push)\ngit push origin main\nEOF
 # WHY: a substitution in an argument is data to the command, even one that reads stdin as code.
 allow	bash -s -- "$(cat <<'EOF'\nIt's a note\nEOF\n)" < deploy.sh
+# WHY: a heredoc after a group feeds the group, and one after `>( … )` reaches it through the command's output.
+hard	(bash) <<EOF\ngit push origin main\nEOF
+hard	{ sh; } <<EOF\ngit push origin main\nEOF
+hard	(cat; bash) <<'EOF'\ngit push origin main\nEOF
+allow	(bash deploy.sh) <<'EOF'\ngit push origin main\nEOF
+hard	cat > >(bash) <<'EOF'\ngit push origin main\nEOF
+allow	cat > >(grep x) <<'EOF'\ngit push origin main\nEOF
+# WHY: an inline-code string is the whole shell word, and its string escapes are decoded as the language decodes them.
+hard	python3 -c 'import os; os.system('"'git push origin main'"')'
+hard	python3 -c 'import os; os.system("git\\x20push origin main")'
+hard	python3 -c 'import os; os.system("git push origin ma\\x69n")'
+# WHY: a whole-line comment runs nothing, and the word subprocess in a string starts nothing.
+allow	python3 -c '# os.system("git clean -fdx")'
+allow	python3 - <<'EOF'\nprint('''it's subprocess''')\nEOF
+hard	python3 - <<'EOF'\nprint('it\\'s')\nimport subprocess\nsubprocess.call(cmd)\nEOF
+hard	python3 - <<'EOF'\nprint('it\\'s')\nfrom subprocess import call as c\nc(cmd)\nEOF
+hard	node - <<'EOF'\nconsole.log(`it's`)\nconst cp = require('child_process'); cp.execSync(cmd)\nEOF
+# WHY: `bash -c` runs its string; a process substitution after it is only `$0`.
+allow	bash -c true <(cat <<EOF\ngit push origin main\nEOF\n)
 # WHY: wrappers pass a static -c payload to Bash for execution.
 #!oracle	env-bash-c	env:bash,-c,git push origin main|bash:-c,git push origin main|git:push,origin,main
 hard	env bash -c 'git push origin main'

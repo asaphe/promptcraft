@@ -1834,8 +1834,8 @@
       "why": "a brace group's output stops carrying its heredocs, so `{ cat <<'EOF'; } | sh` hides the push to main",
       "suite": "destructive-guard",
       "replace": {
-        "from": "push @arg_docs, @{(pop @frames)->{out}};",
-        "to": "pop @frames;"
+        "from": "push @arg_docs, @{$brace->{out}};",
+        "to": ""
       },
       "witness": [
         "{ cat <<'EOF'; } | sh\\ngit push origin main\\nEOF"
@@ -2142,12 +2142,76 @@
       "why": "every heredoc body is blanked in the raw view, so `strip_cmd` hides a `bash <<EOF` body and its kubectl apply passes unreminded",
       "suite": "stateful-op-reminder",
       "replace": {
-        "from": "grep { !$_->{executed} && $_->{span} } @TOPDOCS",
+        "from": "grep { !$_->{executed} && $_->{span} && !$live->($_) } @TOPDOCS",
         "to": "grep { $_->{span} } @TOPDOCS"
       },
       "witness": [
         "bash <<EOF\\nkubectl apply -f deploy.yaml\\nEOF"
       ]
+    },
+    {
+      "why": "a heredoc after a group stops feeding the interpreter inside it, so `(bash) <<EOF` hides the push to main",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "        mark($attached, @command_docs) if $attached;\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "string escapes stop decoding, so `os.system(\"git\\x20push origin main\")` reads as `gitpush` and passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "$value .= chr(hex($1 // $2 // $3 // '') || oct($4 // 0));",
+        "to": "$value .= '';"
+      }
+    },
+    {
+      "why": "a whole-line comment in a non-shell body is read as shell, so `python3 -c '# os.system(\"git clean -fdx\")'` blocks",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "        $body =~ s{^[ \\t]*(?:#|//).*$}{}mg;\n        if ($bodies)",
+        "to": "        if ($bodies)"
+      }
+    },
+    {
+      "why": "the word subprocess counts as a process call, so a body printing `it's subprocess` blocks",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "\\b(?:subprocess|Open3|child_process|pty)\\s*[.(]|",
+        "to": "\\b(?:subprocess|Open3|child_process|pty)\\b|"
+      }
+    },
+    {
+      "why": "an imported process module stops counting, so `from subprocess import call as c` in an unreadable body passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "\\b(?:import|from|require)\\s*\\(?\\s*['\"]?(?:subprocess|pty|child_process|open3)\\b|",
+        "to": ""
+      }
+    },
+    {
+      "why": "`bash -c` with a process substitution reads it as a script, so `bash -c true <(cat <<EOF \u2026)` blocks",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "    return 0 if $words[0] =~ $SHELL && grep { /^-[^-]*c/ } @words[1 .. $#words];\n",
+        "to": ""
+      }
+    },
+    {
+      "why": "an inline-code string is read one chunk at a time, so `os.system('\"'git push origin main'\"')` passes",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "my ($code) = here_word($text, $ansi ? $i - 1 : $i);",
+        "to": "my ($code) = quoted($text, $i, 1, $ansi);"
+      }
+    },
+    {
+      "why": "--bodies blanks an unquoted data body with a live substitution, so `cat <<EOF $(kubectl apply \u2026)` passes unreminded",
+      "suite": "stateful-op-reminder",
+      "replace": {
+        "from": "grep { !$_->{executed} && $_->{span} && !$live->($_) } @TOPDOCS",
+        "to": "grep { !$_->{executed} && $_->{span} } @TOPDOCS"
+      }
     }
   ]
 }

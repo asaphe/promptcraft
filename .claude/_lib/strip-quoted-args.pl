@@ -12,7 +12,7 @@ my $SHELL = qr{(?:^|/)(?:bash|sh|zsh|ksh|mksh|pdksh|oksh|loksh|lksh|dash|ash|pos
 my $LANG = qr{(?:^|/)(python3?|perl|ruby|node)$};
 my $STDIN_WRAPPER = qr{(?:^|/)(?:timeout|gtimeout|nice|nohup|sudo|doas|stdbuf|setsid|ionice|caffeinate|arch|runuser|chroot|unbuffer|chrt|taskset|busybox)$};
 # Anything in a non-shell body that can start a process; such a body that is unreadable as shell fails closed.
-my $CAPABLE = qr{\bqx\s*[^\w\s]|%x\s*[^\w\s]|\b(?:subprocess|Open3|child_process|pty)\b|\b(?:system|exec\w*|spawn\w*|popen|Popen|check_output|check_call|getoutput|getstatusoutput)\s*[(\["']};
+my $CAPABLE = qr{\bqx\s*[^\w\s]|%x\s*[^\w\s]|\b(?:subprocess|Open3|child_process|pty)\s*[.(]|\b(?:import|from|require)\s*\(?\s*['"]?(?:subprocess|pty|child_process|open3)\b|\b(?:system|exec\w*|spawn\w*|popen|Popen|check_output|check_call|getoutput|getstatusoutput)\s*[(\["']};
 # A heredoc's id is its context plus its offset, so a body rendered as code on a later pass shifts no other id.
 our $CTX = 'top';
 our (%FORCE, %LATE, @TOPDOCS, @EXTRA);
@@ -35,7 +35,9 @@ print $output;
 
 sub raw_bodies {
     my @edits;
-    for my $doc (grep { !$_->{executed} && $_->{span} } @TOPDOCS) {
+    # An unquoted body's `$( … )` and backticks run even when the body is data, so that body stays.
+    my $live = sub { !$_[0]{quoted} && substr($input, $_[0]{span}[0], $_[0]{span}[1] - $_[0]{span}[0]) =~ /\$\(|`/ };
+    for my $doc (grep { !$_->{executed} && $_->{span} && !$live->($_) } @TOPDOCS) {
         push @edits, [@{$doc->{span}}, ''], [@{$doc->{open}}, '<<STRIPPED_HEREDOC>>'];
     }
     my $raw = $input;
@@ -161,6 +163,8 @@ sub interpreter {
 sub file_reader {
     my @words = program_words($_[0]);
     return 0 unless @words;
+    # `bash -c '…' <( … )` runs its -c string; the substitution's path is only `$0`.
+    return 0 if $words[0] =~ $SHELL && grep { /^-[^-]*c/ } @words[1 .. $#words];
     return 2 if $words[0] =~ m{^(?:source|\.)$} || $words[0] =~ $SHELL;
     return 1 if $words[0] =~ $LANG;
     return 0;
@@ -439,6 +443,12 @@ sub string_literal {
     my ($quote, $value) = ($1, '');
     while (pos($body) < length $body) {
         return ($value, pos($body)) if $body =~ /\G\Q$quote\E/gc;
+        # The language decodes these before the call runs: `"git\x20push"` runs `git push`.
+        if ($body =~ /\G\\(?:x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8})|([0-7]{1,3}))/gc) {
+            $value .= chr(hex($1 // $2 // $3 // '') || oct($4 // 0));
+            next;
+        }
+        if ($body =~ /\G\\([nrt])/gc) { $value .= {n => "\n", r => "\r", t => "\t"}->{$1}; next; }
         if ($body =~ /\G\\(.)/gcs) { $value .= $1; next; }
         return () if length $quote == 1 && $quote ne '`' && $body =~ /\G\n/gc;
         $body =~ /\G(.)/gcs;
@@ -451,6 +461,8 @@ sub string_literal {
 sub exec_calls {
     my ($doc, $body) = @_;
     my $out = '';
+    # A whole-line `#` or `//` comment runs nothing in any of these languages.
+    $body =~ s{^[ \t]*(?:#|//).*$}{}mg;
     my $calls = qr{(?:os\.(?:system|popen|exec\w*|spawn\w*)|subprocess\.\w+|\b(?:Popen|check_output|check_call|system|execSync|execFileSync|execFile|exec|spawnSync|spawn))\b};
     while ($body =~ /$calls\s*\(?\s*(?:\w+\s*=\s*)?\[?\s*/g) {
         my ($pos, @parts) = (pos($body));
@@ -495,12 +507,14 @@ sub render_body {
     my ($doc, $body) = @_;
     local $CTX = $doc->{id};
     local $VERBATIM = 0;
-    push @EXTRA, $body if $bodies && defined $doc->{inline} && $doc->{executed};
+    push @EXTRA, $body if $bodies && defined $doc->{inline} && ($doc->{executed} || 0) == 2;
     if (($doc->{executed} || 0) == 2) {
         my ($code) = scan($body, 0, '', 0);
         return '$(' . $code . ")\n";
     }
     if ($doc->{executed}) {
+        # A whole-line `#` or `//` comment runs nothing in Python, Perl, Ruby or Node, so it is not read as shell either.
+        $body =~ s{^[ \t]*(?:#|//).*$}{}mg;
         if ($bodies) { push @EXTRA, $1 while $body =~ /`([^`]*)`/g; }
         my $calls = exec_calls($doc, $body);
         my $code = eval { (scan($body, 0, '', 0))[0] };
@@ -527,6 +541,8 @@ sub scan {
     # A substitution in an argument feeds the command's output, never its stdin: `sh -s -- "$( … )"` is data.
     my (@docs, @command_docs, @arg_docs, @piped_docs, @frames, @all);
     my $pipe_pending = 0;
+    # A group or `>( … )` that ran an interpreter, just closed: a heredoc on the same command feeds it (`(bash) <<EOF`).
+    my $attached = 0;
     my $open_braces = sub {
         my ($prefix) = @_;
         while ($prefix =~ s/\A(\s*(?:!\s+|time\s+|if\s+|then\s+|else\s+|elif\s+|while\s+|until\s+|do\s+)*)\{(?=\s|\z)/$1/) {
@@ -540,10 +556,15 @@ sub scan {
         $prefix = $open_braces->($prefix);
         while ($prefix =~ s/\A(\s*)\}(?=\s|\z)/$1/) {
             last unless @frames && $frames[-1]{kind} eq 'brace';
-            push @arg_docs, @{(pop @frames)->{out}};
+            my $brace = pop @frames;
+            push @arg_docs, @{$brace->{out}};
+            $attached = $brace->{seen} if ($brace->{seen} || 0) > $attached;
         }
         my $kind = interpreter($prefix);
         mark($kind, @command_docs, @piped_docs, map { @{$_->{stdin}} } @frames) if $kind;
+        mark($attached, @command_docs) if $attached;
+        $attached = 0;
+        for my $frame (@frames) { $frame->{seen} = $kind if $kind > ($frame->{seen} || 0); }
         push @{$frames[-1]{out}}, @command_docs, @arg_docs, @piped_docs if @frames;
         @piped_docs = $pipe ? (@piped_docs, @command_docs, @arg_docs) : ();
         $pipe_pending = $pipe ? 1 : 0;
@@ -600,8 +621,8 @@ sub scan {
             my $keep = $word_keep || executable_string($simple);
             # `python3 -c '…'` is that language's code: read like a heredoc body it runs.
             if (!$keep && !$arithmetic && lang_inline($simple)) {
-                my ($code) = quoted($text, $i, 1, $ansi);
-                $code = $2 if $code =~ /\A(["'])(.*)\1\z/s;
+                # The whole word, chunk by chunk, as the shell joins it: `'os.system('"'git push…'"')'`.
+                my ($code) = here_word($text, $ansi ? $i - 1 : $i);
                 my $id = "$CTX:lc$i";
                 push @docs, {id => $id, inline => $code, quoted => 1, executed => ($FORCE{$id} || 0) > 1 ? $FORCE{$id} : 1};
             }
@@ -679,7 +700,7 @@ sub scan {
                 # `>( … )` reads what the outer command writes, so the outer command's heredocs are its stdin.
                 my @stdin = $before eq '>' ? (@command_docs, @arg_docs, @piped_docs) : ();
                 $finish->($simple, 0);
-                push @frames, {kind => 'proc', depth => $depth, reader => $reader, stdin => \@stdin, out => []};
+                push @frames, {kind => 'proc', depth => $depth, reader => $reader, stdin => \@stdin, out => [], writes => $before eq '>'};
             } elsif (!command_words($simple) && $simple !~ /[<>]\s*\z/) {
                 $open_braces->($simple);
                 push @frames, {kind => 'sub', depth => $depth, stdin => [@piped_docs], out => []};
@@ -704,6 +725,7 @@ sub scan {
                 } else {
                     push @arg_docs, @{$frame->{out}};
                 }
+                $attached = $frame->{seen} if ($frame->{kind} ne 'proc' || $frame->{writes}) && ($frame->{seen} || 0) > $attached;
             }
             $simple = '';
             $word_keep = 0;
