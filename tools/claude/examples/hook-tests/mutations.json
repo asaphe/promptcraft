@@ -1834,8 +1834,8 @@
       "why": "a brace group's output stops carrying its heredocs, so `{ cat <<'EOF'; } | sh` hides the push to main",
       "suite": "destructive-guard",
       "replace": {
-        "from": "push @arg_docs, @{(pop @frames)->{out}};",
-        "to": "pop @frames;"
+        "from": "push @arg_docs, @{$brace->{out}};",
+        "to": ""
       },
       "witness": [
         "{ cat <<'EOF'; } | sh\\ngit push origin main\\nEOF"
@@ -2142,7 +2142,7 @@
       "why": "every heredoc body is blanked in the raw view, so `strip_cmd` hides a `bash <<EOF` body and its kubectl apply passes unreminded",
       "suite": "stateful-op-reminder",
       "replace": {
-        "from": "grep { !$_->{executed} && $_->{span} } @TOPDOCS",
+        "from": "grep { !$_->{executed} && $_->{span} && !$live->($_) } @TOPDOCS",
         "to": "grep { $_->{span} } @TOPDOCS"
       },
       "witness": [
