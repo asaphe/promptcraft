@@ -114,6 +114,27 @@ class MutateFixturesTest(unittest.TestCase):
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("--jobs must be 1 or more", proc.stderr)
 
+    def test_a_recorded_witness_is_applied_and_catches_first(self):
+        recorded = pathlib.Path(self.tmp) / "witnesses.json"
+        proc = self.score([real_mutation()], "--timeout", "60", "--record-witnesses", str(recorded))
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        row = json.loads(recorded.read_text())["merge-grant"]["0"]
+        manifest = pathlib.Path(self.tmp) / "manifest.json"
+        subprocess.run([sys.executable, str(SCORER), "--manifest", str(manifest), "--apply-witnesses", str(recorded)],
+                       check=True, capture_output=True, text=True, timeout=60)
+        entry = json.loads(manifest.read_text())["merge-grant"][0]
+        self.assertEqual(entry["witness"], [row])
+        proc = self.score([entry], "--timeout", "60")
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertIn("[0/1 passed", proc.stdout)
+        self.assertNotIn("witness missed", proc.stdout)
+
+    def test_a_stale_witness_still_catches_and_says_so(self):
+        proc = self.score([dict(real_mutation(), witness=["no such fixture row"])], "--timeout", "60")
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertIn("1/1 mutations caught", proc.stdout)
+        self.assertIn("witness missed", proc.stdout)
+
     def test_a_run_that_crashes_is_inconclusive(self):
         proc = self.score([dict(NO_OP, suite="no-such-suite")], "--timeout", "60")
         self.assertEqual(proc.returncode, 1, proc.stdout)

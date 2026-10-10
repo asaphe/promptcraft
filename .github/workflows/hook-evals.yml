@@ -75,35 +75,60 @@ jobs:
       - name: Check the Codex hook dispatcher fails closed
         run: python3 tools/codex/test-bash-hook-dispatcher.py
 
-  # Every mutation reruns a whole suite, so they get their own sharded job instead of the evals budget.
-  mutations:
+  # A PR that touches no hook, helper, fixture or this workflow cannot change what a mutation finds.
+  changes:
     runs-on: ubuntu-latest
-    # A destructive-guard shard holds at most 13 mutations, each rerunning at most 491 cases at about 0.17 s a case on CI: about 18 minutes one case at a time, the bound this timeout covers; --jobs runs one case per core.
-    timeout-minutes: 25
+    outputs:
+      hooks: ${{ steps.diff.outputs.hooks }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo "hooks=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # An unreadable diff runs the mutations; quotePath=false leaves only control-character paths quoted, which the pattern allows.
+          if ! changed=$(git -c core.quotePath=false diff --name-only "$BASE...$HEAD"); then
+            echo "hooks=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s\n' "$changed"
+          if printf '%s\n' "$changed" | grep -qE '^"?(tools/claude/examples/(hooks|hook-tests)/|\.github/workflows/hook-evals\.yml$)'; then
+            echo "hooks=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "hooks=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Every mutation reruns a suite, so they get their own sharded job instead of the evals budget.
+  mutations:
+    needs: changes
+    if: needs.changes.outputs.hooks == 'true'
+    runs-on: ubuntu-latest
+    # see: tools/claude/examples/hook-tests/README.md § Mutation witnesses — a caught mutation costs its witness rows; 30 minutes covers a shard whose witnesses all went stale
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
-          - suite: destructive-guard 1/10
-            args: --shard 1/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 2/10
-            args: --shard 2/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 3/10
-            args: --shard 3/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 4/10
-            args: --shard 4/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 5/10
-            args: --shard 5/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 6/10
-            args: --shard 6/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 7/10
-            args: --shard 7/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 8/10
-            args: --shard 8/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 9/10
-            args: --shard 9/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
-          - suite: destructive-guard 10/10
-            args: --shard 10/10 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 1/5
+            args: --shard 1/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 2/5
+            args: --shard 2/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 3/5
+            args: --shard 3/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 4/5
+            args: --shard 4/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+          - suite: destructive-guard 5/5
+            args: --shard 5/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
           - suite: merge-grant, pr-create-guard, stateful-op-reminder and strip-cmd
             args: merge-grant _lib/strip-cmd pr-create-guard stateful-op-reminder
     name: mutations (${{ matrix.suite }})
@@ -117,4 +142,14 @@ jobs:
           MUTATION_ARGS: ${{ matrix.args }}
         run: |
           read -r -a args <<<"$MUTATION_ARGS"
-          python3 tools/claude/examples/hook-tests/mutate-fixtures.py --hooks-dir tools/claude/examples/hooks --timeout 60 --jobs "$(nproc)" "${args[@]}"
+          python3 tools/claude/examples/hook-tests/mutate-fixtures.py --hooks-dir tools/claude/examples/hooks --timeout 60 --jobs "$(nproc)" --record-witnesses witnesses.json "${args[@]}"
+
+      # The rows that caught each mutation this run, for `mutate-fixtures.py --apply-witnesses` when one is missed.
+      - name: Upload this shard's witnesses
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: witnesses-${{ strategy.job-index }}
+          path: witnesses.json
+          if-no-files-found: ignore
+          retention-days: 14
