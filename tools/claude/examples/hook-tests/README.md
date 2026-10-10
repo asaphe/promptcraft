@@ -38,6 +38,9 @@ python3 mutate-fixtures.py --hooks-dir ../hooks
 python3 mutate-fixtures.py --hooks-dir ../hooks --timeout 60 destructive-guard
 # Split one long run across machines: every 3rd mutation, starting at the 1st
 python3 mutate-fixtures.py --hooks-dir ../hooks --timeout 60 --shard 1/3 destructive-guard
+# Refresh the witness rows each mutation runs first, then write them into mutations.json
+python3 mutate-fixtures.py --hooks-dir ../hooks --timeout 60 --record-witnesses /tmp/witnesses.json
+python3 mutate-fixtures.py --apply-witnesses /tmp/witnesses.json
 # The scorer itself: a timeout is never a catch, and shards never overlap
 python3 test-mutate-fixtures.py
 
@@ -134,7 +137,13 @@ Two things are checked per mutation, and the second is the one that matters:
 
 Without (2) a mutation whose pattern has drifted out of the hook silently applies to nothing, the pristine hook passes its own suite, and the run reports the *fixture* as vacuous when the truth is that the mutation was. That reads as a real finding and sends you off to rewrite a fixture that was fine.
 
-A useful signal in the output: distinct mutations should produce *distinct* pass counts. If every mutation drops the suite to the same number, they are all hitting the same branch.
+A useful signal in the output: distinct mutations should produce *distinct* first-failure rows. If every mutation is caught by the same row, they are all hitting the same branch.
+
+### Mutation witnesses
+
+A mutation's optional `witness` lists the fixture rows, by column 2 exactly as written in the `.tsv`, that caught it last time. `run-fixtures.py --first <column 2>` runs those rows before the rest, so a caught mutation costs one or two cases instead of every case ahead of its catch: in the destructive-guard suite that was a few hundred cases, about 30 seconds, per mutation. Only the order changes. A row edited or removed since the witness was recorded matches nothing, the suite then runs in file order as before, and the run reports `witness missed` without changing the verdict. Reordering is safe only where cases are independent, as `--jobs` requires: in a suite whose case reads state an earlier case left, a witness run first can fail for want of that state and score a harmless mutation as caught, so give such a suite no witnesses. `--record-witnesses OUT.json` writes the row that caught each mutation, and `--apply-witnesses OUT.json ...` merges one or more such files, one per shard, into `mutations.json`.
+
+The CI mutation job runs only when a pull request changes a hook, a hook test or the workflow; a push to `main` always runs it, and so does a pull request whose diff cannot be read.
 
 ## Two things that bite when authoring these
 
