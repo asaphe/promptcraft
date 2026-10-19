@@ -52,6 +52,9 @@ python3 test-merge-grant.py
 
 # destructive-guard's own-PR lease, against a real repository and a gh stub
 python3 test-force-push-lease.py
+
+# statusline and context-budget-stop together: the flag file is a contract between them
+python3 test-context-budget.py
 ```
 
 `--hooks-dir` resolves both layouts: flat `<dir>/<name>.sh`, which is how hooks sit in an installed `~/.claude/hooks/`, and nested `<dir>/<name>/<name>.sh`, which is how they sit in this repo. `probe-hooks.py` defaults to the published sibling `hooks/` directory and fails if zero hooks execute, including an all-skipped or empty-filter run. Pass an explicit directory for installed layouts.

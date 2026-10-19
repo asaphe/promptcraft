@@ -1,9 +1,10 @@
 // Claude Code settings.json — Hook configuration patterns
 //
 // Hooks intercept tool calls at specific lifecycle points.
-// This shows two common patterns:
+// This shows three common patterns:
 // 1. PreToolUse hook that rewrites Bash commands (RTK token optimization)
-// 2. StatusLine command that shows contextual info in the CLI
+// 2. Stop hook that can hold a turn end (context-budget handoff)
+// 3. StatusLine command that shows contextual info in the CLI
 {
   // Environment variables available to Claude Code
   "env": {
@@ -28,6 +29,21 @@
             // return modified input via stdout.
             "command": "$HOME/.claude/hooks/rtk/rtk-rewrite.sh",
             // Always declare a timeout: a hook killed at its timeout is a non-blocking error and the tool runs.
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+
+    // Stop hooks fire as Claude ends a turn; {"decision":"block","reason":...} keeps it going with the reason as an instruction.
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            // Acts on the over-budget flag the statusline below writes; see hooks/context-budget-stop/README.md.
+            "command": "$HOME/.claude/hooks/context-budget-stop/context-budget-stop.sh",
             "timeout": 30
           }
         ]

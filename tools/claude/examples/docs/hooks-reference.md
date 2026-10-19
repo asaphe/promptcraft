@@ -26,7 +26,7 @@ Note the matcher on the `post-compact-reinject.sh` row. Re-injecting context aft
 
 Compaction is the one boundary where in-session reasoning is destroyed while anything derived from it survives — which is what makes spending tokens here worthwhile.
 
-## UserPromptSubmit — 6 entries (every prompt)
+## UserPromptSubmit — 5 entries (every prompt)
 
 | Hook | Purpose | Output | Cost |
 |------|---------|--------|------|
@@ -34,7 +34,6 @@ Compaction is the one boundary where in-session reasoning is destroyed while any
 | `engineering-rules-anchor.sh` | Engineering rules re-anchor | ~160 chars additionalContext | **Once per session** (stamp) |
 | `clone-id-inject.sh` | Identifies which repo clone | ~50 chars additionalContext | **Once per session** (stamp) |
 | `aws-auth-check.sh` | Validates SSO tokens, injects profile status | ~100 chars additionalContext | **Once per session** (~2.2s first call, <5ms after) |
-| `session-budget-warn.sh` | Nudges `/clear` when session is very old or context is very large | ~300 chars additionalContext (throttled 1/hr per session) | Every prompt (stat + transcript tail) |
 | `pr-context-inject.sh` | Injects active PR URLs from all repos | 1–5 lines additionalContext | **Once per session** (stamp), seeded from cache |
 
 ## PreToolUse: Bash — 12 entries
@@ -99,12 +98,15 @@ Read this section before writing any `PostToolUse` hook — the payload shape ha
 | `pr-state-cache-invalidate.sh` | `gh pr *` | Invalidates PR cache on ready/close/reopen to prevent stale statusline badge |
 | `null-result-probe.sh` | All Bash | Nudges for a control probe when empty or zero-findings output comes from a command with a silently-collapsing construct |
 
-## Stop — 2 entries
+## Stop — 3 entries
 
 | Hook | Purpose |
 |------|---------|
 | `session-quality-capture.sh` | Records session quality metrics |
 | `op-cache-cleanup.sh` | Purges the per-session secret caches ([claude-secret-guard](https://github.com/asaphe/claude-secret-guard)) |
+| `context-budget-stop.sh` | Blocks one yield per session once context passes its budget: write the handoff, then ask whether to continue in a fresh session |
+
+`context-budget-stop.sh` replaced a per-prompt `UserPromptSubmit` nudge that suggested `/clear` once context grew large. The nudge arrived when the model was about to act on the user's message and was read past; a Stop block lands at a turn boundary, where writing a handoff is the next step anyway. Detection moved into the statusline, which already receives the context fields, so the hook on every turn end is a builtin-only flag check. See [`hooks/context-budget-stop/`](../hooks/context-budget-stop/).
 
 ## SessionEnd — 1 entry
 
