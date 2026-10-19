@@ -565,7 +565,7 @@ Retained hook examples and retired migration stubs with README documentation:
 | Hook | Type | Purpose | Blocks? |
 |------|------|---------|---------|
 | [Destructive Guard](../examples/hooks/destructive-guard/) | PreToolUse | Two-tier blocking for irreversible operations | Hard (exit 2) + Soft (JSON) |
-| [Merge Grant](../examples/hooks/merge-grant/) | UserPromptSubmit, PostToolUse | Arms one-turn merge and PR grants from the user's own prompt (PR only from a menu answer), read by Destructive Guard | No (context) |
+| [Merge Grant](../examples/hooks/merge-grant/) | UserPromptSubmit, PostToolUse | Arms one-turn merge, PR and CI-dispatch grants from the user's own prompt (PR and dispatch also from a menu answer; a bare "yes" renews a live PR or dispatch grant), read by Destructive Guard | No (context) |
 | [Review Verification Guard](../examples/hooks/review-verification-guard/) | Migration stub | Review protocol/kernel and maintained review plugin | Retired |
 | [Memory Guard](../examples/hooks/memory-guard/) | PreToolUse (Write) | Blocks project memory writes for multi-clone repos | Hard (exit 2) |
 | [1Password Read Guard](../examples/hooks/op-read-guard/) | PreToolUse | Blocks raw secret reads, redirects to a masked cache (ships in [claude-secret-guard](https://github.com/asaphe/claude-secret-guard)) | Hard |

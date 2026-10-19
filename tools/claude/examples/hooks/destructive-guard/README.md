@@ -41,6 +41,7 @@ Soft blocks emit `permissionDecision: ask` JSON on stdout and exit 0. Claude Cod
 | `gh stack submit/link/unstack` | Acts on every PR in the stack, not one |
 | `gh issue <mutating verb>`, `gh api .../issues` with a method or field | Files an external artifact under your GitHub identity |
 | `gh run delete` | Permanently removes CI run history |
+| `gh workflow run`, `gh run rerun`, `gh run cancel`, `gh api .../dispatches` | Starts or stops a CI run, which can build, deploy or change cloud state; no prompt in a turn whose prompt asked for a dispatch (see [Merges](#merges)) |
 | `git push --force`/`-f`/`+refspec` to a non-default branch | History rewriting (reversible via reflog); an exact lease on your own PR runs unprompted ([Own-PR lease](#own-pr-lease)) |
 | `git push --delete` / `git push origin :branch` | Deletes a remote branch, auto-closing any PR on it |
 | `git reset --hard` | Discards uncommitted changes (recoverable via reflog) |
@@ -112,6 +113,8 @@ The four merge forms share one gate, and each hard-block message names all four,
 Installed with [`merge-grant`](https://github.com/asaphe/promptcraft/blob/main/tools/claude/examples/hooks/merge-grant/README.md), a merge becomes a permission prompt in exactly one case: the user's latest prompt asked for it. The prompt quotes that request so the approver can check the PR is one it names. The grant lasts until the user's next prompt, is scoped to its session, and every unusable state — no session id, an expired or unparseable grant, one written for another session — falls back to the hard block. `gh stack merge` says in its prompt that every layer beneath the target must be one the user named, since it lands all of them.
 
 A grant never lifts a hard block raised by anything else in the same command: `gh pr merge --admin` — checked on the values view, so `F=--admin; gh pr merge 17 $F` counts — or a merge chained with `git clean -f` still exits 2.
+
+The same hook's `pr` and `dispatch` grants work the other way: they drop a prompt rather than enable one. With `pr` armed, `gh pr create` runs unprompted; with `dispatch` armed, so do `gh workflow run`, `gh run rerun`, `gh run cancel` and `gh api .../dispatches`. Each prompt asks again when its grant is missing, expired, unparseable or another session's, and `gh run delete` asks either way.
 
 ## Own-PR lease
 

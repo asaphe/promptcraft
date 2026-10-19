@@ -18,6 +18,7 @@ that adds a fixture for a phrase-matching guard is the one file guaranteed to
 contain the phrase.
 """
 
+import json
 import os
 import subprocess
 
@@ -146,8 +147,33 @@ def destructive_guard(tmp):
     }}
 
 
+def _transcript(tmp, name, entries):
+    """A transcript whose entries are (text, is_sidechain) assistant turns, oldest first."""
+    path = os.path.join(tmp, "transcript-%s.jsonl" % name)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.writelines(json.dumps({"type": "assistant", "isSidechain": sidechain,
+                                  "message": {"content": [{"type": "text", "text": text}]}}) + "\n"
+                      for text, sidechain in entries)
+    return path
+
+
 def merge_grant(tmp):
-    return {"env": _grant_dir(tmp)}
+    """An empty grant store, plus transcripts whose last agent text a bare `go` answers."""
+    return {"env": _grant_dir(tmp), "tokens": {
+        "proposed_dispatch": _transcript(tmp, "proposed", [
+            ("CI is green.", False),
+            ("Plan is clean. Shall I dispatch deploy.yml on main with env=prod?", False)]),
+        "dispatch_in_a_statement": _transcript(tmp, "statement", [
+            ("CI dispatch: it still prompts, but the prompt now says what the run does. Go on to phase 2?", False)]),
+        "negated_dispatch": _transcript(tmp, "negated", [
+            ("Should I wait and not dispatch anything until CI is green?", False)]),
+        "no_dispatch": _transcript(tmp, "none", [("The fix is pushed and CI is green.", False)]),
+        "sidechain_dispatch": _transcript(tmp, "sidechain", [
+            ("The fix is pushed. Want a summary?", False),
+            ("Shall I dispatch deploy.yml on main?", True)]),
+        "proposed_pr": _transcript(tmp, "pr", [("Shall I open the PR?", False)]),
+        "proposed_merge": _transcript(tmp, "merge", [("Shall I " + "merge 17?", False)]),
+    }}
 
 
 def staged_workflow(tmp):

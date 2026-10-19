@@ -84,6 +84,36 @@
     "expected_output": "creating a PR is a visible shared action"
   },
   {
+    "label": "gh workflow run → soft block naming what to check (no session id, so no dispatch grant can apply)",
+    "command": "gh workflow run deploy.yml --ref main -f env=prod",
+    "expected_exit": 0,
+    "expected_stdout": "Check the workflow, the --ref"
+  },
+  {
+    "label": "gh run rerun → soft block",
+    "command": "gh run rerun 123 --failed",
+    "expected_exit": 0,
+    "expected_stdout": "gh run rerun — re-runs a CI run"
+  },
+  {
+    "label": "gh run cancel → soft block warning about held locks",
+    "command": "gh run cancel 123",
+    "expected_exit": 0,
+    "expected_stdout": "held lock"
+  },
+  {
+    "label": "gh api .../dispatches → soft block (the REST spelling of a workflow run)",
+    "command": "gh api -X POST repos/o/r/actions/workflows/deploy.yml/dispatches -f ref=main",
+    "expected_exit": 0,
+    "expected_stdout": "gh api .../dispatches"
+  },
+  {
+    "label": "gh workflow list / gh run view → silent allow (reading CI is not starting it)",
+    "command": "gh workflow list && gh run view 123 --log",
+    "expected_exit": 0,
+    "expected_silent": true
+  },
+  {
     "label": "gh pr close → hard block with verification checklist",
     "command": "gh pr close 123",
     "expected_exit": 2,

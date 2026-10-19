@@ -904,7 +904,7 @@ fi
 MERGE_FORMS="All four merge forms share one gate: 'gh pr merge', 'gh api .../pulls/N/merge', 'gh api graphql' mergePullRequest, 'gh stack merge'."
 
 # Prints the prompt that armed this session's grant for one action; fails on anything short of a live grant.
-grant_prompt() { # merge | pr
+grant_prompt() { # merge | pr | dispatch
   local session file expires
   session=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null)
   case "$session" in ''|*[!A-Za-z0-9_-]*) return 1 ;; esac
@@ -1015,6 +1015,21 @@ fi
 
 if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?run +delete([[:space:]]|$)'; then
   add_soft "gh run delete — permanently removes CI run history."
+fi
+
+# see: tools/claude/examples/hooks/merge-grant/README.md § The dispatch grant — a run can deploy, so it asks unless this turn's words asked for it
+dispatch_soft() { grant_prompt dispatch >/dev/null || add_soft "$1"; }
+if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?workflow +run([[:space:]]|$)'; then
+  dispatch_soft "gh workflow run — starts a CI workflow, which can build, deploy or change cloud state, production included. Check the workflow, the --ref (the default branch when omitted) and every -f input before approving."
+fi
+if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?run +rerun([[:space:]]|$)'; then
+  dispatch_soft "gh run rerun — re-runs a CI run with the inputs and workflow version it first resolved, deploy steps included."
+fi
+if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?run +cancel([[:space:]]|$)'; then
+  dispatch_soft "gh run cancel — stops a CI run mid-job; a cancelled Terraform or migration job can leave a held lock or a half-applied change."
+fi
+if echo "$CMD_MATCH" | grep -qE 'gh[[:space:]]([^|;&]* )?api[^|;&]*/dispatches([^[:alnum:]_/-]|$)'; then
+  dispatch_soft "gh api .../dispatches — starts a workflow_dispatch or repository_dispatch run through the REST API; check the ref and inputs in its fields."
 fi
 
 # Git — history rewriting (reversible via reflog)

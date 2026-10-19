@@ -197,6 +197,40 @@ allow	Report:\n- create PR: failed\n- ok
 # WHY: the verb reaches only the next four words, so a PR mentioned later in the clause is not the thing opened.
 allow	open the dashboard and check whether the PR builds
 
+# --- dispatch: a request to start, rerun or retrigger a CI run ---
+ctx	dispatch the deploy workflow on main
+ctx	please dispatch deploy.yml with env=prod
+ctx	rerun the failed jobs
+ctx	re-run the failed jobs
+ctx	retrigger CI on this branch
+allow	don't dispatch anything yet
+allow	never rerun a deploy without asking
+allow	the dispatch failed, why?
+allow	did you dispatch the deploy?
+allow	CI is ready to dispatch
+# WHY: `workflow_dispatch` and `repository_dispatch` name an event type, not a request to start a run.
+allow	add a workflow_dispatch trigger to deploy.yml
+allow	does the repository_dispatch event carry a payload?
+
+# --- bare affirmations: every word is yes/go/ok-class; column 3 is the transcript the agent's last text is read from ---
+# WHY: each case runs in its own session with no grant on disk, so a bare yes has nothing to renew and arms nothing itself.
+allow	yes
+allow	go ahead
+allow	ok, do it
+# WHY: a bare go arms dispatch only when a question in the agent's last text proposed one.
+ctx	go	{proposed_dispatch}
+ctx	yes please	{proposed_dispatch}
+allow	go	{dispatch_in_a_statement}
+allow	yes	{negated_dispatch}
+allow	go	{no_dispatch}
+allow	go	{sidechain_dispatch}
+allow	go	/nonexistent/transcript.jsonl
+# WHY: the exception is dispatch only, so a proposed PR or merge still needs the user's own words.
+allow	yes	{proposed_pr}
+allow	yes	{proposed_merge}
+# WHY: anything beyond the affirmation words is judged on its own text.
+allow	yes and also bump the version	{proposed_dispatch}
+
 # --- menu answers: PostToolUse on AskUserQuestion, the question and the label picked ---
 #!event PostToolUse
 #!tool AskUserQuestion
@@ -219,3 +253,8 @@ allow	Which PRs should I summarize?	Open PRs
 ctx	Did you want me to open a PR?	Yes
 # WHY: a picked label is never a heading, so a colon in it does not cancel the pick.
 ctx	How should I proceed?	Open PRs for both: services and infra
+# WHY: a menu answer arms dispatch as it arms pr, and a qualified answer is still not consent.
+ctx	Dispatch deploy.yml on main now?	Yes
+ctx	How should I proceed?	Rerun the failed jobs
+allow	Dispatch deploy.yml on main now?	Yes, but only after CI
+allow	Dispatch deploy.yml now?	No, wait for review

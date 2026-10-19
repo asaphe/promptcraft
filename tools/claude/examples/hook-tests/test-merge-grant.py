@@ -30,6 +30,9 @@ GRAPHQL_HEREDOC_MERGE = ("gh api graphql -f query=\"$(cat <<'EOF'\nmutation {\n 
 STACK_MERGE = "gh stack " + "merge"
 FORMS = (MERGE, REST_MERGE, GRAPHQL_MERGE, GRAPHQL_HEREDOC_MERGE, STACK_MERGE)
 PR_CREATE = "gh pr " + "create --title x --body y"
+DISPATCH = "gh workflow run deploy.yml --ref main -f env=prod"
+DISPATCH_FORMS = (DISPATCH, "gh run rerun 123 --failed", "gh run cancel 123",
+                  "gh api -X POST repos/o/r/actions/workflows/deploy.yml/dispatches -f ref=main")
 NOTIFICATION = "<task-notification>\n<task-id>x</task-id>\n<summary>ready to " + "merge</summary>\n</task-notification>"
 AGENT_MESSAGE = "<agent-message from=\"worker\">\nall green, ready to " + "merge and open the PR\n</agent-message>"
 
@@ -61,10 +64,16 @@ class MergeGrantTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def prompt(self, text, session=SESSION):
+    def prompt(self, text, session=SESSION, last_agent_text=None, sidechain=False):
         payload = {"hook_event_name": "UserPromptSubmit", "prompt": text}
         if session is not None:
             payload["session_id"] = session
+        if last_agent_text is not None:
+            path = os.path.join(self.tmp, "transcript.jsonl")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(json.dumps({"type": "assistant", "isSidechain": sidechain,
+                                     "message": {"content": [{"type": "text", "text": last_agent_text}]}}) + "\n")
+            payload["transcript_path"] = path
         proc = subprocess.run(["bash", str(GRANT_HOOK)], input=json.dumps(payload),
                               capture_output=True, text=True, env=self.env, timeout=10)
         self.assertEqual(proc.stderr, "")
@@ -271,6 +280,83 @@ class MergeGrantTest(unittest.TestCase):
         self.prompt("merge 17")
         self.assertEqual(self.answer({"Which list?": "The two above"}), "allow")
         self.assert_verdict(MERGE, "ask", "merge 17")
+
+    def test_without_a_dispatch_grant_every_dispatch_form_asks(self):
+        for command in DISPATCH_FORMS:
+            self.assert_verdict(command, "ask", "gh api .../dispatches" if " api " in command else " ".join(command.split()[:3]))
+
+    def test_a_dispatch_request_drops_the_dispatch_prompts_until_the_next_prompt(self):
+        self.assertEqual(self.prompt("dispatch the deploy workflow on main"), "ctx")
+        for command in DISPATCH_FORMS:
+            self.assert_verdict(command, "allow")
+        self.assert_verdict("gh run delete 123", "ask", "gh run delete")
+        self.assert_verdict(PR_CREATE, "ask")
+        self.assert_verdict(MERGE, "hard")
+        self.assert_verdict(DISPATCH + " && git clean -fd", "hard", "git clean")
+        self.assertEqual(self.prompt("thanks"), "allow")
+        self.assert_verdict(DISPATCH, "ask")
+
+    def test_a_bare_yes_renews_only_a_live_grant(self):
+        self.assertEqual(self.prompt("yes"), "allow")
+        self.assert_verdict(PR_CREATE, "ask")
+        self.assert_verdict(DISPATCH, "ask")
+        self.assertEqual(self.prompt("open the PR and dispatch the deploy"), "ctx")
+        for affirmation in ("yes", "go ahead", "ok, do it"):
+            self.assertEqual(self.prompt(affirmation), "ctx", affirmation)
+            self.assert_verdict(PR_CREATE, "allow")
+            self.assert_verdict(DISPATCH, "allow")
+        with open(os.path.join(self.grants, SESSION + ".pr.json"), encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh)["prompt"], "open the PR and dispatch the deploy")
+        self.assertEqual(self.prompt("yes, and bump the version too"), "allow")
+        self.assert_verdict(PR_CREATE, "ask")
+        self.assert_verdict(DISPATCH, "ask")
+        self.assertEqual(self.prompt("yes"), "allow")
+        self.assert_verdict(DISPATCH, "ask")
+        self.write_grant(json.dumps({"expires_at": int(time.time()) - 1, "prompt": "open the PR"}), action="pr")
+        self.assertEqual(self.prompt("yes"), "allow")
+        self.assert_verdict(PR_CREATE, "ask")
+
+    def test_a_bare_yes_never_renews_or_arms_a_merge(self):
+        self.prompt("merge 17")
+        self.assertEqual(self.prompt("yes"), "allow")
+        self.assert_verdict(MERGE, "hard")
+        self.assertEqual(self.prompt("yes", last_agent_text="CI is green. Shall I " + "merge 17?"), "allow")
+        self.assert_verdict(MERGE, "hard")
+
+    def test_a_bare_go_arms_dispatch_only_after_a_question_proposed_it(self):
+        proposal = "Plan is clean. Shall I dispatch deploy.yml on main with env=prod?"
+        self.assertEqual(self.prompt("go", last_agent_text=proposal), "ctx")
+        self.assert_verdict(DISPATCH, "allow")
+        self.assert_verdict(PR_CREATE, "ask")
+        self.assertEqual(self.prompt("thanks"), "allow")
+        for text, sidechain in (
+                ("CI dispatch: it still prompts, but the prompt now says what the run does. Go on to phase 2?", False),
+                ("Should I wait and not dispatch anything until CI is green?", False),
+                ("The fix is pushed and CI is green.", False),
+                ("Shall I open the PR?", False),
+                (proposal, True)):
+            self.assertEqual(self.prompt("go", last_agent_text=text, sidechain=sidechain), "allow", text)
+            self.assert_verdict(DISPATCH, "ask")
+            self.assert_verdict(PR_CREATE, "ask")
+        self.assertEqual(self.prompt("go, and bump the version", last_agent_text=proposal), "allow")
+        self.assert_verdict(DISPATCH, "ask")
+
+    def test_a_menu_answer_arms_dispatch(self):
+        self.assertEqual(self.answer({"Dispatch deploy.yml on main now?": "Yes"}), "ctx")
+        self.assert_verdict(DISPATCH, "allow")
+        self.assert_verdict(PR_CREATE, "ask")
+        self.assertEqual(self.prompt("thanks"), "allow")
+        self.assertEqual(self.answer({"Dispatch deploy.yml on main now?": "Yes, but only after CI"}), "allow")
+        self.assert_verdict(DISPATCH, "ask")
+
+    def test_a_dispatch_grant_fails_closed_and_stays_in_its_session(self):
+        self.prompt("dispatch the deploy")
+        self.assert_verdict(DISPATCH, "ask", session="session-b")
+        self.assert_verdict(DISPATCH, "ask", session=None)
+        self.write_grant(json.dumps({"expires_at": int(time.time()) - 1, "prompt": "dispatch it"}), action="dispatch")
+        self.assert_verdict(DISPATCH, "ask")
+        self.write_grant("{not json", action="dispatch")
+        self.assert_verdict(DISPATCH, "ask")
 
     def test_a_pr_grant_fails_closed_and_stays_in_its_session(self):
         self.prompt("open the PR")

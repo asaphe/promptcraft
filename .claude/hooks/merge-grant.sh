@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
-# Per-turn grants — permission to merge a PR or open one, armed only by the user's own words.
+# Per-turn grants — permission to merge a PR, open one or dispatch a CI run, armed only by the user's own words.
 #
 # UserPromptSubmit: a prompt that asks for an action writes that action's grant for this session;
-# the user's next prompt that does not ask again deletes it. PostToolUse on AskUserQuestion: a menu
-# answer that asks for a PR, or agrees to a question that proposed one, arms `pr` — never `merge`.
-# destructive-guard.sh reads the grants. `merge` turns a merge from a hard block into a permission
-# prompt; `pr` drops the permission prompt on `gh pr create`. Without this hook no grant is ever
-# written: every merge stays a hard block and every `gh pr create` asks.
+# a bare affirmation ("yes", "go") renews a live `pr` or `dispatch` grant, and arms `dispatch` when
+# the agent's last question proposed one; any other prompt that does not ask again deletes it.
+# PostToolUse on AskUserQuestion: a menu answer that asks for a PR or a dispatch, or agrees to a
+# question that proposed one, arms `pr` or `dispatch` — never `merge`. destructive-guard.sh reads
+# the grants. `merge` turns a merge from a hard block into a permission prompt; `pr` drops the
+# permission prompt on `gh pr create`; `dispatch` drops it on `gh workflow run`, `gh run rerun|cancel`
+# and a `/dispatches` call. Without this hook no grant is ever written: every merge stays a hard
+# block, and every `gh pr create` and dispatch asks.
 #
 # Register in settings.json:
 # "UserPromptSubmit": [{ "matcher": "", "hooks": [{ "type": "command", "command": "/path/to/merge-grant.sh" }] }]
 # "PostToolUse": [{ "matcher": "AskUserQuestion", "hooks": [{ "type": "command", "command": "/path/to/merge-grant.sh" }] }]
 #
 # Requires: jq, perl. Grants live in ${CLAUDE_MERGE_GRANT_DIR:-$HOME/.claude/merge-grants}:
-# <session>.json for merge, <session>.pr.json for pr. destructive-guard.sh reads the same variable.
+# <session>.json for merge, <session>.<action>.json for the others. destructive-guard.sh reads the same variable.
 
 GRANT_DIR="${CLAUDE_MERGE_GRANT_DIR:-$HOME/.claude/merge-grants}"
 TTL=7200  # backstop for a turn that outlives its user: a long CI wait, a session resumed later
-ACTIONS="merge pr"
+ACTIONS="merge pr dispatch"
 
 INPUT=$(cat)
 command -v jq >/dev/null 2>&1 && command -v perl >/dev/null 2>&1 || exit 0
@@ -38,6 +41,8 @@ asks_for() { # action, text, "label" when the text is a menu option a user picke
     | LC_ALL=C tr '\t\n' ' .' | LC_ALL=C sed -e "s/[.;!?]/ . /g" -e "s/[,()]/ , /g" -e "s/:/ : /g" \
       -e "s/pull[^a-z]*requests*/ pr /g" -e "s/^prs* *[#-]* *[0-9][0-9]*/ prref /" -e "s/\([^a-z]\)prs* *[#-]* *[0-9][0-9]*/\1 prref /g" \
       -e "s/merge[-_]\([a-z]\)/mergename\1/g" \
+      -e "s/workflow[-_]dispatch/dispatchname/g" -e "s/repository[-_]dispatch/dispatchname/g" -e "s/dispatch[-_]\([a-z]\)/dispatchname\1/g" \
+      -e "s/re-run/rerun/g" -e "s/re-trigger/retrigger/g" -e "s/re-dispatch/redispatch/g" \
       -e "s/[^a-z'.,: ]/ /g" \
     | LC_ALL=C tr -s ' ' '\n' | awk -v q="'" -v act="$1" -v label="${3:-}" '
       BEGIN { n = split("dont not never without cannot cant wont shouldnt couldnt wouldnt", w, " "); for (i = 1; i <= n; i++) neg[w[i]] = 1
@@ -60,6 +65,7 @@ asks_for() { # action, text, "label" when the text is a menu option a user picke
       { after_did = ($0 == "did") }
       $0 in neg || $0 ~ ("n" q "t$") { negated = 1 }
       act == "merge" && $0 == "merge" && !negated && prev != "no" && !asked && !((prev in ndet) && !(prev2 in doer)) && !(prev == "to" && prev2 == "ready") { found = 1 }
+      act == "dispatch" && ($0 == "dispatch" || $0 == "rerun" || $0 == "retrigger" || $0 == "redispatch") && !negated && prev != "no" && !asked && !((prev in ndet) && !(prev2 in doer)) && !(prev == "to" && prev2 == "ready") { found = 1 }
       act == "pr" && pr_verb > 0 && ($0 in stop) { pr_verb = 0; opening = 0 }
       act == "pr" && opening { if (!($0 in det)) pr_verb = 0; opening = 0 }
       act == "pr" && fresh && pr_verb > 0 && ($0 == "pr" || $0 == "prs") { if (held_open) pending = 1; else tent = 1; pr_verb = 0 }
@@ -71,21 +77,38 @@ asks_for() { # action, text, "label" when the text is a menu option a user picke
       END { if (tent || (label != "" && pending)) found = 1; exit !found }'
 }
 
-# see: tools/claude/examples/hooks/merge-grant/README.md § Menu answers
-answer_consents() { # answer
+# see: tools/claude/examples/hooks/merge-grant/README.md § Bare affirmations
+is_affirmation() { # text: a menu answer or a typed prompt
   printf '%s' "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]' | sed -e 's/(recommended)//g' \
     | LC_ALL=C tr -c "a-z'\n" ' ' | LC_ALL=C tr -s ' ' '\n' | awk '
-      BEGIN { n = split("yes y yep yeah ok okay sure approve approved confirm confirmed proceed go ahead do it please", w, " "); for (i = 1; i <= n; i++) ok[w[i]] = 1 }
+      BEGIN { n = split("yes y yep yeah ok okay sure approve approved confirm confirmed proceed go ahead do it please just now", w, " "); for (i = 1; i <= n; i++) ok[w[i]] = 1 }
       $0 == "" { next }
       { words++ }
       !($0 in ok) { other = 1 }
       END { exit !(words > 0 && !other) }'
 }
 
+# Only questions: a status line that merely mentions a dispatch is not what a bare "go" answers.
+last_assistant_questions() { # transcript path
+  [ -f "$1" ] || return 0
+  tail -n 400 "$1" | jq -rRn '[inputs | fromjson? | select(.type == "assistant" and (.isSidechain | not))
+      | .message.content | if type == "array" then (map(select(.type == "text") | .text) | join(" ")) else (. // "" | tostring) end
+      | select(length > 0)] | last // ""' 2>/dev/null | tail -c 2000 \
+    | perl -0777 -ne 'print join(" . ", grep { /\?\s*$/ } split /(?<=[.!?])\s+|\n+/), "\n"'
+}
+
+live() { # action
+  local expires
+  expires=$(jq -r '.expires_at // 0' "$(grant_file "$1")" 2>/dev/null) || return 1
+  case "$expires" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$(date +%s)" -lt "$expires" ]
+}
+
 grant_context() { # action
   case "$1" in
     merge) printf '%s' "MERGE GRANT armed for this turn: a merge raises a permission prompt instead of a hard block. Merge only the PRs this message names. If mapping the request to specific PRs takes interpretation (a range, \"the ones above\", a list from an earlier turn), confirm the exact list before the first merge." ;;
     pr) printf '%s' "PR GRANT armed for this turn: \`gh pr create\` runs without destructive-guard's permission prompt; pr-create-guard still checks it. Open only the PR this message asks for." ;;
+    dispatch) printf '%s' "DISPATCH GRANT armed for this turn: \`gh workflow run\`, \`gh run rerun\`, \`gh run cancel\` and a \`gh api .../dispatches\` call run without destructive-guard's permission prompt. Dispatch only the workflow this exchange named, on the ref and inputs stated; \`gh run delete\` still asks." ;;
   esac
 }
 
@@ -106,19 +129,22 @@ emit() { # event, context
 
 CONTEXT=""
 
-# A menu pick is a tool result, not a prompt: it arms pr and clears nothing. Merge needs typed words.
+# A menu pick is a tool result, not a prompt: it arms pr or dispatch and clears nothing. Merge needs typed words.
 if [ "$EVENT" = "PostToolUse" ]; then
   [ "$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)" = "AskUserQuestion" ] || exit 0
   PAIRS=$(printf '%s' "$INPUT" | jq -r '((.tool_response | objects | .answers) // .tool_input.answers // {})
     | to_entries[] | [.key, (.value | tostring)] | @tsv' 2>/dev/null) || exit 0
-  while IFS=$'\t' read -r question answer; do
-    [ -n "$answer" ] || continue
-    alabel=answer; printf '%s' "$question" | LC_ALL=C grep -qiE '(^|[^a-z])(prs|pull requests)([^a-z]|$)' && alabel=""
-    if asks_for pr "$answer" "$alabel" || { asks_for pr "$question" question && answer_consents "$answer"; }; then
-      arm pr "menu: ${question} -> ${answer}" && CONTEXT=$(grant_context pr)
-      break
-    fi
-  done <<<"$PAIRS"
+  for a in pr dispatch; do
+    while IFS=$'\t' read -r question answer; do
+      [ -n "$answer" ] || continue
+      alabel=answer
+      [ "$a" = pr ] && printf '%s' "$question" | LC_ALL=C grep -qiE '(^|[^a-z])(prs|pull requests)([^a-z]|$)' && alabel=""
+      if asks_for "$a" "$answer" "$alabel" || { asks_for "$a" "$question" question && is_affirmation "$answer"; }; then
+        arm "$a" "menu: ${question} -> ${answer}" && CONTEXT="${CONTEXT:+${CONTEXT} }$(grant_context "$a")"
+        break
+      fi
+    done <<<"$PAIRS"
+  done
   emit PostToolUse "$CONTEXT"
   exit 0
 fi
@@ -137,9 +163,20 @@ if [ -n "$PROMPT" ] && [ -z "$(printf '%s' "$OWN" | tr -d '[:space:]')" ]; then
   exit 0
 fi
 
+AFFIRM=""; PROPOSAL=""
+if [ -n "$OWN" ] && is_affirmation "$OWN"; then
+  AFFIRM=1
+  PROPOSAL=$(last_assistant_questions "$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)")
+fi
+
+# see: tools/claude/examples/hooks/merge-grant/README.md § Bare affirmations — merge keeps the typed-words rule
 for a in $ACTIONS; do
   if [ -n "$OWN" ] && asks_for "$a" "$OWN"; then
     arm "$a" "$OWN" && CONTEXT="${CONTEXT:+${CONTEXT} }$(grant_context "$a")"
+  elif [ -n "$AFFIRM" ] && [ "$a" != merge ] && live "$a"; then
+    arm "$a" "$(jq -r '.prompt // ""' "$(grant_file "$a")" 2>/dev/null)" && CONTEXT="${CONTEXT:+${CONTEXT} }$(grant_context "$a")"
+  elif [ -n "$AFFIRM" ] && [ "$a" = dispatch ] && [ -n "$PROPOSAL" ] && asks_for dispatch "$PROPOSAL" question; then
+    arm dispatch "affirmed: ${OWN} -> $(printf '%s' "$PROPOSAL" | tail -c 120)" && CONTEXT="${CONTEXT:+${CONTEXT} }$(grant_context dispatch)"
   else
     rm -f "$(grant_file "$a")"
   fi
