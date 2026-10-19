@@ -59,21 +59,21 @@ Requires `jq` on PATH.
 
 ## Customization
 
-The hook is designed to be customized for your stack. Replace the identity provider, database, and API patterns:
+The hook is designed to be customized for your stack. Replace the identity provider, database, and API patterns. Match with `line_match` (`grep -qE`) or `line_match_i` (`grep -qiE`): they test each line in-process, so a pattern costs no process spawn on every Bash call:
 
 ```bash
 # Replace Descope with your auth provider
-if echo "$CMD" | grep -qiE 'clerk.*(user|organization|session)'; then
+if line_match_i "$CMD" 'clerk.*(user|organization|session)'; then
   REMINDER="STATEFUL OP: Clerk user/org mutation detected. ..."
 fi
 
 # Add your SaaS APIs
-if echo "$CMD" | grep -qiE 'stripe.*(customer|subscription|payment)'; then
+if line_match_i "$CMD" 'stripe.*(customer|subscription|payment)'; then
   REMINDER="STATEFUL OP: Stripe mutation detected. ..."
 fi
 
 # Add your internal services
-if echo "$CMD" | grep -qiE 'curl.*internal-api\.example\.com.*(POST|PUT|DELETE)'; then
+if line_match_i "$CMD" 'curl.*internal-api\.example\.com.*(POST|PUT|DELETE)'; then
   REMINDER="STATEFUL OP: Internal API mutation detected. ..."
 fi
 ```

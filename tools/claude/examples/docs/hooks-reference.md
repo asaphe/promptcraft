@@ -42,7 +42,7 @@ Compaction is the one boundary where in-session reasoning is destroyed while any
 |------|---------|---------|--------|------|
 | `rtk-rewrite.sh` | All Bash | Rewrites commands to use a token-optimizing proxy | Rewrites tool input | Per call, fast |
 | `op-read-guard.sh` | `op *` | Blocks raw secret reads, redirects to a masked cache ([claude-secret-guard](https://github.com/asaphe/claude-secret-guard)) | Blocks or warns | Conditional |
-| `stateful-op-reminder.sh` | All Bash | Nudges on external state mutations | `additionalContext` reminder | Per call, pattern-match only |
+| `stateful-op-reminder.sh` | All Bash | Nudges on external state mutations | `additionalContext` reminder | Per call, in-process pattern match |
 | `destructive-guard.sh` | All Bash | Blocks/soft-blocks destructive ops | Hard block (exit 2) or soft block | Per call, most calls exit early |
 | `agent-config-review-guard.sh` | `git commit*` | Flags agent config changes on commit | Warning | Conditional |
 | `commit-attribution-guard.sh` | `git *` | Hard-blocks AI attribution markers in commit messages and bot branch prefixes | Hard block (exit 2) | Conditional |
@@ -50,7 +50,7 @@ Compaction is the one boundary where in-session reasoning is destroyed while any
 | `gha-lint-guard.sh` | `git commit*` | Runs actionlint on GHA workflows | Blocks on lint errors | Conditional |
 | `agent-config-review-guard.sh` | `git push*` | Flags agent config changes on push | Warning | Conditional |
 | `pr-create-guard.sh` | `gh *` | Pre-flight checklist for PR creation, and for `gh stack submit` | Blocks or warns | Conditional |
-| `session-log.sh` | Stop | Appends the turn to a per-session log; nudges when its newest `state` line is stale | `systemMessage` to the user | Conditional |
+| `session-log.sh` | Stop | Appends the turn to a per-session log | None (writes the log file) | Every turn |
 | `pr-edit-counter.sh` | `gh pr edit*` | Tracks PR edit count | Advisory | Conditional |
 
 ## PreToolUse: Edit / MultiEdit / Write — 4 entries
