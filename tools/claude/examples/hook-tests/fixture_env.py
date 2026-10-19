@@ -84,6 +84,13 @@ def _pr_repo(tmp, name, *, ahead=True, pushed=True, dirty=False, origin_main=Tru
     return repo
 
 
+def _headother_repo(tmp):
+    """A dirty checkout on `feature`, plus a pushed branch `other` that is the one a --head names."""
+    repo = _pr_repo(tmp, "pr-headother", dirty=True)
+    _git(repo, "update-ref", "refs/remotes/origin/other", _head(repo))
+    return repo
+
+
 def pr_create(tmp):
     """The five branch states a PR-creation guard has to tell apart.
 
@@ -99,6 +106,7 @@ def pr_create(tmp):
         "ready": _pr_repo(tmp, "pr-ready"),
         "noorigin": _pr_repo(tmp, "pr-noorigin", origin_main=False, pushed=False),
         "noorigin_ready": _pr_repo(tmp, "pr-noorigin-ready", origin_main=False),
+        "headother": _headother_repo(tmp),
     }}
 
 

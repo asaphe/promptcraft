@@ -93,7 +93,7 @@ PERMISSION_DECISIONS = ("allow", "ask", "deny", "defer")
 TOKEN_RE = re.compile(r"\{[a-z_][a-z0-9_]*\}")
 # Each tool carries new content under a different key; a hook reads exactly one.
 TOOL_INPUT = {
-    "Bash": lambda path, body, prev="": {"command": path},
+    "Bash": lambda path, body, prev="": {"command": path, **({"workdir": body} if body else {})},
     "Write": lambda path, body, prev="": {"file_path": path, "content": body},
     "Edit": lambda path, body, prev="": {
         "file_path": path,
