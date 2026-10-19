@@ -401,7 +401,7 @@ Hooks can fail silently, leaving the impression they're protecting you when they
 | Exit 1 mistaken for a block | Non-blocking error without valid JSON | Use exit 2 with stderr for a blocking error |
 | Matcher too broad | Every tool call triggers the hook | Test matcher against common tool calls (`Edit`, `Read`, `Bash`) |
 | Matcher too narrow | Hook never fires for target pattern | Test with exact tool input strings from a real session |
-| Hook timeout | Kills hook, proceeds without it | Add `timeout 2` wrapper; profile with `time` |
+| Hook timeout | Non-blocking error: the hook's verdict is discarded and the tool runs | Declare `"timeout"` on every entry; keep a hook's own time budget (network calls, `gh` lookups) well under it and fail closed (`ask`/`deny`) when it runs out; profile with `time` |
 | Reads `$ENV_VAR` instead of stdin | Gets empty input, exits with no effect | Hooks receive JSON on stdin, not env vars |
 
 **Testing protocol:** Before registering a hook, test it with realistic input:
