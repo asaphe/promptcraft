@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PREFIX = "https://github.com/asaphe/promptcraft/blob/main/"
 HOOKS = ("destructive-guard", "stateful-op-reminder", "pr-create-guard", "_lib")
 HELPERS = ("hook-diag.sh", "pr-author.sh", "resolve-workdir.sh", "strip-cmd.sh",
-           "strip-quoted-args.pl", "split-cmd-segments.pl")
+           "strip-quoted-args.pl", "split-cmd-segments.pl", "code-exec-scan.pl")
 SOURCES = {
     "basic": ("home", [("tools/claude/examples/config/global-CLAUDE.md", ".claude/CLAUDE.md", "file")]),
     "operations": ("project", [("tools/claude/examples/profiles/operations.md", ".claude/rules/operations.md", "file")]),

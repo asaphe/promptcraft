@@ -31,6 +31,7 @@ Soft blocks emit `permissionDecision: ask` JSON on stdout and exit 0. Claude Cod
 | Bulk `git branch -d/-D` (xargs, loop, or several names) | One bad glob wipes hundreds of refs |
 | `aws * delete-*`, `aws s3 rm`, `aws ec2 terminate-*` | Cloud resource destruction |
 | `aws dynamodb delete-table`, `aws kms schedule-key-deletion`, and peers | Destroys stored data, its backups, or the key that decrypts it |
+| A record-deleting call in the command, a `-c`/`-e` string or a heredoc: SQL `DELETE FROM`, `DROP`/`TRUNCATE`, Mongo `deleteMany`, Redis `FLUSHALL`, an ORM bulk delete, and peers | Deletes stored records in any language or client — see [Record deletion](#record-deletion) |
 
 ### Soft Blocks (confirm first)
 
@@ -48,6 +49,8 @@ Soft blocks emit `permissionDecision: ask` JSON on stdout and exit 0. Claude Cod
 | `kubectl delete/drain/cordon/scale/rollout undo/patch` | Live cluster mutations |
 | `helm uninstall/rollback` | Release changes |
 | Any `aws <service> delete-*` / `remove-*` / `terminate-*` / `purge-*` / `deregister-*` / `destroy-*` | Default-deny for the whole destructive verb family |
+| A script file the command runs that holds a record-deleting call (`python3 cleanup.py`, `psql -f purge.sql`) | `DATA DELETION` prompt — see [Record deletion](#record-deletion) |
+| `kubectl exec`/`attach` into an interpreter, shell or database client; `kubectl run`/`debug`; a Pod, Job or CronJob applied from a manifest; decoded or downloaded code piped into an interpreter | `CODE EXECUTION` prompt — see [Hidden code execution](#hidden-code-execution) |
 
 ## Worktree-Aware Push Detection
 
@@ -135,13 +138,45 @@ Two layers, because a per-service denylist always trails the API:
 
 The catch-all keys on `<lowercase token> <destructive verb>-…` inside one segment. That is deliberately loose, and it over-fires when an *argument value* sits in that position — `aws ecs list-tasks --cluster prod delete-me` prompts. Tightening it to a true command position would trade a prompt on a read for a silent pass on a verb the list has not caught up with, which is the wrong direction for a default-deny. Flag values that follow a `--flag` (`--filters Values=terminate-me`, `--name delete-flag`) do *not* fire, because the token before the verb must not itself start with `-`.
 
+## Record deletion
+
+A request to clean up "the runs", "the jobs" or "the old events" can name a workload (pods, Jobs) or the records describing it (rows, documents, run history). Deleting the workload is recoverable; deleting the records usually is not. This rule makes the record-deleting reading unreachable from the agent, whatever language it is written in.
+
+It matches a record-destroying call, case-insensitively:
+
+- **SQL:** `DELETE FROM`, `DROP` or `TRUNCATE` followed by `TABLE`, `DATABASE`, `SCHEMA`, `INDEX`, `VIEW`, `MATERIALIZED`, `COLLECTION`, `KEYSPACE` or `PARTITION`, and `ALTER TABLE … DROP|DELETE`.
+- **Other stores:** Mongo `dropDatabase`, `drop_collection`, `deleteMany(`, `deleteOne(`; Redis `FLUSHALL`, `FLUSHDB`; Elasticsearch `_delete_by_query`.
+- **ORM bulk deletes:** `.objects….delete(`, `query(…).delete(`, `drop_table(`, `dropTable`, `dropSchema`.
+- **Orchestrator run history (Dagster):** `.wipe(` and `wipe_*(`, `dagster run|asset|instance wipe|delete`, `delete_run(`, and the GraphQL `deletePipelineRun`, `deleteRun`, `wipeAssets` and `deleteDynamicPartitions` mutations.
+
+It looks in two places, and they get different tiers:
+
+- **The raw command — hard block.** The call almost always sits inside a `-c`/`-e`/`--eval` string or a heredoc body, which the parsed views (`CMD_MATCH`, `CMD_STRIPPED`) blank, so this rule reads the raw command instead. There is no approval path: a bundled plan approved with one "yes" can carry a record wipe nobody meant, and a prompt for that step would be approved the same way. The message tells the agent to show the user an itemized impact list and let them run it themselves.
+- **A script file the command names — ask.** Any word ending in a script extension (`.py .js .ts .rb .pl .php .go .java .sql .sh …`) that exists on disk is read, up to 1 MiB, so `python3 cleanup.py`, `psql -f purge.sql` and `psql < purge.sql` are covered. A hit found only there is an ask whose prompt starts `DATA DELETION`, ahead of every other trigger in the command. It is not a hard block because a test file running `DELETE FROM` against its own fixture database is routine, and blocking it would stall the test run. A relative path is read from the hook's working directory, so after a `cd` in the same command the file may not be found.
+
+**Read-only allowlist.** Either way, the command passes when every command in it is a known read-only tool: `grep`/`rg`/`ag`, `cat`, `head`/`tail`, `wc`, `sort`, `jq`/`yq`, `echo`/`printf`, `ls`, `diff`/`cmp`, `test`, and `git log|diff|show|grep|blame|status` (after `git -C <dir>`, `-c <k=v>` or `--no-pager` too). That keeps a search, a diff or a printout of these words from tripping it. Every other command counts as able to run the text: an interpreter, a database client, `curl`, `kubectl exec`, `sh -c`, `git commit`, or a binary nobody listed. This is deliberately a list of readers rather than of executors, because a list of executors misses the next language. A `SELECT`, `kubectl delete jobs`/`pods` (the workload, which asks under its own rule) and pandas `df.drop(…)` all pass this rule. One consequence: a commit message naming these words blocks; write it to a file and use `git commit -F <file>`.
+
+**What it can't see:** a call built at runtime (string concatenation, a decoded or downloaded payload), a compiled binary, and a script fetched and piped into an interpreter — the next section asks about the last two. The guard is a backstop; the primary control is the impact list the agent shows before any deletion.
+
+## Hidden code execution
+
+Code whose effect the command text cannot show still has to run somewhere that holds the credentials. `../_lib/code-exec-scan.pl` names each such door, and the guard turns it into an ask whose prompt starts `CODE EXECUTION` and requires the itemized impact list. It leads every other trigger's wording except `DATA DELETION`.
+
+- **Code inside a cluster workload:** `kubectl exec|attach` whose command after `--` is an interpreter, a shell or a database client (or no command at all, as with `-it`), and `kubectl run|debug`. A non-interpreter exec such as `cat` stays silent.
+- **A pod or Job from a manifest:** `kubectl apply|create|replace -f <file>` where the file's `kind` is `Pod`, `Job` or `CronJob`; also `-f -`, and a `-f` whose path is a variable or does not exist yet — the generate-then-apply shape, where the same command writes the manifest, so nothing can be read before it runs. `kubectl create job|cronjob` is included.
+- **Decoded or downloaded code that then runs:** `base64|xxd|openssl|gunzip|…` piped into an interpreter; `curl|wget|aws s3 cp|…` piped into one; `bash <(curl …)`; `sh -c "$(curl …)"`; and an in-language decode (`b64decode`, `atob`, `Buffer.from(…, 'base64')`, `unhexlify`, `marshal`/`pickle.loads`, …) next to `exec`/`eval`/`system`/`spawn`.
+
+**Which namespaces count.** The workload checks apply only in a namespace matching the Perl regex in `DESTRUCTIVE_GUARD_APP_NS`. The default, `^(?!kube-)`, is every namespace except the `kube-` system ones (`kube-system`, `kube-public`, `kube-node-lease`). Narrow it to your deployment namespaces, for example `DESTRUCTIVE_GUARD_APP_NS='^(prod|staging)-'`, or widen it with `.`. A command with no `-n` always counts, because the context's default namespace is not in the text.
+
+It is an ask, not a block: reading state through `kubectl exec … python` is legitimate, so the point is that the prompt makes a list of what the code touches mandatory. The helper runs only when the command contains one of its trigger words. **It fails closed:** if the helper is missing, unreadable, or dies (an invalid `DESTRUCTIVE_GUARD_APP_NS` regex included), the guard asks with a prompt saying the command was not checked. Still not covered: a compiled binary run locally against a database, and a local database client building its statement at runtime. The impact list and the database's own audit log are the controls there.
+
 ## Cost per call
 
 This is a `PreToolUse` hook: it runs before **every** Bash tool call, so its own latency is a tax on everything else.
 
-Preprocessing invokes the quote parser twice, once for matching and once for extraction. These invocations avoid adding another multi-record output protocol between the parser and Bash, at the cost of two syntax walks and Perl startups. The rule cascade adds roughly 60 `echo | grep` fork pairs and a Perl segment split; checkout also requests scoped records. A fast-path gate skips that cascade when the parsed command names none of `git`, `gh`, `aws`, `kubectl`, `helm`, `terraform`, `xargs`.
+Preprocessing invokes the quote parser twice, once for matching and once for extraction. These invocations avoid adding another multi-record output protocol between the parser and Bash, at the cost of two syntax walks and Perl startups. The rule cascade adds roughly 60 `echo | grep` fork pairs and a Perl segment split; checkout also requests scoped records. A fast-path gate skips that cascade when the parsed command names none of `git`, `gh`, `aws`, `kubectl`, `helm`, `terraform`, `xargs` and its lowercased raw text matches none of `GUARD_WORDS` — the record-deletion and code-execution trigger words (`delete`, `drop`, `flush`, `base64`, `curl`, …) and a word ending in a script extension, since those rules key on text in any language rather than on a binary.
 
-That gate is a fail-**open** if it is ever wrong: a rule keyed on a binary the gate omits silently stops firing, and no eval case would notice unless one happened to cover it. So the token list is not trusted as written. `.claude/scripts/check-guard-gate.py` re-derives every rule's leading binary from the hook source, fails if the gate omits one, and separately asserts that every case the suite expects to act on survives the gate. It is itself mutation-tested — dropping a token from `GUARD_TOOLS` must make it fail.
+That gate is a fail-**open** if it is ever wrong: a rule keyed on a binary the gate omits silently stops firing, and no eval case would notice unless one happened to cover it. So the token list is not trusted as written. `.claude/scripts/check-guard-gate.py` re-derives every rule's leading binary from the hook source, fails if the gate omits one or if `GUARD_WORDS` misses a code-execution trigger word, and separately asserts that every case the suite expects to act on survives the gate. It is itself mutation-tested — dropping a token from `GUARD_TOOLS` must make it fail.
 
 Measured median over 12 local runs with the expansion parser, using macOS Bash 3.2:
 
@@ -181,6 +216,8 @@ This hook ships twice: `tools/claude/examples/hooks/destructive-guard/` is what 
 ```
 
 Requires `jq` and `perl` on PATH, plus `../_lib/hook-diag.sh`, `../_lib/strip-quoted-args.pl`, and `../_lib/split-cmd-segments.pl` installed under the same parent directory as the hook. The [own-PR lease](#own-pr-lease) also needs `../_lib/pr-author.sh` and an authenticated `gh`; without them that push asks, as every other force-push does. Update the guard and helpers together. To let the agent merge, or open a PR without a second prompt, when the user asks, also register [`merge-grant`](https://github.com/asaphe/promptcraft/blob/main/tools/claude/examples/hooks/merge-grant/README.md); the guard reads its store from `$CLAUDE_MERGE_GRANT_DIR` (default `~/.claude/merge-grants`).
+
+[Hidden code execution](#hidden-code-execution) also reads `../_lib/code-exec-scan.pl`; when that helper is missing, every command it would have checked asks instead.
 
 ## Testing
 

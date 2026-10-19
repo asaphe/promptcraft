@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Fail if destructive-guard's fast-path gate does not cover every rule.
 
-The gate exits 0 early when the command names none of GUARD_TOOLS. That is a
+The gate exits 0 early when the command names none of GUARD_TOOLS and its
+lowercased text matches none of GUARD_WORDS (the record-deletion and
+code-execution triggers, which key on words in any language). That is a
 fail-OPEN if a rule ever keys on a binary the gate omits: the rule silently
 stops firing, and nothing in the eval suite notices unless a case happens to
 cover it. So the token set is not trusted as written — it is re-derived from
@@ -45,6 +47,23 @@ def gate_tokens(src: str) -> set[str]:
     return set(m.group(1).split("|"))
 
 
+def gate_words(src: str) -> re.Pattern[str]:
+    """The second gate: words a record-deletion or code-execution rule keys on, matched on the lowercased raw command."""
+    ext = re.search(r"^SCRIPT_EXT='([^']+)'", src, re.M)
+    words = re.search(r"^GUARD_WORDS='(.+)'$", src, re.M)
+    if not ext or not words:
+        sys.exit("FAIL: GUARD_WORDS or SCRIPT_EXT not found in the hook")
+    return re.compile(words.group(1).replace("'\"$SCRIPT_EXT\"'", ext.group(1)))
+
+
+def case_words(src: str) -> set[str]:
+    """Trigger words of every `case "$CMD_LC" in *word*|…)` arm: each runs only if the gate let the command through."""
+    found: set[str] = set()
+    for arm in re.findall(r'^case "\$CMD_LC" in (\S[^\n]*?)\)\s*$', src, re.M):
+        found.update(w.strip("*'") for w in arm.split("|"))
+    return found
+
+
 def rule_tokens(src: str) -> set[str]:
     """Leading binary of every `grep -qE` rule pattern in the hook."""
     found: set[str] = set()
@@ -71,6 +90,17 @@ def main() -> None:
             f"never run: {missing}\n  gate = {sorted(gate)}\n  Add them to GUARD_TOOLS."
         )
 
+    words_re = gate_words(src)
+    triggers = case_words(src)
+    if not triggers:
+        sys.exit("FAIL: found no `case \"$CMD_LC\"` trigger words — the scan is broken, not the gate")
+    unguarded = sorted(w for w in triggers if not words_re.search(w))
+    if unguarded:
+        sys.exit(
+            "FAIL: trigger words the second gate (GUARD_WORDS) does not match, so their rule "
+            f"never runs: {unguarded}\n  Add them to GUARD_WORDS."
+        )
+
     # Second, independent check: every case the suite expects to be acted on must survive the gate.
     acted_on = [
         c for c in json.loads(CASES.read_text())
@@ -80,7 +110,8 @@ def main() -> None:
     ]
     gate_re = re.compile(rf"(^|[^A-Za-z0-9_.-])({'|'.join(sorted(gate))})(\s|$)")
     blocked_by_gate = [
-        c["label"] for c in acted_on if not gate_re.search(normalise(c["command"]))
+        c["label"] for c in acted_on
+        if not gate_re.search(normalise(c["command"])) and not words_re.search(c["command"].lower())
     ]
     if blocked_by_gate:
         sys.exit(
@@ -92,8 +123,9 @@ def main() -> None:
     if not (rule_tokens(src) & gate):
         sys.exit("FAIL: derived zero rule tokens — the scan is broken, not the gate")
 
-    print(f"OK: gate {sorted(gate)} covers all {len(rules)} rule binaries "
-          f"and all {len(acted_on)} acted-on cases")
+    print(f"OK: gate {sorted(gate)} covers all {len(rules)} rule binaries, "
+          f"GUARD_WORDS covers all {len(triggers)} trigger words, "
+          f"and the two cover all {len(acted_on)} acted-on cases")
 
 
 if __name__ == "__main__":

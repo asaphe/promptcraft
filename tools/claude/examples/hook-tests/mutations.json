@@ -1337,6 +1337,66 @@
       "witness": [
         "bash -c \"git push\\\"\\\" origin main\""
       ]
+    },
+    {
+      "why": "a record-deleting call in the command text stops counting, so `psql -c \"DELETE FROM runs;\"` runs with no block",
+      "replace": {
+        "from": "[[ \" $CMD_LC\" =~ $DATA_DESTROY ]] && DS_INLINE=1\n",
+        "to": ""
+      },
+      "witness": [
+        "psql -h db -d appdb -c \"DELETE FROM runs;\""
+      ]
+    },
+    {
+      "why": "the second gate drops `flush`, so `redis-cli FLUSHALL` exits at the fast path before the record-deletion rule runs",
+      "replace": {
+        "from": "GUARD_WORDS='wipe|delete|drop|truncate|flush|",
+        "to": "GUARD_WORDS='wipe|delete|drop|truncate|"
+      },
+      "witness": [
+        "redis-cli FLUSHALL"
+      ]
+    },
+    {
+      "why": "grep stops counting as a read-only tool, so searching a codebase for the deleting calls hard-blocks",
+      "replace": {
+        "from": "next if $h =~ /^(grep|egrep|",
+        "to": "next if $h =~ /^(egrep|"
+      },
+      "witness": [
+        "grep -rn \"deleteMany(\" src | wc -l"
+      ]
+    },
+    {
+      "why": "read-only git subcommands stop counting, so `git log -S \"DELETE FROM runs\"` hard-blocks",
+      "replace": {
+        "from": "      next if $h eq \"git\" && ($w[0] // \"\") =~ /^(log|diff|show|grep|blame|status)$/;\n",
+        "to": ""
+      },
+      "witness": [
+        "git log -S \"DELETE FROM runs\" --oneline"
+      ]
+    },
+    {
+      "why": "a pipe stops splitting the read-only check, so `echo \"DELETE FROM runs\" | psql` reads as an echo and runs",
+      "replace": {
+        "from": "for my $seg (split /\\$\\(|`|&&|\\|\\||[;&|()\\n]/) {",
+        "to": "for my $seg (split /\\$\\(|`|&&|\\|\\||[;&()\\n]/) {"
+      },
+      "witness": [
+        "echo \"DELETE FROM runs\" | psql -h db"
+      ]
+    },
+    {
+      "why": "the CODE EXECUTION reason never reaches the prompt, so `kubectl exec \u2026 -- python` runs unprompted",
+      "replace": {
+        "from": "[ -z \"$CODE_EXEC_ASK_REASON\" ] || lead_soft \"$CODE_EXEC_ASK_REASON\"\n",
+        "to": ""
+      },
+      "witness": [
+        "kubectl exec -n app-a deploy/x -- python -c 'print(1)'"
+      ]
     }
   ],
   "pr-create-guard": [
@@ -2212,6 +2272,60 @@
         "from": "grep { !$_->{executed} && $_->{span} && !$live->($_) } @TOPDOCS",
         "to": "grep { !$_->{executed} && $_->{span} } @TOPDOCS"
       }
+    }
+  ],
+  "_lib/code-exec-scan.pl": [
+    {
+      "why": "the default namespace filter stops excluding system namespaces, so `kubectl exec -n kube-system \u2026 -- python` prompts",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "$ns_src = '^(?!kube-)' unless",
+        "to": "$ns_src = '.' unless"
+      },
+      "witness": [
+        "kubectl exec -n kube-system pod -- python -c 'print(1)'"
+      ]
+    },
+    {
+      "why": "any exec command counts as an interpreter, so `kubectl exec \u2026 -- cat /etc/hostname` prompts",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "ns_name($ns) if $head =~ /^$INTERP$/i;",
+        "to": "ns_name($ns);"
+      },
+      "witness": [
+        "kubectl exec -n app-a pod -- cat /etc/hostname"
+      ]
+    },
+    {
+      "why": "decoded text piped into a shell stops counting, so `echo \u2026 | base64 -d | sh` runs unprompted",
+      "suite": "destructive-guard",
+      "delete_matching": "decoded text piped into",
+      "witness": [
+        "echo ZWNobyBoaQ== | base64 -d | sh"
+      ]
+    },
+    {
+      "why": "a manifest path that does not exist yet counts as readable, so a generate-then-apply into an app namespace runs unprompted",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "if ($p =~ /[\\$`(]/ || !-e $p) {",
+        "to": "if ($p =~ /[\\$`(]/) {"
+      },
+      "witness": [
+        "kubectl apply -n app-b -f /nonexistent/generated-later.yaml"
+      ]
+    },
+    {
+      "why": "an in-language decode no longer needs an exec beside it, so printing a decoded value prompts",
+      "suite": "destructive-guard",
+      "replace": {
+        "from": "    && $lc =~ /\\b(?:exec|eval|",
+        "to": "    || $lc =~ /\\b(?:exec|eval|"
+      },
+      "witness": [
+        "python3 -c \"import base64; print(base64.b64decode('aGk='))\""
+      ]
     }
   ]
 }
