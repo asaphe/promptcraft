@@ -48,6 +48,8 @@ The [GitHub create-review API](https://docs.github.com/en/rest/pulls/reviews#cre
 
 Alternatively, create a review with its inline comments in one request. For either method, inspect errors and read back the created review and comments before claiming publication succeeded.
 
+**Every posted sentence is a claim, and the text is what gets verified.** Unverified claims enter at write-up time, after the findings were checked: counts, paraphrases of a doc, qualifiers ("every", "never", "strict"), timings and reachability. Before any review body, inline comment or chat reply is posted or edited, have a fresh-context checker audit the exact text against the reviewed head and live state, and land its corrections first. Another bot or session agreeing with the text is not verification.
+
 ## Build the per-comment posts (recommended)
 
 For each finding that maps to a diff line:

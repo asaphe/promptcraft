@@ -151,6 +151,10 @@ if git diff --staged | grep -qiE "$PATTERN"; then
 fi
 ```
 
+### Outbound-text guard
+
+A staged-diff scan misses the text that leaves through other channels. If you work in an employer's repos from the same machine as personal projects, a PreToolUse hook on `git` and `gh` commands can hard-block configured personal identifiers — a personal account (`github.com/<personal-account>`), home paths (`/home/<you>/`), a personal drive mount, private repo names — in commit messages, PR and issue bodies, comments, reviews and `--body-file` text bound for the employer's repos. Resolve the target repo from `--repo` or the working directory's `origin`, strip directory and file arguments before matching so a `cd` into a home path is not a hit, block when a body file cannot be read, and fail closed when the hook's helpers cannot load.
+
 ### Claude Code rules
 
 Add to your global `~/.claude/CLAUDE.md`:
