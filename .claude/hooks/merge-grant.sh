@@ -37,14 +37,23 @@ grant_file() { # action
 
 # see: tools/claude/examples/hooks/merge-grant/README.md § What arms it
 asks_for() { # action, text, "label" when the text is a menu option a user picked
-  printf '%s' "$2" | LC_ALL=C sed -e "s/’/'/g" -e "s/‘/'/g" -e "s/\`/'/g" | LC_ALL=C tr '[:upper:]' '[:lower:]' \
+  words_ask_for "$1" "$(request_words "$2")" "${3:-}"
+}
+
+# The token stream asks_for parses, one word per line; callers checking several actions compute it once.
+request_words() { # text
+  printf '%s' "$1" | LC_ALL=C sed -e "s/’/'/g" -e "s/‘/'/g" -e "s/\`/'/g" | LC_ALL=C tr '[:upper:]' '[:lower:]' \
     | LC_ALL=C tr '\t\n' ' .' | LC_ALL=C sed -e "s/[.;!?]/ . /g" -e "s/[,()]/ , /g" -e "s/:/ : /g" \
       -e "s/pull[^a-z]*requests*/ pr /g" -e "s/^prs* *[#-]* *[0-9][0-9]*/ prref /" -e "s/\([^a-z]\)prs* *[#-]* *[0-9][0-9]*/\1 prref /g" \
       -e "s/merge[-_]\([a-z]\)/mergename\1/g" \
       -e "s/workflow[-_]dispatch/dispatchname/g" -e "s/repository[-_]dispatch/dispatchname/g" -e "s/dispatch[-_]\([a-z]\)/dispatchname\1/g" \
       -e "s/re-run/rerun/g" -e "s/re-trigger/retrigger/g" -e "s/re-dispatch/redispatch/g" \
       -e "s/[^a-z'.,: ]/ /g" \
-    | LC_ALL=C tr -s ' ' '\n' | awk -v q="'" -v act="$1" -v label="${3:-}" '
+    | LC_ALL=C tr -s ' ' '\n'
+}
+
+words_ask_for() { # action, request_words output, label
+  printf '%s\n' "$2" | awk -v q="'" -v act="$1" -v label="${3:-}" '
       BEGIN { n = split("dont not never without cannot cant wont shouldnt couldnt wouldnt", w, " "); for (i = 1; i <= n; i++) neg[w[i]] = 1
               n = split("a an the this that these those my our your its their both another separate", w, " "); for (i = 1; i <= n; i++) det[w[i]] = 1
               n = split("a an the this that these those my our your its their another any each every", w, " "); for (i = 1; i <= n; i++) ndet[w[i]] = 1
@@ -134,16 +143,24 @@ if [ "$EVENT" = "PostToolUse" ]; then
   [ "$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)" = "AskUserQuestion" ] || exit 0
   PAIRS=$(printf '%s' "$INPUT" | jq -r '((.tool_response | objects | .answers) // .tool_input.answers // {})
     | to_entries[] | [.key, (.value | tostring)] | @tsv' 2>/dev/null) || exit 0
+  # Each pair's words are computed once, not once per action.
+  QS=(); ANS=(); QW=(); AW=(); PRQ=()
+  while IFS=$'\t' read -r question answer; do
+    [ -n "$answer" ] || continue
+    alabel=answer
+    printf '%s' "$question" | LC_ALL=C grep -qiE '(^|[^a-z])(prs|pull requests)([^a-z]|$)' && alabel=""
+    QS+=("$question"); ANS+=("$answer"); QW+=("$(request_words "$question")"); AW+=("$(request_words "$answer")"); PRQ+=("$alabel")
+  done <<<"$PAIRS"
   for a in pr dispatch; do
-    while IFS=$'\t' read -r question answer; do
-      [ -n "$answer" ] || continue
-      alabel=answer
-      [ "$a" = pr ] && printf '%s' "$question" | LC_ALL=C grep -qiE '(^|[^a-z])(prs|pull requests)([^a-z]|$)' && alabel=""
-      if asks_for "$a" "$answer" "$alabel" || { asks_for "$a" "$question" question && is_affirmation "$answer"; }; then
-        arm "$a" "menu: ${question} -> ${answer}" && CONTEXT="${CONTEXT:+${CONTEXT} }$(grant_context "$a")"
+    i=0
+    while [ "$i" -lt "${#QS[@]}" ]; do
+      alabel=answer; [ "$a" = pr ] && alabel=${PRQ[$i]}
+      if words_ask_for "$a" "${AW[$i]}" "$alabel" || { words_ask_for "$a" "${QW[$i]}" question && is_affirmation "${ANS[$i]}"; }; then
+        arm "$a" "menu: ${QS[$i]} -> ${ANS[$i]}" && CONTEXT="${CONTEXT:+${CONTEXT} }$(grant_context "$a")"
         break
       fi
-    done <<<"$PAIRS"
+      i=$((i + 1))
+    done
   done
   emit PostToolUse "$CONTEXT"
   exit 0
@@ -159,7 +176,7 @@ if ! OWN=$(printf '%s' "$PROMPT" | perl -0777 -pe '
   for a in $ACTIONS; do rm -f "$(grant_file "$a")"; done
   exit 0
 fi
-if [ -n "$PROMPT" ] && [ -z "$(printf '%s' "$OWN" | tr -d '[:space:]')" ]; then
+if [ -n "$PROMPT" ] && [ -z "${OWN//[[:space:]]/}" ]; then
   exit 0
 fi
 
@@ -170,15 +187,18 @@ if [ -n "$OWN" ] && is_affirmation "$OWN"; then
 fi
 
 # see: tools/claude/examples/hooks/merge-grant/README.md § Bare affirmations — merge keeps the typed-words rule
+# This hook runs on every prompt, so the prompt is normalized once for all actions.
+OWN_WORDS=""; [ -z "$OWN" ] || OWN_WORDS=$(request_words "$OWN")
 for a in $ACTIONS; do
-  if [ -n "$OWN" ] && asks_for "$a" "$OWN"; then
+  if [ -n "$OWN" ] && words_ask_for "$a" "$OWN_WORDS"; then
     arm "$a" "$OWN" && CONTEXT="${CONTEXT:+${CONTEXT} }$(grant_context "$a")"
   elif [ -n "$AFFIRM" ] && [ "$a" != merge ] && live "$a"; then
     arm "$a" "$(jq -r '.prompt // ""' "$(grant_file "$a")" 2>/dev/null)" && CONTEXT="${CONTEXT:+${CONTEXT} }$(grant_context "$a")"
   elif [ -n "$AFFIRM" ] && [ "$a" = dispatch ] && [ -n "$PROPOSAL" ] && asks_for dispatch "$PROPOSAL" question; then
     arm dispatch "affirmed: ${OWN} -> $(printf '%s' "$PROPOSAL" | tail -c 120)" && CONTEXT="${CONTEXT:+${CONTEXT} }$(grant_context dispatch)"
   else
-    rm -f "$(grant_file "$a")"
+    f=$(grant_file "$a")
+    if [ -e "$f" ] || [ -L "$f" ]; then rm -f "$f"; fi
   fi
 done
 emit UserPromptSubmit "$CONTEXT"

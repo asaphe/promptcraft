@@ -238,8 +238,8 @@
     {
       "why": "a menu label is read as a heading, so the pick `Open PRs` arms nothing",
       "replace": {
-        "from": "asks_for \"$a\" \"$answer\" \"$alabel\"",
-        "to": "asks_for \"$a\" \"$answer\""
+        "from": "words_ask_for \"$a\" \"${AW[$i]}\" \"$alabel\"",
+        "to": "words_ask_for \"$a\" \"${AW[$i]}\""
       },
       "witness": [
         "How should I proceed?"
