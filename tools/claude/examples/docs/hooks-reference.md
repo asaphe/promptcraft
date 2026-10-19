@@ -43,7 +43,7 @@ Compaction is the one boundary where in-session reasoning is destroyed while any
 |------|---------|---------|--------|------|
 | `rtk-rewrite.sh` | All Bash | Rewrites commands to use a token-optimizing proxy | Rewrites tool input | Per call, fast |
 | `op-read-guard.sh` | `op *` | Blocks raw secret reads, redirects to a masked cache ([claude-secret-guard](https://github.com/asaphe/claude-secret-guard)) | Blocks or warns | Conditional |
-| `stateful-op-reminder.sh` | All Bash | Nudges on external state mutations | `additionalContext` reminder | Per call, pattern-match only |
+| `stateful-op-reminder.sh` | All Bash | Nudges on external state mutations | `additionalContext` reminder | Per call, in-process pattern match |
 | `destructive-guard.sh` | All Bash | Blocks/soft-blocks destructive ops | Hard block (exit 2) or soft block | Per call, most calls exit early |
 | `agent-config-review-guard.sh` | `git commit*` | Flags agent config changes on commit | Warning | Conditional |
 | `commit-attribution-guard.sh` | `git *` | Hard-blocks AI attribution markers in commit messages and bot branch prefixes | Hard block (exit 2) | Conditional |
