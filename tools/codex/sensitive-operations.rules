@@ -1,0 +1,47 @@
+prefix_rule(
+    pattern = ["gh", "pr", "close"],
+    decision = "prompt",
+    justification = "Confirm before closing a pull request; closing a shared PR needs explicit approval.",
+    match = ["gh pr close 123", "gh pr close 123 --delete-branch"],
+    not_match = ["gh pr view 123", "gh pr checks 123"],
+)
+
+prefix_rule(
+    pattern = ["gh", "issue", ["create", "edit", "close", "comment", "delete"]],
+    decision = "prompt",
+    justification = "Confirm before writing to a GitHub issue another person will see.",
+    match = ["gh issue create --title x --body y", "gh issue comment 5 --body y"],
+    not_match = ["gh issue view 5", "gh issue list"],
+)
+
+prefix_rule(
+    pattern = ["aws", "s3", ["rm", "rb"]],
+    decision = "prompt",
+    justification = "Confirm before deleting S3 objects or buckets.",
+    match = ["aws s3 rm s3://bucket/key", "aws s3 rb s3://bucket"],
+    not_match = ["aws s3 ls s3://bucket", "aws s3 cp s3://bucket/key ."],
+)
+
+prefix_rule(
+    pattern = ["git", "stash", ["drop", "clear"]],
+    decision = "prompt",
+    justification = "Confirm before dropping stashed work.",
+    match = ["git stash drop", "git stash clear"],
+    not_match = ["git stash list", "git stash show"],
+)
+
+prefix_rule(
+    pattern = ["terraform", "force-unlock"],
+    decision = "prompt",
+    justification = "Confirm before releasing a Terraform lock another run may hold.",
+    match = ["terraform force-unlock 1234"],
+    not_match = ["terraform plan", "terraform show"],
+)
+
+prefix_rule(
+    pattern = ["terraform", "state", ["rm", "mv", "push", "replace-provider"]],
+    decision = "prompt",
+    justification = "Confirm before editing Terraform state.",
+    match = ["terraform state rm aws_s3_bucket.x", "terraform state mv a b"],
+    not_match = ["terraform state list", "terraform state show aws_s3_bucket.x"],
+)
