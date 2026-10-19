@@ -63,6 +63,10 @@ jobs:
           python3 tools/claude/examples/hook-tests/run-fixtures.py merge-grant --hooks-dir tools/claude/examples/hooks --jobs "$(nproc)"
           python3 tools/claude/examples/hook-tests/test-merge-grant.py
 
+      # The flag file is a contract between the statusline and the Stop hook, so neither script alone can see it break.
+      - name: Check the context-budget statusline flag and Stop hook together
+        run: python3 tools/claude/examples/hook-tests/test-context-budget.py
+
       # The scorer is what keeps a slow runner from reading as a caught mutation.
       - name: Check the mutation scorer
         run: python3 tools/claude/examples/hook-tests/test-mutate-fixtures.py

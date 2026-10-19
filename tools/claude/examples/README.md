@@ -64,7 +64,8 @@ Supporting documentation referenced by agents and skills:
 - **`skill-arg-substitution-guard/`** — Blocks a `SKILL.md` or `commands/*.md` edit that writes a `$<digits>` token (an awk field, a price) the skill loader would silently replace with an argument.
 - **`null-result-probe/`** — PostToolUse nudge: a command that returned nothing, or a scanner that reported a confident zero, while containing a construct that collapses silently (unquoted glob or expansion, git pathspec, `find` on `/tmp`) needs a control probe before the emptiness is read as a finding. Backs `rules/general/evidence-nulls.md`.
 - **`rtk/`** — PreToolUse hook that rewrites Bash commands through RTK (Rust Token Killer) for token savings.
-- **`statusline/`** — Statusline command showing directory, git branch/worktree, AWS profile, model name, effort level, context-window usage, PR review state, lines changed, and rate-limit reset.
+- **`statusline/`** — Statusline command showing directory, git branch/worktree, AWS profile, model name, effort level, context-window usage, PR review state, lines changed, and rate-limit reset. Also writes the per-session flag `context-budget-stop` reads once context passes its budget.
+- **`context-budget-stop/`** — Stop hook that, once the statusline flags a session over its context budget (three quarters of the window, lowered by `CLAUDE_CONTEXT_BUDGET_TOKENS`), blocks one turn end so Claude writes a self-contained handoff and asks whether to continue in a fresh session instead of compacting.
 - Plus auto-lint and AWS auth check examples. `ci-polling-guard/` and `kubectl-context-inject/` are retired migration stubs; see [RETIRED.md](RETIRED.md).
 
 ### `rules/`

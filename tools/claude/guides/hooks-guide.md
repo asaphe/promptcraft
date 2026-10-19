@@ -597,6 +597,7 @@ Retained hook examples and retired migration stubs with README documentation:
 | [Post-Compact Reinject](../examples/hooks/post-compact-reinject/) | SessionStart (compact) | Re-inject critical context after compaction | No (context) |
 | [Model/Effort Pin Guard](../examples/hooks/model-effort-pin-guard/) | SessionStart | Re-pin `model` / `effortLevel` in user settings after a persisted `/model` pick | No (context) |
 | [Session Quality Capture](../examples/hooks/session-quality-capture/) | Stop | Record session metrics (tool calls, corrections, PR edits) | No (metrics) |
+| [Context Budget Stop](../examples/hooks/context-budget-stop/) | Stop | Once context passes a budget flagged by the statusline, hold one turn end to write a handoff and ask about a fresh session | Yes (once per session) |
 
 ## Related Resources
 

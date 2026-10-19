@@ -27,7 +27,7 @@ All segments are conditional — only shown when the data is present:
 | `max`/`xhg`/`low`/`med` | Effort level from `.effort.level`, only when non-default (`high` hidden) |
 | `think` | `.thinking.enabled` is true |
 | `+120/-45` | Lines added/removed this session, when either is >0 |
-| `ctx:42%` | Always; green <50%, yellow <80%, red ≥80% |
+| `ctx:42%` | Always; green <50%, yellow <80%, red ≥80% or once past the [context budget](#context-budget-flag) |
 | `rl:62% 38m` | Only shown ≥50%; yellow, red ≥80%; suffix = minutes until `.rate_limits.five_hour.resets_at` |
 
 Everything except the git/kubeconfig/file-walk segments comes from the harness JSON on stdin — one `jq` call extracts all fields as a TSV row, keeping per-tick subprocess count low. There is deliberately no cost segment: with usage-based limits the rate-limit segment is the actionable signal, and the cost number invites watching it instead.
@@ -70,6 +70,10 @@ secondary_repos=("$HOME/code/infrastructure" "$HOME/code/workflows")
 ```
 
 The cache is invalidated after `git push` (see `post-push-hygiene`); refresh it manually after `gh pr create/ready/close/reopen`.
+
+## Context budget flag
+
+When context tokens (`used_percentage` × `context_window_size`) reach the budget, the script writes a per-session flag file and posts one desktop notification, which the [context-budget-stop](../context-budget-stop/) hook turns into a handoff at the next turn end. The budget is three quarters of the window, lowered by `CLAUDE_CONTEXT_BUDGET_TOKENS` when set; flags live in `CLAUDE_CONTEXT_BUDGET_DIR` (default `~/.claude/context-budget`). Without the hook registered the flag is inert and only the red segment remains.
 
 ## Known fix: bash 5.3 path shortening
 

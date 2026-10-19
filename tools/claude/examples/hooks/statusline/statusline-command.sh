@@ -6,7 +6,7 @@ input=$(cat)
 # \x1f join: tab is IFS-whitespace, so empty TSV fields collapse and shift later values left
 IFS=$'\x1f' read -r model used rate5h worktree_name effort_level thinking_enabled \
   repo_name git_worktree pr_number pr_review_state \
-  lines_added lines_removed session_name added_dirs_count rl_resets_at < <(
+  lines_added lines_removed session_name added_dirs_count rl_resets_at session_id ctx_size < <(
   echo "$input" | jq -r '[
     (.model.display_name // ""),
     (.context_window.used_percentage // ""),
@@ -22,7 +22,9 @@ IFS=$'\x1f' read -r model used rate5h worktree_name effort_level thinking_enable
     (if ((.cost.total_lines_removed // 0) > 0) then (.cost.total_lines_removed | tostring) else "" end),
     (.session_name // ""),
     ((.workspace.added_dirs // []) | length | if . > 0 then tostring else "" end),
-    (if .rate_limits.five_hour.resets_at != null then (.rate_limits.five_hour.resets_at | tostring) else "" end)
+    (if .rate_limits.five_hour.resets_at != null then (.rate_limits.five_hour.resets_at | tostring) else "" end),
+    (.session_id // ""),
+    (.context_window.context_window_size // "" | tostring)
   ] | join("\u001f")'
 )
 
@@ -195,7 +197,32 @@ fi
 # Context window usage
 if [ -n "$used" ]; then
   used_int=$(echo "$used" | awk '{printf "%d", $1}')
-  if   [ "$used_int" -ge 80 ]; then color='\033[31m'
+  over_budget=""
+  # Flag read by the context-budget-stop hook; see: ../context-budget-stop/README.md
+  if [[ $ctx_size =~ ^[0-9]+$ && $session_id =~ ^[A-Za-z0-9_-]+$ ]]; then
+    budget=$(( ctx_size * 3 / 4 ))
+    budget_cap="${CLAUDE_CONTEXT_BUDGET_TOKENS:-}"
+    if [[ $budget_cap =~ ^[0-9]+$ ]] && [ "$budget_cap" -gt 0 ] && [ "$budget_cap" -lt "$budget" ]; then
+      budget=$budget_cap
+    fi
+    ctx_tokens=$(awk -v p="$used" -v s="$ctx_size" 'BEGIN {printf "%d", p * s / 100}')
+    if [ "$budget" -gt 0 ] && [ "$ctx_tokens" -ge "$budget" ]; then
+      over_budget=1
+      flag_dir="${CLAUDE_CONTEXT_BUDGET_DIR:-$HOME/.claude/context-budget}"
+      if [ ! -e "$flag_dir/$session_id" ]; then
+        mkdir -p "$flag_dir" && printf '%s %s\n' "$ctx_tokens" "$budget" > "$flag_dir/$session_id"
+        ctx_msg="Context ~$(( ctx_tokens / 1000 ))k passed the $(( budget / 1000 ))k budget; the session writes a handoff at its next stop."
+        ctx_title="Claude Code: ${repo_name:-session} over context budget"
+        # Text goes in as argv, never spliced into the AppleScript source.
+        if command -v osascript >/dev/null 2>&1; then
+          (osascript -e 'on run argv' -e 'display notification (item 1 of argv) with title (item 2 of argv)' -e 'end run' "$ctx_msg" "$ctx_title" >/dev/null 2>&1 &)
+        elif command -v notify-send >/dev/null 2>&1; then
+          (notify-send "$ctx_title" "$ctx_msg" >/dev/null 2>&1 &)
+        fi
+      fi
+    fi
+  fi
+  if   [ -n "$over_budget" ] || [ "$used_int" -ge 80 ]; then color='\033[31m'
   elif [ "$used_int" -ge 50 ]; then color='\033[33m'
   else                               color='\033[32m'
   fi
