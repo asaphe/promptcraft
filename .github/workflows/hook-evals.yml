@@ -120,15 +120,15 @@ jobs:
       matrix:
         include:
           - suite: destructive-guard 1/5
-            args: --shard 1/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+            args: --shard 1/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl _lib/code-exec-scan.pl
           - suite: destructive-guard 2/5
-            args: --shard 2/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+            args: --shard 2/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl _lib/code-exec-scan.pl
           - suite: destructive-guard 3/5
-            args: --shard 3/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+            args: --shard 3/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl _lib/code-exec-scan.pl
           - suite: destructive-guard 4/5
-            args: --shard 4/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+            args: --shard 4/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl _lib/code-exec-scan.pl
           - suite: destructive-guard 5/5
-            args: --shard 5/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl
+            args: --shard 5/5 destructive-guard _lib/strip-quoted-args.pl _lib/split-cmd-segments.pl _lib/code-exec-scan.pl
           - suite: merge-grant, pr-create-guard, stateful-op-reminder and strip-cmd
             args: merge-grant _lib/strip-cmd pr-create-guard stateful-op-reminder
     name: mutations (${{ matrix.suite }})

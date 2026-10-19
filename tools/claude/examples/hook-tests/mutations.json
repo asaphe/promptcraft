@@ -1341,7 +1341,7 @@
     {
       "why": "a record-deleting call in the command text stops counting, so `psql -c \"DELETE FROM runs;\"` runs with no block",
       "replace": {
-        "from": "[[ \" $CMD_LC\" =~ $DATA_DESTROY ]] && DS_INLINE=1\n",
+        "from": "[[ \" $DS_SCAN\" =~ $DATA_DESTROY ]] && DS_INLINE=1\n",
         "to": ""
       },
       "witness": [
