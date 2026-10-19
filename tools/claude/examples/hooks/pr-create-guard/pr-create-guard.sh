@@ -52,6 +52,8 @@ case "$WORK_DIR" in
   "~") WORK_DIR="$HOME" ;;
   "~/"*) WORK_DIR="$HOME/${WORK_DIR#\~/}" ;;
 esac
+# No leading cd: the tool's workdir, then the session cwd, name the repo the command runs in.
+[ -n "$WORK_DIR" ] || WORK_DIR=$(printf '%s' "$INPUT" | jq -r '.tool_input.workdir // .cwd // empty' 2>/dev/null)
 # Must be a real repo: a -C at a non-repo makes every check below fail and the guard go silent.
 if [ -n "$WORK_DIR" ] && git -C "$WORK_DIR" rev-parse --git-dir >/dev/null 2>&1; then
   GITC=(-C "$WORK_DIR")
@@ -86,17 +88,28 @@ git "${GITC[@]}" fetch origin "$DEFAULT_BRANCH" --quiet 2>/dev/null
 
 # Checked FIRST: neither reads origin/<default>, so an unresolvable default branch
 # must not take them down with it. see: README.md § When the default branch cannot be resolved
+# An explicit --head/-H names the PR's branch; the checkout may be another one.
+PR_ARGS=$(printf '%s\n' "$CMD_MATCH" | sed -nE 's/.*gh[[:space:]]([^|;&]* )?pr +create(.*)/\2/p' | head -1)
+HEAD_ARG=$(printf '%s\n' "$PR_ARGS" | sed -nE 's/.*(^|[[:space:]])(--head|-H)[=[:space:]]+([^[:space:]]+).*/\3/p' | head -1)
+HEAD_ARG=${HEAD_ARG##*:}
 BRANCH=$(git "${GITC[@]}" branch --show-current 2>/dev/null)
+CMP_REF=HEAD
+if [ -n "$HEAD_ARG" ] && [ "$HEAD_ARG" != "$BRANCH" ]; then
+  BRANCH=$HEAD_ARG
+  CMP_REF="origin/$HEAD_ARG"
+  git "${GITC[@]}" fetch origin "$BRANCH" --quiet 2>/dev/null
+fi
 REMOTE_REF=$(git "${GITC[@]}" rev-parse "origin/$BRANCH" 2>/dev/null)
 LOCAL_REF=$(git "${GITC[@]}" rev-parse HEAD 2>/dev/null)
 if [ -z "$REMOTE_REF" ]; then
   ISSUES="${ISSUES}\n  - Branch '$BRANCH' has NOT been pushed to remote. Push first."
-elif [ "$REMOTE_REF" != "$LOCAL_REF" ]; then
+elif [ "$CMP_REF" = HEAD ] && [ "$REMOTE_REF" != "$LOCAL_REF" ]; then
   ISSUES="${ISSUES}\n  - Local HEAD differs from origin/$BRANCH — unpushed commits exist. Push first."
 fi
 
-# 3. Uncommitted changes that would be missed
-DIRTY=$(git "${GITC[@]}" status --porcelain 2>/dev/null | head -5)
+# 3. Uncommitted changes that would be missed — only when the PR's branch is the checkout.
+DIRTY=""
+[ "$CMP_REF" = HEAD ] && DIRTY=$(git "${GITC[@]}" status --porcelain 2>/dev/null | head -5)
 if [ -n "$DIRTY" ]; then
   ISSUES="${ISSUES}\n  - Uncommitted changes exist that won't be in the PR:\n$(echo "$DIRTY" | sed 's/^/      /')"
 fi
@@ -112,7 +125,7 @@ fi
 if ! git "${GITC[@]}" rev-parse --verify --quiet "origin/${DEFAULT_BRANCH}" >/dev/null 2>&1; then
   exit 0
 fi
-DIFF_STAT=$(git "${GITC[@]}" diff --stat "origin/${DEFAULT_BRANCH}...HEAD" 2>/dev/null)
+DIFF_STAT=$(git "${GITC[@]}" diff --stat "origin/${DEFAULT_BRANCH}...${CMP_REF}" 2>/dev/null)
 if [ -z "$DIFF_STAT" ]; then
   echo "PR CREATE BLOCKED — branch '$BRANCH' has zero diff vs origin/${DEFAULT_BRANCH}. All changes already exist on the default branch." >&2
   exit 2
@@ -121,7 +134,7 @@ fi
 # --- Verification checklist (emit as reminder, do not block) ---
 
 FILE_COUNT=$(echo "$DIFF_STAT" | tail -1 | grep -oE '[0-9]+ file' | grep -oE '[0-9]+')
-COMMIT_COUNT=$(git "${GITC[@]}" rev-list --count "origin/${DEFAULT_BRANCH}..HEAD" 2>/dev/null)
+COMMIT_COUNT=$(git "${GITC[@]}" rev-list --count "origin/${DEFAULT_BRANCH}..${CMP_REF}" 2>/dev/null)
 INSERTIONS=$(echo "$DIFF_STAT" | tail -1 | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+')
 DELETIONS=$(echo "$DIFF_STAT" | tail -1 | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+')
 

@@ -54,3 +54,17 @@ allow	cd {ready} && git commit -m "docs: explain when to run gh pr create vs gh 
 # --- input unavailable: the extraction returns nothing, which is indistinguishable
 # from "no command to guard". Pinned so a later edit cannot flip it silently.
 allow	<absent>
+
+# --- no leading cd: the repo comes from the tool workdir (column 3), else the payload cwd.
+# {dirty} as workdir must block exactly as `cd {dirty}` does, and {ready} must pass.
+hard	gh pr create --title x --body y	{dirty}
+ctx	gh pr create --title x --body y	{ready}
+# A leading cd still wins over the workdir.
+ctx	cd {ready} && gh pr create --title x --body y	{dirty}
+
+# --- --head / -H names the PR branch, so the checkout dirty tree is not that branch. {headother} is dirty on `feature` with `other` pushed ahead of main.
+ctx	cd {headother} && gh pr create --head other --title x --body y
+ctx	cd {headother} && gh pr create -H other --title x --body y
+# Controls: --head naming the checkout still sees the dirty tree; an unpushed --head still blocks.
+hard	cd {headother} && gh pr create --head feature --title x --body y
+hard	cd {headother} && gh pr create --head nope --title x --body y
