@@ -422,6 +422,80 @@ Verify the expected event-specific output and exit status, including positive an
 - For expensive validation, consider PostToolUse (non-blocking) instead of PreToolUse
 - **Measure before deploying:** `time echo '{"tool_name":"Bash","tool_input":{"command":"ls"}}' | ./hook.sh`
 - **Total hook overhead** per tool call should stay under 200ms across all matching hooks combined
+- **Count process launches, not lines of code** — each `cat`, `grep`, `jq` or `perl` a hook starts is a separate exec; see [Running Hooks Under zsh](#running-hooks-under-zsh) for the builtins and shell-only matching that avoid them
+
+## Running Hooks Under zsh
+
+The cost of a small hook is dominated by process launches, not by the shell language. A chain of hooks on every Bash call pays one interpreter start per hook plus one start per child it spawns (`cat`, `grep`, `jq`, `perl`, `stat`, `rm`), and on a machine with endpoint-security tooling each launch is slow. Two lessons from moving a hook set from bash to macOS's `/bin/zsh`:
+
+- **Swapping the interpreter alone does not remove the cost.** Which interpreter-plus-child pair is slow can change between measurements, so a benchmark taken before and after a shell switch may only show the pair that happened to be slow that hour. The durable saving is fewer process starts.
+- **zsh helps mainly because it has builtins for work that bash needs a child for** (see [Cutting process launches](#cutting-process-launches)). Keep a fallback for hosts where the hook runs under bash.
+
+### Start-up header
+
+A hook ported with minimal edits starts like this:
+
+```zsh
+#!/bin/zsh -f
+emulate -R ksh -o bsd_echo -o bash_rematch +o local_options +o local_traps
+```
+
+`-f` skips the user's `~/.zshenv`, so a personal setup cannot change hook behaviour. The `emulate` line restores the bash behaviour the code was written for: word splitting of unquoted expansions, 0-based arrays, an unmatched glob left as text, `echo` without escape processing, `BASH_REMATCH`, and a function's `setopt` or `trap` outliving the function. A third-party hook whose file hash is pinned keeps its original interpreter: have the dispatcher start it with `/bin/bash` explicitly.
+
+One behaviour change survives the emulation: the last element of a pipeline runs in the current shell, so `cmd | while read ...` keeps its variables afterwards, and an `exit` inside that loop ends the hook.
+
+### Constructs the emulation does not cover
+
+| bash | zsh form | Why |
+|---|---|---|
+| `read -ra a <<<"$s"` | `read -rA a <<<"$s"; a=("${a[@]:#}")` | `-a` fails, and `-A` keeps an empty last field after trailing whitespace |
+| `shopt -s nocasematch` | `setopt no_case_match` / `setopt case_match` | covers `=~`; restore it before any other test reads it |
+| `shopt -s nullglob` | `setopt nullglob` / `unsetopt nullglob` | there is no `shopt` |
+| `${BASH_SOURCE[0]}` | `$0` | `$0` is the script path, also inside a sourced file |
+| `${!arr[@]}` | `for (( i = 0; i < ${#arr[@]}; i++ ))` | no index expansion |
+| `$EPOCHSECONDS` | `zmodload -F zsh/datetime p:EPOCHSECONDS` first | it is a module parameter |
+| `[[ $x =~ (a)b ]]` | `re='(a)b'; [[ $x =~ $re ]]` | a regex that starts with `(` is a parse error inline |
+| `local status path` | other names | `status` is read-only and `path` is tied to `PATH` |
+
+### Regressions that parse cleanly but mean something else
+
+These passed a syntax check and only showed up as a guard that stopped blocking, or one that started asking or blocking on safe input. Each has a one-line fix.
+
+| Construct | Fix | What happened |
+|---|---|---|
+| `[[ $x =~ \$\{?a ]]` | `re='\$\{?a'; [[ $x =~ $re ]]` | zsh removes an inline regex's backslashes, so `\$` reached the engine as an anchor and nothing matched; a path built from a variable in the command was never expanded and was blocked |
+| `"${x//;/$'\n'}"`, `"${t//\/.\//\/}"` | `y=${x//;/$'\n'}` then use `"$y"` | inside double quotes zsh keeps the replacement's `$'...'` or backslash escape as literal text; the pattern side and an unquoted assignment expand it. A path normalizer left `\/` in place, so a safe scratch-directory delete asked instead of passing |
+| `declare -F fn` | `declare -f fn >/dev/null 2>&1` | zsh's `-F` declares a float variable and succeeds whether or not `fn` exists, so a "library loaded?" check always passed |
+| `source lib.sh` before a fail-closed check | `[ -r lib.sh ] && source lib.sh`, then the check | a missing file ends the hook with exit 1 at once, even when a fallback follows; bash returns 1 and carries on. The fail-closed branch never ran, and a guard that exited 1 (a non-blocking error) let every protected command through |
+
+A fifth finding from the same port was not a zsh difference: `"$PY""$HOME/guard.py"` (a typo) fused the interpreter and the script into one word, so the guard never ran. The lesson holds regardless of shell: give every guard a positive-control test that must block, because a guard that silently stops firing looks identical to a guard with nothing to report.
+
+### Commands you write run under zsh too
+
+If the harness shell is zsh, the commands the model writes hit zsh semantics even when no hook is involved. The same silent-wrong-answer shapes apply:
+
+- **Unquoted expansions are not word-split.** Assigning positional parameters from an unquoted `$pair` sets only `$1`, and `scanner -- $FILES` passes N names as one argument; a per-path tool prints one "cannot open" and can exit 0, a clean scan of nothing. Use `${=var}`, `read -r a b`, or pipe the list through `xargs -0`.
+- **An unmatched glob can fall through.** `ls /tmp/nope-*.jsonl` may leave the literal pattern, and then lists something else. Verify with `find -L <dir> -maxdepth 1 -name '<pattern>'`.
+- **A letter after `$var:` is a modifier.** `"$ref:config/x"` reaches the command with the colon and the next letter consumed (`:c`), and `"$image:latest"` is lowercased (`:l`); the modifiers `a A c e h l P q Q r s t u &`, and `g` before one of them, behave this way. The failure is silent, and under `2>/dev/null` it prints a clean negative for a valid object. Write `${ref}:path`. A guard can catch this by scanning a command for `$name:<letter>` while skipping single-quoted text and heredoc bodies, where zsh expands nothing.
+- **Pipeline status arrays are spelled differently.** `${pipestatus[1]}` in zsh, `${PIPESTATUS[0]}` in bash; the wrong spelling expands to empty instead of erroring, which reads as success.
+
+### Cutting process launches
+
+Done in the hooks themselves; each keeps a fallback so the same file still works under bash:
+
+- Read stdin with `INPUT=$(</dev/stdin)` instead of `$(cat)`.
+- Test a pattern in the shell instead of `echo "$text" | grep -qE "$re"`: loop over the lines of `$text` and use `[[ $line =~ $re ]]`. That removes two launches per test, which matters when a guard runs dozens of tests.
+- Let the first library that already runs `jq` over the input export the fields later hooks need (such as the command string), so they skip their own `jq`.
+- Replace `stat`, `rm` and `date` with zsh builtins where available (`zmodload -F zsh/stat b:zstat`, `zsh/files b:zf_rm`, `zsh/datetime b:strftime p:EPOCHSECONDS`), gated on `[ -n "${ZSH_VERSION:-}" ]` with the external command as the else branch.
+- Merge two `perl` passes over the same text into one invocation, and keep a fallback for when the helper is unreadable.
+
+### Verifying a port
+
+- **Syntax-check with the same emulation:** `zsh --emulate ksh -o bsd_echo -o bash_rematch -n hook.sh`. Plain `zsh -n` parses with native options and accepts the inline `(` regex. A parse error prints a diagnostic; do not trust the exit status alone, because under `-n` a `! cmd` that never ran leaves status 1 for the rest of the file.
+- **Scan for the parse-clean constructs** above with a small static probe that fails on an escaped replacement inside a double-quoted `${//}`, a backslash before a metacharacter in an inline `=~` regex, and `declare -F`. Syntax checks cannot see these.
+- **Start hooks in tests through their own shebang**, not `bash hook.sh`, or the test exercises a different interpreter than production. A one-line helper that reads `#!` from the first line and builds the argv is enough.
+- **Replay recorded inputs through both versions and diff the decisions.** Include a mutation control (break one case on purpose) to prove the harness can see a difference, and expect a few harmless diffs such as error wording for a failed `cd`.
+- **Keep sourced libraries valid in both shells** if any hook that sources them still runs under bash.
 
 ## POSIX Compatibility in Hook Scripts
 
