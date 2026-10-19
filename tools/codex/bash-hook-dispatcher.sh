@@ -8,10 +8,34 @@ INPUT=$(cat)
 
 # Without jq the event is unreadable, and any exit but 2-with-a-reason lets Codex run the command.
 command -v jq >/dev/null 2>&1 || { echo "bash-hook-dispatcher: jq not on PATH, failing closed" >&2; exit 2; }
+command -v perl >/dev/null 2>&1 || { echo "bash-hook-dispatcher: perl not on PATH, failing closed" >&2; exit 2; }
 
 # Order is run order, and the first block wins.
 PRE_HOOKS=(destructive-guard/destructive-guard.sh pr-create-guard/pr-create-guard.sh)
 POST_HOOKS=(post-push-hygiene/post-push-hygiene.sh)
+
+# Seconds. The chain stays under the 180s hook timeout registered in hooks.json, so Codex never kills the
+# dispatcher mid-chain (a killed PreToolUse hook runs the tool). see: tools/codex/shared-hooks.md § The dispatcher
+CHILD_SECONDS=${DISPATCH_CHILD_SECONDS:-25}
+TOTAL_SECONDS=${DISPATCH_TOTAL_SECONDS:-150}
+START=$SECONDS
+
+# macOS has no timeout(1). perl runs the child in its own process group and kills the whole group on the alarm (exit 124).
+run_child() {
+  perl -e '
+    my ($t, @cmd) = @ARGV;
+    my $pid = fork();
+    exit 127 unless defined $pid;
+    if (!$pid) { setpgrp(0, 0); exec @cmd; exit 127; }
+    $SIG{ALRM} = sub { kill "KILL", -$pid; waitpid($pid, 0); exit 124; };
+    alarm $t;
+    waitpid($pid, 0);
+    alarm 0;
+    my $st = $?;
+    kill "KILL", -$pid;
+    exit($st & 127 ? 128 + ($st & 127) : $st >> 8);
+  ' "$@"
+}
 
 # Codex blocks only on exit 2 WITH a stderr reason, or an explicit deny; every other outcome runs the tool.
 block() {
@@ -31,11 +55,22 @@ CONTEXT=""
 for HOOK in "${HOOKS[@]}"; do
   [ -f "$HOOKS_DIR/$HOOK" ] || block "child hook $HOOK is missing from $HOOKS_DIR"
   ERR=$(mktemp) || block "cannot allocate a stderr buffer"
-  OUT=$(printf '%s' "$INPUT" | bash "$HOOKS_DIR/$HOOK" 2>"$ERR")
+  LEFT=$((TOTAL_SECONDS - (SECONDS - START)))
+  if [ "$LEFT" -le 0 ]; then
+    rm -f "$ERR"
+    [ "$EVENT" = PreToolUse ] || { echo "$HOOK not run: ${TOTAL_SECONDS}s dispatcher budget spent" >&2; exit 1; }
+    block "$HOOK not run: ${TOTAL_SECONDS}s dispatcher budget spent, failing closed"
+  fi
+  LIMIT=$(( LEFT < CHILD_SECONDS ? LEFT : CHILD_SECONDS ))
+  OUT=$(printf '%s' "$INPUT" | run_child "$LIMIT" bash "$HOOKS_DIR/$HOOK" 2>"$ERR")
   CODE=$?
   REASON=$(head -c 4000 "$ERR")
   rm -f "$ERR"
 
+  if [ "$CODE" -eq 124 ]; then
+    [ "$EVENT" = PreToolUse ] || { echo "$HOOK timed out after ${LIMIT}s" >&2; exit 1; }
+    block "$HOOK timed out after ${LIMIT}s and was killed, failing closed: ${REASON}"
+  fi
   if [ "$CODE" -ne 0 ]; then
     [ "$CODE" -eq 2 ] && block "${REASON:-$HOOK exited 2 without a reason}"
     [ "$EVENT" = PreToolUse ] || { echo "$HOOK exited $CODE: ${REASON}" >&2; exit 1; }

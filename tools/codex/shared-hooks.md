@@ -81,7 +81,7 @@ Register it for both Bash events in `~/.codex/hooks.json`:
 
 Then open `/hooks` and trust both entries.
 
-**Size the timeout for the whole chain.** The dispatcher's `timeout` covers every child in sequence, and a timed-out `PreToolUse` hook is one of the outcomes where Codex runs the tool. Set it above the summed worst case of the children, and give each network call inside a child its own short timeout. Then a slow API makes one child fail, rather than taking the whole dispatcher down unblocked.
+**Size the timeout for the whole chain.** The dispatcher's `timeout` covers every child in sequence, and a timed-out `PreToolUse` hook is one of the outcomes where Codex runs the tool. So the dispatcher enforces its own budget, below the registered one: each child runs in its own process group with a 25-second limit (`DISPATCH_CHILD_SECONDS`), and the whole chain gets 150 seconds (`DISPATCH_TOTAL_SECONDS`), under the `"timeout": 180` registered above. A child that outlives its limit has its group killed and the dispatcher blocks with exit 2 and a reason; once the total is spent, the next child is not started and the call blocks. Under `PostToolUse` a timeout is reported with exit 1. If you add children, keep the registered `timeout` above the total, and give each network call inside a child its own timeout well under 25 seconds, so a slow API fails one child rather than spending the chain.
 
 **Trust covers the dispatcher, not its children.** Codex hashes the hook definition, which here is the dispatcher's command line. Adding a child, or changing one, is not shown in `/hooks`. That is the convenience in the table above and also a review gap: review the child list and the scripts in version control, because Codex will not. This follows from the documented trust model; it has not been tested against a changed child.
 
@@ -97,8 +97,10 @@ Verified behaviour of the script as published, with stub children and with this 
 | output Codex would not honour here: not JSON, the older `{"decision":"block"}` shape, `continue`, `updatedInput` | exit 2, "cannot honour" |
 | exit 2 with empty stderr | exit 2 with a generated reason |
 | crash under `PostToolUse` | exit 1, reported |
+| hung child (past 25s, or past what is left of the 150s total) under `PreToolUse` | its process group is killed, then exit 2, "timed out … failing closed" |
+| hung child under `PostToolUse` | exit 1, reported |
 | missing child script | exit 2 |
-| no `jq` on `PATH` (the event cannot be read) | exit 2, "failing closed" |
+| no `jq` or `perl` on `PATH` (the event or the timer is unavailable) | exit 2, "failing closed" |
 | no `hook_event_name`, an unknown one (`pre_tool_use`), malformed or empty JSON | exit 2, "unsupported event … failing closed": an event it cannot read may be a `PreToolUse` |
 | real `destructive-guard`: `git status` / push to `main` / `gh pr create` | exit 0 / exit 2 (hard block) / exit 2 (its ask, blocked) |
 

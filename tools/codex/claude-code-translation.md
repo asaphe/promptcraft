@@ -46,6 +46,8 @@ Claude Code has one permission model: allow, ask and deny rules matched per tool
 
 The closest Codex equivalent of a Claude `ask` rule on a command prefix is a `prefix_rule` with `decision = "prompt"`. A hook cannot fill that role: Codex `PreToolUse` hooks do not support `permissionDecision: "ask"`. See [shared-hooks.md](shared-hooks.md).
 
+[sensitive-operations.rules](sensitive-operations.rules) is a worked set: `prompt` rules for closing a PR, writing to a GitHub issue, deleting S3 objects or buckets, dropping stashes, force-unlocking Terraform and editing Terraform state. Each rule carries `match` and `not_match` examples, which Codex checks when it loads the file, so a pattern that drifts fails loudly. Test a command against it with `codex execpolicy check --rules <file> <command...>`.
+
 ## config.toml paths
 
 Some `config.toml` values go through a shell and some do not. Whether `~` and `$HOME` expand depends on which:
@@ -83,6 +85,12 @@ codex exec --sandbox workspace-write "<scoped objective>" </dev/null
 - **`--sandbox`**: `codex exec` runs in a `read-only` sandbox by default, so a task that edits files needs `workspace-write`. `--full-auto` is deprecated.
 - **`-o <file>`** (`--output-last-message`) writes the final message to a file. `--json` streams every event as JSON Lines.
 - **Prompt from a file**: pass a long objective, or one containing backticks or quotes, as a file the task reads. Inside a shell-quoted argument, a backtick or `$(...)` is expanded before Codex ever sees it.
+
+Three limits observed in practice, which may change between Codex versions:
+
+- **`workspace-write` has no network.** The child can read code and run tests, linters and type checkers from an environment that already exists, but cannot install dependencies, fetch from a remote or call an external API. Build the environment before the dispatch, or tell the child to record what needed the network as a gap.
+- **A provider safety filter can end a turn silently.** Exploit-style work — probing an authorizer for a bypass, writing attack payloads — and sometimes ordinary security review can stop the turn with no final message; the session log records the stop, the `-o` file stays empty. Check for it before reading an empty result as "no findings", and route adversarial probing to another model.
+- **A report kept for the final message dies with the turn.** Have the child append each finding to one durable file as it confirms it.
 
 Judge what comes back as you would any contributor's diff. The run's exit status shows it finished, not that the change is right.
 

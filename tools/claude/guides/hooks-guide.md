@@ -121,6 +121,8 @@ exit 0
 
 Use it sparingly and make the predicate precise. A Stop hook that fires when it shouldn't is worse than most bad hooks, because it fires at the exact moment the user is waiting for an answer, and a gate that cries wolf trains its reader to stop reading it.
 
+Record instead of block when no verdict can exist yet. An intermediate yield ("pushed, CI running") cannot carry the PR link or merge verdict a handover gate wants, so blocking every verdict-less yield mostly produces re-yields; log it and let it through, and keep blocking only the yields that state something wrong. Likewise, a yield that says the work is still in flight and how the user will hear back is a report — accept it rather than demanding a finished result.
+
 ## Design Patterns
 
 ### 1. Validation Guardrails (PreToolUse)
@@ -401,7 +403,7 @@ Hooks can fail silently, leaving the impression they're protecting you when they
 | Exit 1 mistaken for a block | Non-blocking error without valid JSON | Use exit 2 with stderr for a blocking error |
 | Matcher too broad | Every tool call triggers the hook | Test matcher against common tool calls (`Edit`, `Read`, `Bash`) |
 | Matcher too narrow | Hook never fires for target pattern | Test with exact tool input strings from a real session |
-| Hook timeout | Kills hook, proceeds without it | Add `timeout 2` wrapper; profile with `time` |
+| Hook timeout | Non-blocking error: the hook's verdict is discarded and the tool runs | Declare `"timeout"` on every entry; keep a hook's own time budget (network calls, `gh` lookups) well under it and fail closed (`ask`/`deny`) when it runs out; profile with `time` |
 | Reads `$ENV_VAR` instead of stdin | Gets empty input, exits with no effect | Hooks receive JSON on stdin, not env vars |
 
 **Testing protocol:** Before registering a hook, test it with realistic input:

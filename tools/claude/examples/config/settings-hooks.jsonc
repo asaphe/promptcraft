@@ -26,7 +26,9 @@
             // This hook rewrites commands to use RTK for token-optimized output.
             // The hook script receives the tool input as JSON on stdin and can
             // return modified input via stdout.
-            "command": "$HOME/.claude/hooks/rtk/rtk-rewrite.sh"
+            "command": "$HOME/.claude/hooks/rtk/rtk-rewrite.sh",
+            // Always declare a timeout: a hook killed at its timeout is a non-blocking error and the tool runs.
+            "timeout": 30
           }
         ]
       }

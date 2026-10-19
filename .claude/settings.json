@@ -15,7 +15,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/merge-grant.sh"
+            "command": ".claude/hooks/merge-grant.sh",
+            "timeout": 30
           }
         ]
       }
@@ -26,15 +27,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/stateful-op-reminder.sh"
+            "command": ".claude/hooks/stateful-op-reminder.sh",
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": ".claude/hooks/destructive-guard.sh"
+            "command": ".claude/hooks/destructive-guard.sh",
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": ".claude/hooks/pr-create-guard.sh"
+            "command": ".claude/hooks/pr-create-guard.sh",
+            "timeout": 30
           }
         ]
       }
@@ -45,7 +49,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/merge-grant.sh"
+            "command": ".claude/hooks/merge-grant.sh",
+            "timeout": 30
           }
         ]
       }

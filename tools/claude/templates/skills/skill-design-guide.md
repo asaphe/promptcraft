@@ -58,6 +58,10 @@ argument-hint: "[application] [environment]"  # Placeholder shown to user
 
 Must be `true` for skills meant to be invoked via slash commands. Set to `false` for skills loaded by agents via the `skills` frontmatter field.
 
+#### `disable-model-invocation`
+
+Optional. `true` removes a rarely used skill from the model's skill catalog — no description spent in every session's context, no unprompted invocation — while `/name` still runs it. Name such skills in a rule so the model knows they are unlisted, not gone, and can suggest the command when a task fits. A routing eval must drop user-only skills from the catalog it builds, since a live session never sees them either.
+
 #### `allowed-tools`
 
 Grant the minimum tools needed. Common patterns:

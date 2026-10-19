@@ -40,6 +40,7 @@ Tool-agnostic source material; select relevant guidance and adapt project conven
 - [tools/codex/claude-code-translation.md](tools/codex/claude-code-translation.md): where each Claude Code piece lives in Codex — instruction files, skills, subagents, permissions, MCP, plugins — and which `config.toml` fields need absolute paths.
 - [tools/codex/shared-hooks.md](tools/codex/shared-hooks.md): running Claude Code hooks under Codex, and the `PreToolUse` outcomes Codex lets through.
 - [tools/codex/bash-hook-dispatcher.sh](tools/codex/bash-hook-dispatcher.sh): one registered Codex hook that runs Claude Code Bash hooks in order and fails closed.
+- [tools/codex/sensitive-operations.rules](tools/codex/sensitive-operations.rules): `prefix_rule` policies that prompt before closing PRs, writing to issues, deleting S3 objects, dropping stashes and editing Terraform state, each with `match`/`not_match` self-tests.
 
 ## Cursor (tools/cursor/)
 
