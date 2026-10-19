@@ -48,6 +48,7 @@ GITC=()
 WORK_DIR=$(printf '%s\n' "$CMD_MATCH" | tr ';&|' '\n\n\n' \
   | sed -nE "s/^[[:space:]]*cd[[:space:]]+(\"([^\"]+)\"|'([^']+)'|([^[:space:]]+))[[:space:]]*$/\2\3\4/p" | tail -1)
 # A quoted ~ never expands, so [ -d "~/repo" ] is false and the check silently reads the session repo.
+# shellcheck disable=SC2088  # matching the literal tilde is the point
 case "$WORK_DIR" in
   "~") WORK_DIR="$HOME" ;;
   "~/"*) WORK_DIR="$HOME/${WORK_DIR#\~/}" ;;
