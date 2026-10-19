@@ -238,8 +238,8 @@
     {
       "why": "a menu label is read as a heading, so the pick `Open PRs` arms nothing",
       "replace": {
-        "from": "asks_for pr \"$answer\" \"$alabel\"",
-        "to": "asks_for pr \"$answer\""
+        "from": "asks_for \"$a\" \"$answer\" \"$alabel\"",
+        "to": "asks_for \"$a\" \"$answer\""
       },
       "witness": [
         "How should I proceed?"
@@ -410,6 +410,76 @@
       },
       "witness": [
         "CI is green and the PR is ready to merge"
+      ]
+    },
+    {
+      "why": "a bare go answers a statement too, so a status line that mentions a dispatch arms the dispatch grant",
+      "replace": {
+        "from": "grep { /\\?\\s*$/ }",
+        "to": "grep { 1 }"
+      },
+      "witness": [
+        "go"
+      ]
+    },
+    {
+      "why": "a subagent's text counts as the agent's last question, so a bare go arms a dispatch the user never saw proposed",
+      "replace": {
+        "from": " and (.isSidechain | not)",
+        "to": ""
+      },
+      "witness": [
+        "go"
+      ]
+    },
+    {
+      "why": "a bare yes to a proposed PR or merge arms it, so the agent's own question stands in for the user's words",
+      "replace": {
+        "from": "[ \"$a\" = dispatch ] && [ -n \"$PROPOSAL\" ] && asks_for dispatch",
+        "to": "[ -n \"$PROPOSAL\" ] && asks_for \"$a\""
+      },
+      "witness": [
+        "yes"
+      ]
+    },
+    {
+      "why": "a bare yes arms a grant with nothing armed, so every yes skips the PR and dispatch prompts",
+      "replace": {
+        "from": "[ \"$a\" != merge ] && live \"$a\"",
+        "to": "[ \"$a\" != merge ]"
+      },
+      "witness": [
+        "yes"
+      ]
+    },
+    {
+      "why": "an affirmation with more words still counts, so \"yes and also bump the version\" arms the dispatch it answered",
+      "replace": {
+        "from": "      END { exit !(words > 0 && !other) }'\n}\n\n# Only questions",
+        "to": "      END { exit !(words > 0) }'\n}\n\n# Only questions"
+      },
+      "witness": [
+        "yes and also bump the version"
+      ]
+    },
+    {
+      "why": "a negated dispatch arms the grant, so \"don't dispatch anything yet\" skips the dispatch prompt",
+      "replace": {
+        "from": "redispatch\") && !negated && ",
+        "to": "redispatch\") && "
+      },
+      "witness": [
+        "don't dispatch anything yet"
+      ]
+    },
+    {
+      "why": "an event-type name reads as a request, so \"add a workflow_dispatch trigger\" arms the dispatch grant",
+      "replace": {
+        "from": "-e \"s/workflow[-_]dispatch/dispatchname/g\" ",
+        "to": ""
+      },
+      "witness": [
+        "add a workflow_dispatch trigger to deploy.yml"
       ]
     }
   ],
@@ -1396,6 +1466,26 @@
       },
       "witness": [
         "kubectl exec -n app-a deploy/x -- python -c 'print(1)'"
+      ]
+    },
+    {
+      "why": "gh workflow run starts a run unprompted, so a deploy workflow runs without the user seeing its ref and inputs",
+      "replace": {
+        "from": "  dispatch_soft \"gh workflow run \u2014",
+        "to": "  : \"gh workflow run \u2014"
+      },
+      "witness": [
+        "gh workflow run deploy.yml --ref main -f env=prod"
+      ]
+    },
+    {
+      "why": "the REST dispatch endpoint starts a run unprompted, so the gh api spelling bypasses the workflow run prompt",
+      "replace": {
+        "from": "  dispatch_soft \"gh api .../dispatches",
+        "to": "  : \"gh api .../dispatches"
+      },
+      "witness": [
+        "gh api -X POST repos/o/r/actions/workflows/deploy.yml/dispatches -f ref=main"
       ]
     }
   ],

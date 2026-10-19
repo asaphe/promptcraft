@@ -227,6 +227,20 @@ ask	git push --force-w origin feature/my-branch
 allow	git push origin HEAD:feature/my-branch
 allow	git push origin feature/my-branch:other
 
+# --- ask: a CI run can deploy. No dispatch grant is armed here, so every form asks ---
+ask	gh workflow run deploy.yml --ref main -f env=prod
+ask	gh --repo o/r workflow run deploy.yml
+ask	gh run rerun 123 --failed
+ask	gh run cancel 123
+ask	gh api -X POST repos/o/r/actions/workflows/deploy.yml/dispatches -f ref=main
+ask	gh api repos/o/r/dispatches -f event_type=deploy
+allow	gh workflow list
+allow	gh workflow view deploy.yml
+allow	gh run view 123 --log
+allow	gh run watch 123
+allow	gh api repos/o/r/actions/runs
+allow	echo "gh workflow run deploy.yml"
+
 # --- third review: push and branch-switch parsing ---
 # WHY: a word that only starts with the toplevel substitution is that checkout's top plus the rest of the word.
 hard	cd $(git rev-parse --show-toplevel)/../push-main && git push

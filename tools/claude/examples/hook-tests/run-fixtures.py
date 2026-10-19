@@ -266,7 +266,8 @@ def parse_fixture(path, raws=None):
 
 def build_payload(cmd, output, flags, tool, event, cwd, tmp, index=0):
     payload = {
-        "session_id": "fixture",
+        # One session per case: a grant one case arms must not be renewed or read by another under --jobs.
+        "session_id": "fixture-%d" % index,
         "cwd": cwd,
         "hook_event_name": event,
         "tool_name": tool,

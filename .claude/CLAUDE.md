@@ -9,9 +9,9 @@ General contribution rules live in `../AGENTS.md` (loaded by every AI assistant)
 This repo runs its own example hooks from `../tools/claude/examples/hooks/`, copied into `.claude/hooks/`:
 
 - `stateful-op-reminder.sh` — nudges (never blocks) on mutations to external systems.
-- `destructive-guard.sh` — two-tier blocking (hard: push to main, destructive AWS; soft: PR ops, force-push).
+- `destructive-guard.sh` — two-tier blocking (hard: push to main, destructive AWS; soft: PR ops, CI dispatch, force-push).
 - `pr-create-guard.sh` — blocks PR creation on missing prerequisites.
-- `merge-grant.sh` — arms one-turn grants from the user's words: a merge request makes `destructive-guard.sh` ask instead of hard-blocking that turn's merges; a request to open a PR, typed or picked in a menu, skips its `gh pr create` prompt.
+- `merge-grant.sh` — arms one-turn grants from the user's words: a merge request makes `destructive-guard.sh` ask instead of hard-blocking that turn's merges; a request to open a PR or dispatch a CI run, typed or picked in a menu, skips its `gh pr create` or `gh workflow run` prompt; a bare "yes" renews a live PR or dispatch grant.
 
 When updating a hook in `../tools/claude/examples/hooks/`, sync the `.claude/hooks/` copy too. Breaking dogfood = broken examples. CI enforces this: `.claude/scripts/check-mirrors.py` fails the build if a dogfooded copy has drifted from its published example.
 

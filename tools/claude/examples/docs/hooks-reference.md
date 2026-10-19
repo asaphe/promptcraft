@@ -30,7 +30,7 @@ Compaction is the one boundary where in-session reasoning is destroyed while any
 
 | Hook | Purpose | Output | Cost |
 |------|---------|--------|------|
-| `merge-grant.sh` | Arms one-turn merge and PR grants when the prompt asks for one (a PR grant also from an `AskUserQuestion` answer); clears them on every other prompt | ~300 chars additionalContext (only when armed) | Every prompt (one text scan) |
+| `merge-grant.sh` | Arms one-turn merge, PR and CI-dispatch grants when the prompt asks for one (PR and dispatch also from an `AskUserQuestion` answer, dispatch also from a bare "go" to a dispatch the agent proposed); a bare "yes" renews a live PR or dispatch grant; every other prompt clears them | ~300 chars additionalContext (only when armed) | Every prompt (one text scan; a bare affirmation also reads the transcript's last 400 lines) |
 | `engineering-rules-anchor.sh` | Engineering rules re-anchor | ~160 chars additionalContext | **Once per session** (stamp) |
 | `clone-id-inject.sh` | Identifies which repo clone | ~50 chars additionalContext | **Once per session** (stamp) |
 | `aws-auth-check.sh` | Validates SSO tokens, injects profile status | ~100 chars additionalContext | **Once per session** (~2.2s first call, <5ms after) |
