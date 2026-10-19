@@ -51,7 +51,7 @@ Compaction is the one boundary where in-session reasoning is destroyed while any
 | `gha-lint-guard.sh` | `git commit*` | Runs actionlint on GHA workflows | Blocks on lint errors | Conditional |
 | `agent-config-review-guard.sh` | `git push*` | Flags agent config changes on push | Warning | Conditional |
 | `pr-create-guard.sh` | `gh *` | Pre-flight checklist for PR creation, and for `gh stack submit` | Blocks or warns | Conditional |
-| `session-log.sh` | Stop | Appends the turn to a per-session log; nudges when its newest `state` line is stale | `systemMessage` to the user | Conditional |
+| `session-log.sh` | Stop | Appends the turn to a per-session log | None (writes the log file) | Every turn |
 | `pr-edit-counter.sh` | `gh pr edit*` | Tracks PR edit count | Advisory | Conditional |
 
 ## PreToolUse: Edit / MultiEdit / Write — 4 entries

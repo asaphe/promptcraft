@@ -73,26 +73,4 @@ if [ ! -f "$PRUNED" ] && [ "$PRUNE_OK" -eq 1 ]; then
   fi
 fi
 
-ASKS=$(printf '%s' "$RESULT" | jq -r '.asks_total // 0' 2>/dev/null)
-TURNS=$(printf '%s' "$RESULT" | jq -r '.state_turns // "none"' 2>/dev/null)
-MINS=$(printf '%s' "$RESULT" | jq -r '.state_mins // 0' 2>/dev/null)
-case "$ASKS" in ''|*[!0-9]*) ASKS=0 ;; esac
-case "$MINS" in ''|*[!0-9]*) MINS=0 ;; esac
-
-# Below five asks there is nothing worth narrating, and the nudge would fire on every short session.
-[ "$ASKS" -ge 5 ] || exit 0
-
-STALE=0
-if [ "$TURNS" = "none" ] || [ "$TURNS" = "null" ]; then
-  STALE=1
-else
-  case "$TURNS" in ''|*[!0-9]*) TURNS=0 ;; esac
-  { [ "$TURNS" -ge 20 ] || [ "$MINS" -ge 45 ]; } && STALE=1
-fi
-[ "$STALE" -eq 1 ] || exit 0
-
-# shellcheck disable=SC2034  # read by the sourced hook-diag.sh
-HOOK_DIAG_DECISION="notify"
-jq -n --arg p "$LOG_PATH" \
-  '{systemMessage:("Session log has no recent state entry. Append one line to " + $p + " :  - HH:MM state · objective … | decided … | open … | next …")}'
 exit 0

@@ -6,7 +6,7 @@ Three files, and they are separable:
 
 | File | Role |
 |---|---|
-| `session-log.sh` | The Stop hook. Derives the turn's entries, prunes old logs, nudges when the log has no recent `state` line. |
+| `session-log.sh` | The Stop hook. Derives the turn's entries and prunes old logs. |
 | `session-log-derive.py` | Transcript → log entries. Also runnable by hand, which is how you backfill. |
 | `sessions.py` | The reader: `list`, `show`, `grep` over the logs. Install this alone if you only want to read logs someone else's tooling writes. |
 
@@ -17,7 +17,7 @@ The transcript is a complete record and an unusable one — it is enormous, it i
 Two properties do most of the work:
 
 - **The index is derived, never stored.** One file per session is the only shape that survives many parallel Claude Code sessions without write contention. `sessions.py list` scans the directory at read time; a stored index would only add a second source of truth to drift.
-- **Half the content is written by the model, not the hook.** The hook records what mechanically *happened* (files edited, agents dispatched, PRs opened). What was *decided* is not derivable from a transcript, so Claude appends `state` lines itself. The hook's only role there is noticing when the newest `state` line has gone stale and saying so.
+- **Half the content is written by the model, not the hook.** The hook records what mechanically *happened* (files edited, agents dispatched, PRs opened). What was *decided* is not derivable from a transcript, so Claude appends `state` lines itself; the hook never prompts for one.
 
 ## Log format
 
@@ -58,8 +58,6 @@ The `ticket:` line above assumes `SESSION_LOG_TICKET_RE` is configured; unset, i
 
 **`state` is the only kind that records a decision.** A derived log records what happened, never what was concluded. If a session has no `state` line, say so when reading it rather than inferring intent from the mechanical entries.
 
-A `state` line carries `HH:MM` and no date, so its age is only derivable inside the log's own day. A session resumed across days keeps writing into day one's file, where the same stamp could be minutes or days old — so the hook reports the minutes as unknown there and decides staleness from the number of entries appended after the line instead. That count is exact and never ambiguous.
-
 ## Install
 
 Register the Stop hook in `~/.claude/settings.json`:
@@ -84,9 +82,9 @@ Register the Stop hook in `~/.claude/settings.json`:
 
 `session-log.sh` finds `session-log-derive.py` beside itself and `_lib/hook-diag.sh` one directory up, so keep the layout of this repo when copying — or edit the two paths at the top of the script.
 
-Its helper diagnostics contain only the closed metadata described in [`_lib/`](../_lib/), including fixed degradation events and `notify`; they retain no transcript paths, derive errors or session IDs. This restriction applies to diagnostic logs, not the intentional per-session Markdown log described above.
+Its helper diagnostics contain only the closed metadata described in [`_lib/`](../_lib/), including fixed degradation events; they retain no transcript paths, derive errors or session IDs. This restriction applies to diagnostic logs, not the intentional per-session Markdown log described above.
 
-The hook never blocks and never writes to stderr on a non-zero exit. Both are deliberate: a Stop hook that forces narration pushes the session's real answer above the fold, and a logger that can wedge a yield is worse than no logger.
+The hook never blocks, prints nothing, and never writes to stderr on a non-zero exit. All three are deliberate: a Stop hook that forces narration pushes the session's real answer above the fold, and a logger that can wedge a yield is worse than no logger.
 
 ## Reading the logs
 

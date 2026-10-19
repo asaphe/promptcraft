@@ -264,35 +264,6 @@ def write_log(path, meta, session, entries):
             fh.write(line + "\n")
 
 
-def last_state(path):
-    """(turns_since, minutes_since) for the newest `state` entry; (None, None) if never."""
-    if not os.path.exists(path):
-        return None, None
-    turns, stamp = 0, None
-    with open(path, errors="replace") as fh:
-        lines = [ln for ln in fh if ln.startswith("- ")]
-    for line in reversed(lines):
-        parts = line[2:].split(" ", 2)
-        if len(parts) >= 2 and parts[1] == "state":
-            stamp = parts[0]
-            break
-        turns += 1
-    if stamp is None:
-        return None, None
-    now = datetime.now(LOCAL_TZ) if LOCAL_TZ else datetime.now()
-    try:
-        hh, mm = (int(x) for x in stamp.split(":"))
-    except ValueError:
-        return turns, None
-    # A state line carries HH:MM and no date, so its age is only derivable inside the log's
-    # own day. A session resumed across days keeps writing into day one's file, where the
-    # same stamp could be minutes or days old — report unknown and let `turns` decide.
-    if os.path.basename(os.path.dirname(path)) != now.strftime("%Y-%m-%d"):
-        return turns, None
-    mins = (now.hour * 60 + now.minute) - (hh * 60 + mm)
-    return turns, mins if mins >= 0 else mins + 1440
-
-
 def run(transcript, session, sessions_dir=SESSIONS_DIR, force_offsets=None):
     mark_meta = {"records": 0, "ledger": 0, "pending": [], "header": {}, "path": None}
     mark_path = None
@@ -341,11 +312,7 @@ def run(transcript, session, sessions_dir=SESSIONS_DIR, force_offsets=None):
                               "cwd": meta["cwd"], "seen": sorted(meta["seen"]),
                               "last_edit": meta.get("last_edit")}}, fh)
 
-    turns, mins = last_state(log_path)
-    with open(log_path, errors="replace") as fh:
-        asks_total = sum(1 for ln in fh if ln.startswith("- ") and " ask " in ln[:16])
-    return {"path": log_path, "appended": len(entries), "records": total,
-            "asks_total": asks_total, "state_turns": turns, "state_mins": mins}
+    return {"path": log_path, "appended": len(entries), "records": total}
 
 
 def main():

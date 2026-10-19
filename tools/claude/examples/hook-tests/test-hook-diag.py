@@ -224,7 +224,7 @@ class Diagnostics(unittest.TestCase):
             ("commit-attribution-guard", bash('git commit -m "plain"'), False),
             ("commit-attribution-guard", bash('git commit -m "Co-Authored-By: ' + 'Claude ' + MARK + '"'), True),
             ("session-log", {"session_id":MARK, "transcript_path":str(self.root / MARK)}, False),
-            ("session-log", {"session_id":MARK, "transcript_path":str(transcript)}, True),
+            ("session-log", {"session_id":MARK, "transcript_path":str(transcript)}, False),
         ]
         for name, payload, fires in cases:
             path = Path(name) / (name + ".sh")
