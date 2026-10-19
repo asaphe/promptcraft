@@ -14,6 +14,7 @@ import pathlib
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 
 
@@ -37,6 +38,7 @@ case "${STUB_%(name)s:-pass}" in
   legacy) printf '%%s' '{"decision":"block","reason":"legacy refuses"}' ;;
   halt) printf '%%s' '{"continue":false}' ;;
   rewrite) printf '%%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","updatedInput":{"command":"true"}}}' ;;
+  hang) sleep 300 & sleep 300 ;;
   context) printf '{"hookSpecificOutput":{"hookEventName":"%%s","additionalContext":"note"}}' "${STUB_EVENT:-PostToolUse}" ;;
 esac
 exit 0
@@ -118,6 +120,27 @@ class DispatcherTest(unittest.TestCase):
         self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
         self.assertIn("exited 1", proc.stderr)
 
+    def test_a_hung_child_is_killed_and_blocks(self):
+        mark = pathlib.Path(self.tmp) / "pr-create-guard-ran-after-hang"
+        started = time.monotonic()
+        proc = self.event("PreToolUse", STUB_DESTRUCTIVE_GUARD="hang", STUB_MARK_PR_CREATE_GUARD=str(mark),
+                          DISPATCH_CHILD_SECONDS="2")
+        self.assert_blocks(proc, "timed out after 2s")
+        self.assertLess(time.monotonic() - started, 20, "the dispatcher waited on the hung child")
+        self.assertFalse(mark.exists(), "a child after the timeout ran")
+
+    def test_a_spent_total_budget_blocks_before_the_next_child(self):
+        mark = pathlib.Path(self.tmp) / "pr-create-guard-ran-after-budget"
+        proc = self.event("PreToolUse", STUB_DESTRUCTIVE_GUARD="hang", STUB_MARK_PR_CREATE_GUARD=str(mark),
+                          DISPATCH_CHILD_SECONDS="10", DISPATCH_TOTAL_SECONDS="1")
+        self.assert_blocks(proc, "timed out after 1s")
+        self.assertFalse(mark.exists())
+
+    def test_a_post_tool_use_hang_is_reported_not_blocked(self):
+        proc = self.event("PostToolUse", STUB_POST_PUSH_HYGIENE="hang", DISPATCH_CHILD_SECONDS="2")
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertIn("timed out", proc.stderr)
+
     def test_a_missing_child_blocks(self):
         os.remove(os.path.join(self.hooks, CHILDREN[1]))
         self.assert_blocks(self.event("PreToolUse"), "missing")
@@ -132,7 +155,7 @@ class DispatcherTest(unittest.TestCase):
     def test_without_jq_it_blocks_before_reading_the_event(self):
         bindir = os.path.join(self.tmp, "bin")
         os.makedirs(bindir)
-        for tool in ("bash", "cat", "dirname", "head", "mktemp", "rm"):
+        for tool in ("bash", "cat", "dirname", "head", "mktemp", "rm", "perl"):
             found = shutil.which(tool)
             self.assertIsNotNone(found, tool)
             os.symlink(found, os.path.join(bindir, tool))
