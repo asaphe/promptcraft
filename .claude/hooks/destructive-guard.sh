@@ -860,7 +860,9 @@ DATA_DESTROY='\.wipe(_[a-z_]+)?[[:space:]]*\(|[^a-z_]wipe(_?assets?|_?runs?|_?al
 DATA_ASK_REASON=""
 DS_FILE_HITS=""
 DS_INLINE=""
-[[ " $CMD_LC" =~ $DATA_DESTROY ]] && DS_INLINE=1
+# see: README.md § Record deletion — a message, title, body or notes value is prose for a person, so it is blanked first
+DS_SCAN=$(printf '%s' "$CMD_LC" | perl -0777 -pe 's/(\s(?:-m|--message|--title|--body|--notes)(?:=|\s+))("\$\(cat\s+<<-?\s*["\x27]?(\w+)["\x27]?\n.*?\n\s*\g{-1}\s*\n?\)"|"(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/$1""/gs') && [ -n "$DS_SCAN" ] || DS_SCAN=$CMD_LC
+[[ " $DS_SCAN" =~ $DATA_DESTROY ]] && DS_INLINE=1
 # A script the command runs from disk carries its body there, not in the command text.
 while IFS= read -r DS_TOK; do
   [ -n "$DS_TOK" ] || continue
@@ -1131,7 +1133,7 @@ fi
 
 # see: README.md § Hidden code execution — the helper runs only on a trigger word, and a helper that cannot run asks
 CODE_EXEC_ASK_REASON=""
-case "$CMD_LC" in *kubectl*|*base64*|*curl*|*wget*|*decode*|*decompress*|*atob*|*fromhex*|*unhexlify*|*xxd*|*openssl*|*gunzip*|*zcat*|*bunzip2*|*xz*|*rev*|*uudecode*|*marshal*|*pickle*|*fetch*|*http*|*gsutil*|*'s3 cp'*)
+case "$CMD_LC" in *kubectl*|*base64*|*curl*|*wget*|*decode*|*decompress*|*atob*|*fromhex*|*unhexlify*|*xxd*|*openssl*|*gunzip*|*zcat*|*bunzip2*|*xz*|*rev*|*marshal*|*pickle*|*fetch*|*http*|*gsutil*|*'s3 cp'*)
   CE_HELPER="$(dirname "$0")/../_lib/code-exec-scan.pl"
   if [ -r "$CE_HELPER" ] && CE_WHY=$(printf '%s' "$CMD" | perl "$CE_HELPER" 2>/dev/null); then
     [ -z "$CE_WHY" ] || CODE_EXEC_ASK_REASON="CODE EXECUTION — ${CE_WHY}. Its effect is not visible in the command, so approve only after seeing ${IMPACT_LIST}."

