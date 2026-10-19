@@ -10,6 +10,7 @@ This directory holds shell utilities that other hooks source. The leading unders
 | [`hook-diag.sh`](hook-diag.sh) | Diagnostic wrapper. Sourced AFTER reading stdin into `$INPUT`. Logs closed metadata to rotating JSON Lines files, re-emits captured stderr on exit 1 and exit 2 so the reason reaches the model, and records a hook that wrote to stderr on exit 0 — where the harness discards it. |
 | [`strip-quoted-args.pl`](strip-quoted-args.pl) | Reads raw shell text on stdin and preserves executable expansions while blanking quoted data; `--values` retains argument values for extraction. |
 | [`split-cmd-segments.pl`](split-cmd-segments.pl) | Splits executable shell segments and recognised command substitutions into NUL-delimited records. |
+| [`code-exec-scan.pl`](code-exec-scan.pl) | Reads a command on stdin and prints why it runs code its text cannot show (a `kubectl exec` into an interpreter, a pod from a manifest, decoded or downloaded code run), or nothing; see [`destructive-guard`](../destructive-guard/README.md#hidden-code-execution). |
 | [`resolve-workdir.sh`](resolve-workdir.sh) | `resolve_workdir "$CMD"` returns the repository a git command acts on — via `git -C <dir>` or a leading `cd <dir> &&` — or nothing. |
 | [`pr-author.sh`](pr-author.sh) | Cached predicates for PR authorship and repository visibility, for gates that treat a self- or bot-authored PR differently from someone else's. |
 

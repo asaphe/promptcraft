@@ -73,7 +73,7 @@ cp -R tools/claude/examples/hooks/_lib "$HOME/.claude/hooks/"
 
 <!-- /adoption:hooks -->
 
-The complete `_lib` directory is required, including `hook-diag.sh`, `pr-author.sh`, `resolve-workdir.sh`, `strip-cmd.sh`, `strip-quoted-args.pl`, and `split-cmd-segments.pl`. Keep it beside the three hook directories. Registration is a separate manual activation step in `~/.claude/settings.json`, using each hook's README and these actual nested script paths (quote paths containing spaces in command strings):
+The complete `_lib` directory is required, including `hook-diag.sh`, `pr-author.sh`, `resolve-workdir.sh`, `strip-cmd.sh`, `strip-quoted-args.pl`, `split-cmd-segments.pl`, and `code-exec-scan.pl`. Keep it beside the three hook directories. Registration is a separate manual activation step in `~/.claude/settings.json`, using each hook's README and these actual nested script paths (quote paths containing spaces in command strings):
 
 - `~/.claude/hooks/destructive-guard/destructive-guard.sh`
 - `~/.claude/hooks/stateful-op-reminder/stateful-op-reminder.sh`

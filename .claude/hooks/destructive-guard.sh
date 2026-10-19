@@ -656,7 +656,12 @@ seg_matches() {
 
 # see: README.md § Cost per call — every rule keys on one of these; check-guard-gate.py fails CI if one is missing
 GUARD_TOOLS='git|gh|aws|kubectl|helm|terraform|xargs'
-if ! echo "$CMD_MATCH" | grep -qE "(^|[^[:alnum:]_.-])(${GUARD_TOOLS})([[:space:]]|$)"; then
+# see: README.md § Record deletion — those rules key on words in any language or a script file, not on a binary
+SCRIPT_EXT='py|js|mjs|cjs|ts|rb|pl|php|go|java|kt|kts|scala|lua|r|sh|bash|zsh|sql|cql|groovy|swift|cs|rs|ex|exs|clj|jl'
+GUARD_WORDS='wipe|delete|drop|truncate|flush|kubectl|base64|curl|wget|decode|decompress|atob|fromhex|unhexlify|xxd|openssl|gunzip|zcat|bunzip2|xz|rev|uudecode|marshal|pickle|fetch|http|gsutil|s3 cp|\.('"$SCRIPT_EXT"')([^a-z0-9]|$)'
+CMD_LC=$(printf '%s' "$CMD" | tr '[:upper:]' '[:lower:]')
+if ! echo "$CMD_MATCH" | grep -qE "(^|[^[:alnum:]_.-])(${GUARD_TOOLS})([[:space:]]|$)" \
+   && ! [[ $CMD_LC =~ $GUARD_WORDS ]]; then
   exit 0
 fi
 
@@ -842,6 +847,51 @@ AWS_CATASTROPHIC='dynamodb +delete-(table|backup)'\
 '|backup +delete-(recovery-point|backup-vault)'
 if echo "$CMD_MATCH" | grep -qE "aws[[:space:]]([^|;&]* )?(${AWS_CATASTROPHIC})([[:space:]]|\$)"; then
   HARD_REASON="aws — irreversible destruction of stored data, its backups, or the KMS key that decrypts it. No approval path: confirm profile, account and exact resource, then run it yourself."
+fi
+
+IMPACT_LIST="an itemized impact list — one line per affected item, labelled DELETE, CHANGE or KEEP, each DELETE line saying DATA or WORKLOAD, how many, and how it is recovered"
+# see: README.md § Record deletion — read from the raw command: the call sits in a -c string or heredoc body the parsed views blank
+DATA_DESTROY='\.wipe(_[a-z_]+)?[[:space:]]*\(|[^a-z_]wipe(_?assets?|_?runs?|_?all)?[[:space:]]*\(|dagster[[:space:]]+(run|asset|instance)[[:space:]]+(wipe|delete)'\
+'|delete_?runs?[[:space:]]*\(|deletepipelinerun|deleterun|wipeassets|deletedynamicpartitions|delete_dynamic_partition'\
+'|(drop|truncate)[[:space:]]+(table|database|schema|index|view|materialized|collection|keyspace|partition)'\
+'|delete[[:space:]]+from[[:space:]]|alter[[:space:]]+table[^;]*[[:space:]](drop|delete)[[:space:]]'\
+'|dropdatabase|drop_collection|deletemany[[:space:]]*\(|deleteone[[:space:]]*\(|flushall|flushdb|_delete_by_query'\
+'|\.objects\.[a-z_().]*\.delete[[:space:]]*\(|query\([^)]*\)\.delete[[:space:]]*\(|droptable|drop_table[[:space:]]*\(|dropschema'
+DATA_ASK_REASON=""
+DS_FILE_HITS=""
+DS_INLINE=""
+# see: README.md § Record deletion — a message, title, body or notes value is prose for a person, so it is blanked first
+DS_SCAN=$(printf '%s' "$CMD_LC" | perl -0777 -pe 's/(\s(?:-m|--message|--title|--body|--notes)(?:=|\s+))("\$\(cat\s+<<-?\s*["\x27]?(\w+)["\x27]?\n.*?\n\s*\g{-1}\s*\n?\)"|"(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)/$1""/gs') && [ -n "$DS_SCAN" ] || DS_SCAN=$CMD_LC
+[[ " $DS_SCAN" =~ $DATA_DESTROY ]] && DS_INLINE=1
+# A script the command runs from disk carries its body there, not in the command text.
+while IFS= read -r DS_TOK; do
+  [ -n "$DS_TOK" ] || continue
+  DS_PATH=$(expand_path "$DS_TOK")
+  [ -f "$DS_PATH" ] && [ -r "$DS_PATH" ] || continue
+  DS_BODY=" $(head -c 1048576 -- "$DS_PATH" 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+  [[ $DS_BODY =~ $DATA_DESTROY ]] && DS_FILE_HITS="$DS_FILE_HITS $DS_TOK"
+done < <(printf '%s' "$CMD_STRIPPED" | perl -ne 'for (split /[\s;&|()<>=]+/) { s/^["\x27@]+|["\x27]+$//g; print "$_\n" if /\.('"$SCRIPT_EXT"')$/i }')
+if [ -n "$DS_FILE_HITS" ] || [ -n "$DS_INLINE" ]; then
+  # Only a command made entirely of read-only tools may carry the words as data: a grep, a diff, an echo.
+  DS_ONLY_READERS=$(printf '%s' "$CMD_MATCH" | perl -0777 -ne '
+    my $ok = 1;
+    for my $seg (split /\$\(|`|&&|\|\||[;&|()\n]/) {
+      my @w = split " ", $seg;
+      shift @w while @w && $w[0] =~ /^([A-Za-z_]\w*=.*|time|command|nice|!)$/;
+      next unless @w;
+      (my $h = $w[0]) =~ s{.*/}{};
+      next if $h =~ /^(grep|egrep|fgrep|rg|ag|cat|bat|head|tail|less|more|wc|sort|uniq|cut|tr|jq|yq|echo|printf|ls|stat|file|diff|cmp|true|:|read|test|\[|\[\[|\]\]|done|do|then|else|fi|esac|\{|\})$/;
+      if ($h eq "git") { shift @w; while (@w && $w[0] =~ /^(-C|-c|--no-pager)$/) { my $f = shift @w; shift @w if $f ne "--no-pager" } }
+      next if $h eq "git" && ($w[0] // "") =~ /^(log|diff|show|grep|blame|status)$/;
+      $ok = 0;
+    }
+    print $ok ? 1 : "";')
+  # see: README.md § Record deletion — a hit only in a script file asks, one in the command itself hard-blocks
+  if [ -z "$DS_ONLY_READERS" ] && [ -z "$DS_INLINE" ]; then
+    DATA_ASK_REASON="DATA DELETION — the script(s)${DS_FILE_HITS} contain a record-deleting call (SQL DELETE/DROP/TRUNCATE, a Mongo/Redis/Elasticsearch/ORM bulk delete, a Dagster wipe or delete_run). Approve only if the user asked for that data to be deleted, after seeing ${IMPACT_LIST}."
+  elif [ -z "$DS_ONLY_READERS" ]; then
+    HARD_REASON="deletes stored records (SQL DELETE FROM, DROP/TRUNCATE TABLE|DATABASE|SCHEMA|…, ALTER TABLE … DROP; Mongo dropDatabase/drop_collection/deleteMany/deleteOne; Redis FLUSHALL/FLUSHDB; Elasticsearch _delete_by_query; an ORM bulk delete; a Dagster wipe, delete_run or GraphQL delete mutation) in the command itself, a -c/-e string or a heredoc included. No approval path: show the user ${IMPACT_LIST}; if they want the records gone, they run it themselves."
+  fi
 fi
 
 # GitHub PR close/merge — shared PR state; deliberately hard so an allow-list
@@ -1080,6 +1130,25 @@ if seg_matches '(-X|--method)[[:space:]]+GET([[:space:]]|$)|[[:space:]]search/is
    '(-X|--method)[[:space:]]+(POST|PATCH|PUT|DELETE)|[[:space:]](-f|-F|--field|--raw-field|--input)[[:space:]]'; then
   add_soft "gh api .../issues with a mutating method or field — the REST form of gh issue create/comment/edit, subject to the same rule: only when the user asked for it by name. A read-only GET on /issues is unaffected."
 fi
+
+# see: README.md § Hidden code execution — the helper runs only on a trigger word, and a helper that cannot run asks
+CODE_EXEC_ASK_REASON=""
+case "$CMD_LC" in *kubectl*|*base64*|*curl*|*wget*|*decode*|*decompress*|*atob*|*fromhex*|*unhexlify*|*xxd*|*openssl*|*gunzip*|*zcat*|*bunzip2*|*xz*|*rev*|*marshal*|*pickle*|*fetch*|*http*|*gsutil*|*'s3 cp'*)
+  CE_HELPER="$(dirname "$0")/../_lib/code-exec-scan.pl"
+  if [ -r "$CE_HELPER" ] && CE_WHY=$(printf '%s' "$CMD" | perl "$CE_HELPER" 2>/dev/null); then
+    [ -z "$CE_WHY" ] || CODE_EXEC_ASK_REASON="CODE EXECUTION — ${CE_WHY}. Its effect is not visible in the command, so approve only after seeing ${IMPACT_LIST}."
+  else
+    CODE_EXEC_ASK_REASON="CODE EXECUTION — ../_lib/code-exec-scan.pl could not run (missing, unreadable, or an invalid DESTRUCTIVE_GUARD_APP_NS regex), so a kubectl exec, a pod creation or a decode-and-run in this command was not checked. Approve only after seeing ${IMPACT_LIST}."
+  fi ;;
+esac
+
+# The headline of the prompt, ahead of every other trigger, so no lesser reason hides that this one runs unseen code or deletes data.
+lead_soft() {
+  if [ -z "$SOFT_REASON" ]; then SOFT_REASON="$1"; else SOFT_REASON="$1
+ALSO: $SOFT_REASON"; fi
+}
+[ -z "$CODE_EXEC_ASK_REASON" ] || lead_soft "$CODE_EXEC_ASK_REASON"
+[ -z "$DATA_ASK_REASON" ] || lead_soft "$DATA_ASK_REASON"
 
 # =====================================================================
 # Apply blocks — hard wins over soft

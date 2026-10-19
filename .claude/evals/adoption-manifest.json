@@ -61,7 +61,8 @@
         ".claude/hooks/_lib/resolve-workdir.sh",
         ".claude/hooks/_lib/strip-cmd.sh",
         ".claude/hooks/_lib/strip-quoted-args.pl",
-        ".claude/hooks/_lib/split-cmd-segments.pl"
+        ".claude/hooks/_lib/split-cmd-segments.pl",
+        ".claude/hooks/_lib/code-exec-scan.pl"
       ],
       "upstream_links": [
         {
