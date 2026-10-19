@@ -8,7 +8,13 @@
 
 - **Plan mode rejections mean the plan isn't ready** — When ExitPlanMode is rejected, ask what's missing. Don't try to exit again without addressing feedback. Present plans incrementally.
 
-- **Enumerate before destructive operations** — When asked to "remove" or "clean up," produce an explicit numbered list of exactly which resources will be affected. Get per-item or per-batch confirmation. Never infer scope from broad terms. When a pattern or wildcard is involved (e.g., "destroy everything with clickhouse in the name"), group matches by category (namespaces vs services vs databases vs secrets) and get per-group confirmation — a pattern like `*clickhouse*` can match far more resource types than intended.
+- **Enumerate before destructive operations** — When asked to "remove" or "clean up," produce an explicit numbered list of exactly which resources will be affected. Get per-item or per-batch confirmation. Never infer scope from broad terms. When a pattern or wildcard is involved (e.g., "destroy everything with clickhouse in the name"), group matches by category (namespaces vs services vs databases vs secrets) and get per-group confirmation — a pattern like `*clickhouse*` can match far more resource types than intended. Build the list when you interpret the request, before choosing any command — the failure it prevents is a misread request, not a mistyped command. One line per item, labelled **DELETE** (gone), **CHANGE** (modified or disrupted, reversible) or **KEEP** (untouched); every DELETE line says **DATA** (records, history, objects, backups) or **WORKLOAD** (pods, jobs, deployments), with its count and how it is recovered, and quotes the user's words that asked for it or is marked **INFERRED** and asked about.
+
+- **A destructive verb whose object names both a workload and its records is a question** — "delete the runs" beside a cleanup most likely means the jobs, not their history. Record deletion is never inferred: name both readings and what each destroys, ask it as its own yes/no rather than a step in a bundled plan, and check what backs it up first (point-in-time recovery, a snapshot, a dump).
+
+- **A throwaway resource you create in shared infrastructure is deleted by the same command that reads its output** — a debug pod or scratch job is never garbage-collected, and the session that read its logs is the only one that knows it exists.
+
+- **A stray resource found mid-task is surfaced as a question when found** — read its live state first (a name says nothing about whether it runs), then ask whether to remove it. An "FYI, no action taken" line in a handoff is read by nobody and acted on by nobody.
 
 - **Read before editing — no parallel edits without reads** — Never issue an Edit call for a file not read in the current turn. When editing multiple files, read them all first, then edit. After context continuations, re-read before editing.
 

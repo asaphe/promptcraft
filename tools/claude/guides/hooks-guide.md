@@ -121,6 +121,8 @@ exit 0
 
 Use it sparingly and make the predicate precise. A Stop hook that fires when it shouldn't is worse than most bad hooks, because it fires at the exact moment the user is waiting for an answer, and a gate that cries wolf trains its reader to stop reading it.
 
+Record instead of block when no verdict can exist yet. An intermediate yield ("pushed, CI running") cannot carry the PR link or merge verdict a handover gate wants, so blocking every verdict-less yield mostly produces re-yields; log it and let it through, and keep blocking only the yields that state something wrong. Likewise, a yield that says the work is still in flight and how the user will hear back is a report — accept it rather than demanding a finished result.
+
 ## Design Patterns
 
 ### 1. Validation Guardrails (PreToolUse)
