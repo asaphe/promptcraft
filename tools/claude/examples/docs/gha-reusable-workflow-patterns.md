@@ -107,7 +107,7 @@ concurrency:
 
 ```yaml
 concurrency:
-  group: mt-provision-${{ inputs.deployment_name }}-${{ inputs.environment }}
+  group: provision-${{ inputs.deployment_name }}-${{ inputs.environment }}
   cancel-in-progress: false
 ```
 
